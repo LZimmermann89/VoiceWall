@@ -32,6 +32,16 @@ VoiceWall ist ein wirklich DSGVO-konformes, zu 100 Prozent lokales Sprachdiktier
 7. Empfehlungen: sauberer und sicherer geloest, und was noch fehlt (priorisierte Korrekturen aus der Kritik-Runde)
 
 
+> **Nachtrag nach M1-Spike (2026-07-03, verbindlich, Details in `docs/M1-SPIKE-ERGEBNIS.md`):**
+> Der Architektur-Spike ist abgeschlossen. Die drei Projektbrecher-Fragen sind empirisch entschieden:
+> 1. **Prozessmodell: utilityProcess (Option B).** `@fugood/whisper.node@1.0.22` laedt und transkribiert in Electron 43.0.0 ohne electron-rebuild sowohl im Main-Prozess als auch im utilityProcess (mac-arm64, Metal aktiv). utilityProcess gewaehlt wegen empirisch belegter Crash-Isolation (reproduzierbarer nativer SIGTRAP via `JSON.stringify(getModelInfo())` toetet im Main-Prozess die ganze App, im utilityProcess nur das Kind) bei null Performance-Nachteil.
+> 2. **N-API bestaetigt:** napi_versions [6], 58 napi_-Symbole, 0 V8/nan-Symbole in der echten .node-Datei. Kein Compiler noetig.
+> 3. **Binary-Bezug bestaetigt:** Registry-optionalDependencies mit os/cpu-Gate, Subpaket ohne scripts-Feld, `npm ci --ignore-scripts` liefert die .node trotzdem. Skriptverbotsfest.
+> 4. **TCC/Ad-hoc-Signing:** Designated Requirement einer Ad-hoc-Signatur ist der cdhash, NICHT die Bundle-ID. Jeder Rebuild bricht nachweislich die TCC-Identitaet. Re-Grant-Schritt pro Update einplanen; Developer-ID-Entscheidung nach manuellem TCC-Test mit Lars.
+> 5. **Latenz M1 Max:** konstant ca. 1,2 bis 1,4 s pro VAD-Segment (Encoder auf 30-s-Fenster dominiert), Realtime-Faktor 2,2x bis 7,2x, Modell-Load ca. 300 ms. Windows-Schwachhardware bleibt offene Messluecke, Fallback-Modelle ggml-small/base (ggerganov/whisper.cpp) benannt.
+> 6. **API-Korrekturen zu Abschnitt 2:** Die Option `no_timestamps` existiert nicht; Optionen sind camelCase (`language`, `temperature`, `beamSize`, ...); VAD-Optionen `minSpeechDurationMs` usw.; `transcribeData` erwartet 16-bit-PCM-ArrayBuffer; das npm-Paket liefert keine funktionierende index.d.ts, eigene Typdeklaration noetig. Niemals Napi-Rueckgabeobjekte serialisieren oder clonen.
+> 7. **Modell-Checksummen (R14, gegen HF-LFS-OID quergecheckt):** Q5_0 `15e92e3db0993c52fffa781513eec9253475331c1be808f8fb409285c9d9d030` (574.041.195 Bytes), Silero-VAD v5.1.2 `29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf` (885.098 Bytes).
+
 ## 1. Architektur & Projekt-Setup
 
 Dieser Abschnitt ist die verbindliche Grundlage für alle folgenden Abschnitte der ABARBEITUNG.md. Er legt Runtime, Architektur, Repo-Struktur, Tech-Stack, Qualitätsstandards, Teststrategie, CI und Release-Prozess so fest, dass eine andere Session ohne Rückfragen weiterbauen kann. Leitprinzip durchgängig: **Beleg statt Behauptung.** Jede DSGVO-Aussage muss architektonisch beweisbar sein (0 externe Requests im Betrieb, Loopback-Bindung, keine Telemetrie), nicht nur behauptet.
