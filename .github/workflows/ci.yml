@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node einrichten (Version aus .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Niemals --omit=optional: prebuilt native Binaries (ab M1 das
+      # Whisper-Addon) kommen ueber optionalDependencies.
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      - name: Typpruefung
+        run: npm run typecheck
+
+      - name: Lint (inkl. Modulgrenzen, 0 Warnungen)
+        run: npm run lint
+
+      - name: Formatpruefung
+        run: npm run format:check
+
+      - name: Unit-Tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      # E2E nur auf macOS und Windows: Playwright startet die gebaute
+      # Electron-App mit echtem Fenster, Linux braeuchte xvfb und ist fuer
+      # das Produkt (mac/win) nicht Zielplattform.
+      - name: E2E-Tests (Playwright for Electron)
+        if: matrix.os != 'ubuntu-latest'
+        run: npm run test:e2e
+
+      - name: Supply-Chain-Audit
+        run: npm audit --audit-level=high
+
+      - name: SBOM erzeugen (CycloneDX)
+        run: npm run sbom
+
+      - name: SBOM als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.os }}
+          path: sbom.cdx.json
+          if-no-files-found: error
+
+      - name: Lockfile-Guard
+        run: git diff --exit-code package-lock.json
