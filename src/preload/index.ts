@@ -1,16 +1,75 @@
 /**
- * Preload: exponiert über die contextBridge eine schmale, getypte API an den
- * Renderer. Der Renderer erhält niemals direkten Zugriff auf Node, Electron
- * oder das Dateisystem. Jede IPC-Antwort wird an dieser Vertrauensgrenze mit
- * zod validiert, bevor sie den Renderer erreicht.
+ * Preload des Hauptfensters: exponiert über die contextBridge eine schmale,
+ * getypte API an den Renderer. Der Renderer erhält niemals direkten Zugriff
+ * auf Node, Electron oder das Dateisystem. Jede IPC-Antwort und jedes
+ * eingehende Event wird an dieser Vertrauensgrenze mit zod validiert, bevor es
+ * den Renderer erreicht.
  */
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { IpcChannel } from '../main/ipc/channels';
-import { pingResponseSchema } from '../shared/schema';
-import type { VoiceWallBridge } from '../shared/types';
+import {
+  actionResultSchema,
+  appStatusSchema,
+  audioLevelSchema,
+  modelProgressSchema,
+  pingResponseSchema,
+  transcriptPayloadSchema,
+} from '../shared/schema';
+import type { Unsubscribe, VoiceWallBridge } from '../shared/types';
+
+/** Meldet einen validierenden Listener an einen Main-zu-Renderer-Kanal an. */
+function subscribe<T>(
+  channel: string,
+  parse: (raw: unknown) => T,
+  listener: (value: T) => void,
+): Unsubscribe {
+  const handler = (_event: IpcRendererEvent, payload: unknown): void => {
+    listener(parse(payload));
+  };
+  ipcRenderer.on(channel, handler);
+  return () => {
+    ipcRenderer.removeListener(channel, handler);
+  };
+}
 
 const bridge: VoiceWallBridge = {
   ping: async () => pingResponseSchema.parse(await ipcRenderer.invoke(IpcChannel.Ping)),
+  getStatus: async () => appStatusSchema.parse(await ipcRenderer.invoke(IpcChannel.GetStatus)),
+  grantConsent: async () =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.GrantConsent)),
+  prepareModels: async () =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.PrepareModels)),
+  startDictation: async () =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.StartDictation)),
+  stopDictation: async () =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.StopDictation)),
+  onStatus: (listener) =>
+    subscribe(IpcChannel.StatusChanged, (raw) => appStatusSchema.parse(raw), listener),
+  onModelProgress: (listener) =>
+    subscribe(IpcChannel.ModelProgress, (raw) => modelProgressSchema.parse(raw), listener),
+  onTranscript: (listener) =>
+    subscribe(IpcChannel.TranscriptNew, (raw) => transcriptPayloadSchema.parse(raw), listener),
+  onAudioLevel: (listener) =>
+    subscribe(IpcChannel.AudioLevel, (raw) => audioLevelSchema.parse(raw), listener),
+  onError: (listener) =>
+    subscribe(
+      IpcChannel.DictationError,
+      (raw): string => {
+        // Fehlermeldungen kommen als reiner String ueber den Kanal.
+        return typeof raw === 'string' ? raw : String(raw);
+      },
+      listener,
+    ),
+  devInjectPcm: async (pcm) => {
+    try {
+      return actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevInjectPcm, pcm));
+    } catch (error) {
+      return {
+        ok: false,
+        message: `PCM-Injektion nicht verfuegbar: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  },
 };
 
 contextBridge.exposeInMainWorld('voicewall', bridge);

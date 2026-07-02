@@ -1,7 +1,8 @@
 /**
- * Registrierung aller IPC-Handler des Main-Prozesses. Jeder Handler liefert
- * ausschließlich typisierte Werte an den Renderer zurück, nie rohe Fehler
- * oder Stacktraces.
+ * Registrierung der grundlegenden IPC-Handler des Main-Prozesses. Der
+ * STT-spezifische Teil wird vom DictationOrchestrator registriert (siehe
+ * stt/orchestrator.ts). Jeder Handler liefert ausschließlich typisierte
+ * Werte an den Renderer zurück, nie rohe Fehler oder Stacktraces.
  */
 import { ipcMain } from 'electron';
 import type { PingResponse } from '../../shared/schema';

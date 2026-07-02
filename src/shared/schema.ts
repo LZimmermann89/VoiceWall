@@ -1,11 +1,74 @@
 /**
  * Zod-Schemas für Daten, die eine Vertrauensgrenze überqueren (IPC-Payloads,
  * später Konfig und Modell-Manifest). Externe, ungetypte Daten werden am Rand
- * geparst, danach existiert im Code nur noch der validierte Typ.
+ * geparst, danach existiert im Code nur noch der validierte Typ. Dieses Modul
+ * bleibt plattformneutral (keine Node-/DOM-Abhaengigkeit).
  */
 import { z } from 'zod';
 
-/** Antwort des Ping-Kanals: der einzige IPC-Kanal in M0. */
+/** Antwort des Ping-Kanals: Erreichbarkeitstest der IPC-Bruecke. */
 export const pingResponseSchema = z.literal('pong');
-
 export type PingResponse = z.infer<typeof pingResponseSchema>;
+
+/** OS-Mikrofonstatus, so wie er dem Renderer gemeldet wird. */
+export const microphoneStateSchema = z.enum([
+  'granted',
+  'denied',
+  'restricted',
+  'unknown',
+  'not-checked',
+]);
+export type MicrophoneState = z.infer<typeof microphoneStateSchema>;
+
+/** Praesenzstatus eines einzelnen Modells. */
+export const modelStatusSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  present: z.boolean(),
+});
+export type ModelStatusView = z.infer<typeof modelStatusSchema>;
+
+/** Gesamtzustand der App, Grundlage der Status-UI. */
+export const appStatusSchema = z.object({
+  consentGranted: z.boolean(),
+  microphoneState: microphoneStateSchema,
+  models: z.array(modelStatusSchema),
+  modelsReady: z.boolean(),
+  engineReady: z.boolean(),
+  dictationActive: z.boolean(),
+  lastError: z.string().nullable(),
+});
+export type AppStatus = z.infer<typeof appStatusSchema>;
+
+/** Ein neues Transkript-Segment. */
+export const transcriptPayloadSchema = z.object({
+  text: z.string(),
+  durationMs: z.number(),
+  audioMs: z.number(),
+});
+export type TranscriptPayload = z.infer<typeof transcriptPayloadSchema>;
+
+/** Download-Fortschritt eines Modells. */
+export const modelProgressSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  receivedBytes: z.number(),
+  totalBytes: z.number().nullable(),
+  percent: z.number().nullable(),
+});
+export type ModelProgress = z.infer<typeof modelProgressSchema>;
+
+/** Aktueller Audiopegel (RMS, 0..1) fuer die Pegelanzeige. */
+export const audioLevelSchema = z.object({ rms: z.number() });
+export type AudioLevel = z.infer<typeof audioLevelSchema>;
+
+/** Eine deutsche Fehlermeldung fuer die UI. */
+export const errorPayloadSchema = z.object({ message: z.string() });
+export type ErrorPayload = z.infer<typeof errorPayloadSchema>;
+
+/** Generisches Ergebnis einer Aktion (Erfolg oder deutsche Fehlermeldung). */
+export const actionResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true) }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type ActionResult = z.infer<typeof actionResultSchema>;
