@@ -1,0 +1,12 @@
+# Erzwingt LF fuer alle Textdateien auf allen Plattformen.
+# Grund: Der Windows-CI-Runner checkt mit core.autocrlf=true als CRLF aus,
+# Prettier (endOfLine: lf) meldet dann jede Datei als falsch formatiert.
+* text=auto eol=lf
+
+# Binaerdateien nie anfassen
+*.png binary
+*.ico binary
+*.icns binary
+*.bin binary
+*.node binary
+*.wav binary
