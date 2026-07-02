@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Info.plist-Ergaenzungen fuer das macOS-App-Bundle.
+
+  WICHTIG: Diese Schluessel gehoeren beim Packaging (M6) in die Info.plist des
+  fertigen VoiceWall.app-Bundles. Ohne den NSMicrophoneUsageDescription-Key
+  schlaegt getUserMedia auf macOS STILL fehl (kein Fehler, kein Dialog).
+
+  Im Dev-Modus (electron-vite dev) haengt die TCC-Mikrofonberechtigung nicht an
+  VoiceWall, sondern am Electron-Helfer-Binary; der macOS-Dialog nennt dann
+  "Electron". Erst das gepackte, signierte Bundle bekommt eine stabile
+  Bundle-Identitaet und damit einen dauerhaften Grant (siehe M1-Spike, F4).
+
+  Einbau in M6, z. B. via electron-builder "extendInfo" oder direktes Mergen in
+  die Bundle-Info.plist.
+-->
+<plist version="1.0">
+  <dict>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>VoiceWall nutzt das Mikrofon ausschliesslich lokal auf diesem Rechner fuer die Umwandlung Ihrer Sprache in Text. Es werden keine Audiodaten gespeichert oder an einen Server uebertragen.</string>
+  </dict>
+</plist>

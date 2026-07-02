@@ -8,8 +8,26 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import { registerIpcHandlers } from './ipc/handlers';
+import { createLogger } from './log/logger';
+import { DictationOrchestrator } from './stt/orchestrator';
+
+// App-Namen fruehzeitig und deterministisch setzen. Ohne dies liefe die App
+// im Dev-/Build-Modus unter dem Default "Electron", wodurch userData auf den
+// falschen Ordner zeigt. Der Name bestimmt app.getPath('userData') und damit
+// den Modell-, Log- und Konfig-Ordner (macOS: ~/Library/Application Support/voicewall).
+app.setName('voicewall');
 
 let mainWindow: BrowserWindow | null = null;
+let orchestrator: DictationOrchestrator | null = null;
+
+/**
+ * Der Dev-/Test-PCM-Injektionskanal ist nur aktiv, wenn er explizit per
+ * Umgebungsvariable freigeschaltet wird UND die App nicht paketiert ist. So
+ * existiert der Testpfad im ausgelieferten Produkt garantiert nicht.
+ */
+function isTestIpcEnabled(): boolean {
+  return process.env['VOICEWALL_ENABLE_TEST_IPC'] === '1' && !app.isPackaged;
+}
 
 /**
  * Crash-Reporting hart deaktivieren.
@@ -93,14 +111,30 @@ if (!hasSingleInstanceLock) {
     contents.setWindowOpenHandler(() => ({ action: 'deny' }));
   });
 
-  // Auch auf macOS beenden, wenn alle Fenster zu sind: In M0 gibt es ohne
-  // Fenster keinen Grund weiterzulaufen (kein Tray, kein Hintergrund-Diktat).
+  // Auch auf macOS beenden, wenn alle Fenster zu sind: Ohne sichtbares Fenster
+  // gibt es aktuell keinen Grund weiterzulaufen (kein Tray, kein
+  // Hintergrund-Diktat in diesem Meilenstein).
   app.on('window-all-closed', () => {
     app.quit();
   });
 
+  // Engine-Kind geordnet beenden, bevor die App schliesst.
+  app.on('before-quit', () => {
+    void orchestrator?.shutdown();
+  });
+
   void app.whenReady().then(() => {
     registerIpcHandlers();
+    const logger = createLogger(app.getPath('userData'));
+    orchestrator = new DictationOrchestrator({
+      userDataPath: app.getPath('userData'),
+      logger,
+      getMainWindow: () => mainWindow,
+      enableTestIpc: isTestIpcEnabled(),
+      // Metal-GPU nur auf macOS; Windows/Linux laufen CPU-only.
+      useGpu: process.platform === 'darwin',
+    });
+    orchestrator.register();
     mainWindow = createMainWindow();
   });
 }

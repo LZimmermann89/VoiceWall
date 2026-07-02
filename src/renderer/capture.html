@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      CSP des Capture-Fensters. worker-src/child-src blob: sind noetig, weil das
+      AudioWorklet-Modul als Blob-URL geladen wird (file://-Falle unter
+      Electron, siehe ABARBEITUNG 2.1). connect-src 'self': keine externen
+      Requests aus dem Capture-Fenster.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; worker-src blob:; child-src blob:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>VoiceWall Audio-Capture</title>
+  </head>
+  <body>
+    <!-- Verstecktes Fenster, keine sichtbare UI. -->
+    <script type="module" src="/capture.ts"></script>
+  </body>
+</html>
