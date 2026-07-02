@@ -1,0 +1,11 @@
+VoiceWall
+Copyright (c) 2026 Lars Zimmermann
+
+Dieses Produkt enthält beziehungsweise nutzt Software von Drittanbietern.
+Die vollständige Liste mit Lizenztexten steht in THIRD_PARTY_LICENSES.md.
+
+Grundgerüst-Hinweis: Die Attribution für whisper.cpp, das GGML-Modell
+(primeline/whisper-large-v3-turbo-german, GGML/Q5_0-Konvertierung durch
+cstr/whisper-large-v3-turbo-german-ggml, Apache-2.0) und Silero VAD wird in
+Meilenstein M2 ergänzt, sobald diese Komponenten tatsächlich eingebunden
+sind. In M0 enthält das Projekt noch keine Whisper- oder Modellbausteine.

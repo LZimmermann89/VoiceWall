@@ -1,0 +1,26 @@
+VoiceWall - Proprietäre Lizenz (Grundgerüst)
+
+Copyright (c) 2026 Lars Zimmermann. Alle Rechte vorbehalten.
+
+1. Inhaber sämtlicher Rechte an dieser Software (VoiceWall) ist
+   Lars Zimmermann.
+
+2. Es wird ein einfaches, nicht übertragbares Nutzungsrecht je erworbener
+   On-Site-Installation eingeräumt. Eine Installation gilt als erworben,
+   wenn sie durch den Rechteinhaber oder eine von ihm beauftragte Person
+   beim Kunden eingerichtet und abgerechnet wurde.
+
+3. Jede darüber hinausgehende Nutzung, insbesondere Vervielfältigung,
+   Verbreitung, öffentliche Zugänglichmachung, Vermietung, Unterlizenzierung
+   oder Bearbeitung, bedarf der vorherigen schriftlichen Zustimmung des
+   Rechteinhabers.
+
+4. Die Einsichtnahme in den Quellcode zum Zweck der Prüfung vor der
+   Installation (Review-then-run) ist ausdrücklich gestattet.
+
+5. Lizenzen von Drittkomponenten bleiben unberührt, siehe
+   THIRD_PARTY_LICENSES.md und NOTICE.
+
+Hinweis: Dieses Dokument ist ein Grundgerüst. Die finale, rechtlich geprüfte
+Formulierung ist vor dem ersten Kundeneinsatz mit Lars Zimmermann
+abzustimmen.

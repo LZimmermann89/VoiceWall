@@ -1,0 +1,24 @@
+# Abhängigkeiten
+node_modules/
+
+# Build-Ausgaben
+out/
+dist/
+
+# Test- und Tool-Ausgaben
+playwright-report/
+test-results/
+coverage/
+sbom.cdx.json
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# Session-lokale Werkzeuge
+.claude/
