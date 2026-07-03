@@ -3,6 +3,16 @@
  * Dieses Modul darf weder Node- noch DOM-APIs verwenden.
  */
 import type {
+  CompanyListView,
+  CompanyNamePreview,
+  CompanyStorageStrategy,
+  CreateCompanyResult,
+  DictateListResult,
+  DictateSearchFilter,
+  SaveDictateResult,
+  SyncCheckView,
+} from './company';
+import type {
   ActionResult,
   AppStatus,
   AudioLevel,
@@ -50,6 +60,27 @@ export interface VoiceWallBridge {
   readonly copyLastTranscript: () => Promise<ActionResult>;
   /** macOS: Systemeinstellungen, Bedienungshilfen-Bereich oeffnen. */
   readonly openAccessibilitySettings: () => Promise<ActionResult>;
+
+  // Firmenverwaltung und Diktat-Speicher (M5, Ordner-als-Datenbank).
+  /** Liste aller validierten Firmen plus aktive Firma und Auto-Speichern. */
+  readonly listCompanies: () => Promise<CompanyListView>;
+  /** Vorschau des sanitisierten Ordnernamens fuer einen Firmennamen. */
+  readonly previewCompanyName: (name: string) => Promise<CompanyNamePreview>;
+  /** Neue Firma anlegen (Desktop oder lokal mit Desktop-Verknuepfung). */
+  readonly createCompany: (
+    name: string,
+    strategie: CompanyStorageStrategy,
+  ) => Promise<CreateCompanyResult>;
+  /** Aktive Firma wechseln. */
+  readonly setActiveCompany: (pfad: string) => Promise<ActionResult>;
+  /** Sync-Pruefung des Desktop-Zielordners (Risiko R8). */
+  readonly checkDesktopSync: () => Promise<SyncCheckView>;
+  /** Letztes Transkript als Diktat in der aktiven Firma speichern. */
+  readonly saveLastDictate: () => Promise<SaveDictateResult>;
+  /** Diktate der aktiven Firma auflisten/durchsuchen (Manifest-Schnellsuche). */
+  readonly listDictates: (filter: DictateSearchFilter) => Promise<DictateListResult>;
+  /** Diktate automatisch in der aktiven Firma speichern (an/aus). */
+  readonly setDictateAutoSave: (enabled: boolean) => Promise<ActionResult>;
   /**
    * Nur Dev/Test: injiziert ein vollstaendiges PCM-Segment direkt in die
    * Engine (deterministischer Beweis ohne echtes Mikrofon). Ohne aktiven

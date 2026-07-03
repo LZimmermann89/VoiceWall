@@ -83,7 +83,7 @@ export class DictationOrchestrator {
   private engineReady = false;
   private dictationActive = false;
   private lastError: string | null = null;
-  private transcriptListener: ((text: string) => void) | null = null;
+  private transcriptListener: ((text: string, audioMs: number) => void) | null = null;
   private flowStatusProvider: (() => FlowStatus) | null = null;
 
   private engine: WhisperEngineManager | null = null;
@@ -195,8 +195,12 @@ export class DictationOrchestrator {
     return this.consentGranted;
   }
 
-  /** Registriert den zusaetzlichen Transkript-Empfaenger (FlowController). */
-  setTranscriptListener(listener: ((text: string) => void) | null): void {
+  /**
+   * Registriert den zusaetzlichen Transkript-Empfaenger (FlowController).
+   * `audioMs` traegt die Audiolaenge des Segments (fuer `dauer_sekunden`
+   * beim Diktat-Speichern in M5).
+   */
+  setTranscriptListener(listener: ((text: string, audioMs: number) => void) | null): void {
     this.transcriptListener = listener;
   }
 
@@ -344,7 +348,7 @@ export class DictationOrchestrator {
             audioMs: event.audioMs,
           });
           // M3: der FlowController sammelt Segmente des Hotkey-Diktats.
-          this.transcriptListener?.(event.text);
+          this.transcriptListener?.(event.text, event.audioMs);
           // Segment fertig: Ringpuffer aktiv nullen (kein Rohaudio im RAM halten).
           this.ringBuffer.clear();
         },

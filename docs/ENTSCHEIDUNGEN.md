@@ -218,3 +218,95 @@ ist aber: auch debug protokolliert NIEMALS Transkriptinhalte.
    mit Diktattext erreicht die Logdatei nicht, eine Modell-Load-Zeile schon.
    Damit bleibt die Diagnosefähigkeit (Modell-Load, Backend, Timings) erhalten,
    ohne die Datenschutz-Garantie zu verletzen.
+
+## E13: YAML-Front-Matter mit eigenem Mini-Serializer/-Parser statt js-yaml (M5)
+
+**Kontext:** Diktate sind Markdown-Dateien mit YAML-Front-Matter
+(ABARBEITUNG 4.4.2). Das Metadaten-Schema ist strikt flach: nur
+string, number und string[] (id, titel, erstellt, geaendert, sprache,
+modell, dauer_sekunden, wortzahl, tags, quelle, ziel_app, version).
+
+**Entscheidung:** Kein YAML-Paket (js-yaml/yaml), sondern ein eigener,
+~250 Zeilen kleiner Serializer/Parser NUR für dieses flache Schema
+(`src/shared/front-matter.ts`). Gründe:
+
+1. Ein vollwertiger YAML-Parser bringt genau die Features mit, die hier
+   Risiko wären: Anker/Aliase (Billion-Laughs-Bomben), Tags, Merge-Keys,
+   verschachtelte Strukturen. Der eigene Parser lehnt alles davon hart ab
+   (Fehler-Result), es gibt keine eval-artigen Pfade.
+2. Injektionssicherheit beim Schreiben ist beweisbar: Strings werden
+   JSON-quotiert (gültige YAML-1.2-Double-Quote-Skalare), Quotes,
+   Backslashes, Newlines und Steuerzeichen sind escaped. Ein Titel wie
+   `x"\nid: gekapert` kann strukturell keinen zweiten Schlüssel erzeugen
+   (Round-trip-Tests mit bösartigen Titeln in
+   `tests/unit/front-matter.test.ts`, inkl. Doppelte-Schlüssel-Abwehr).
+3. Eine Dependency weniger in der Supply Chain (Auditor-Argument).
+
+Beim Lesen toleriert der Parser Hand-Edits (Plain-Skalare, '...'-Strings,
+Kommentare), bleibt aber strikt bei Struktur (flach, keine Duplikate).
+
+## E14: Migrations-Backups liegen INNERHALB des Firmenordners unter `.voicewall/backups/` (M5)
+
+**Kontext:** Die Migrationsroutine (Risiko R12) arbeitet backup-erst. Zur
+Wahl standen: Backup neben dem Firmenordner (z. B.
+`Desktop/<Firma>-backup/`) oder innerhalb des Ordners.
+
+**Entscheidung:** Innerhalb, unter
+`.voicewall/backups/vor-migration-v<von>-<timestamp>/`. Gründe: (1) Das
+Backup reist bei Kopie/Umzug des Firmenordners mit (Portabilitäts-Garantie
+aus 4.7 bleibt vollständig), (2) es braucht keine Schreibrechte außerhalb
+des Firmenordners, (3) es liegt versteckt im Verwaltungskern und
+verschmutzt nicht den Desktop des Kunden. Strukturell ist es vom
+Diktate-Scan ausgenommen (rebuildManifest liest ausschließlich `Diktate/`),
+und die Kopierroutine kopiert `backups/` nie mit (keine
+Backup-im-Backup-Kaskade). Ablauf und Rollback: `src/main/storage/migration.ts`,
+Beweis in `tests/unit/migration.test.ts` (Erfolgsfall, injizierter Fehler
+mit byte-identischem Original, Idempotenz).
+
+## E15: Desktop-Verknüpfung als Symlink (macOS) bzw. Directory-Junction (Windows), kein .lnk (M5)
+
+**Kontext:** Die Sync-Fallen-Strategie (Risiko R8) legt Diktate in den
+nicht synchronisierten Ordner `~/VoiceWall/` und zeigt auf dem Desktop nur
+eine Verknüpfung. Windows-".lnk"-Dateien lassen sich ohne Shell-COM-Objekt
+nur über einen PowerShell-Aufruf erzeugen.
+
+**Entscheidung:** `fs.symlink` mit Typ `dir` (macOS/Linux) bzw. `junction`
+(Windows). Directory-Junctions funktionieren unter Windows OHNE
+Administrator-Rechte und ohne Developer-Mode, verhalten sich im Explorer
+wie ein Ordner und brauchen keinen einzigen Kindprozess (kein PowerShell,
+kein execFile, keine String-Interpolation, kleinstmögliche Angriffsfläche).
+Einschränkung ehrlich dokumentiert: eine Junction zeigt kein
+Verknüpfungs-Pfeil-Overlay wie eine .lnk; dafür ist sie robuster (kein
+Shell-Handler) und rückstandsfrei löschbar. Die Anlage ist idempotent und
+überschreibt nie bestehende Einträge (`src/main/storage/sync-detection.ts`,
+Tests mit injizierten Pfaden plus echtem Symlink-Test unter POSIX).
+
+## E16: Fast-User-Switching und Mehrbenutzer-Rechner (M5, Kritik D7)
+
+**Kontext:** Auf Kanzlei-Rechnern können mehrere OS-Benutzerkonten
+existieren, teils gleichzeitig angemeldet (Fast-User-Switching). Unklar
+war, wessen Desktop, Konfiguration und TCC-Freigaben gelten.
+
+**Festlegung (Ist-Zustand, ehrlich):**
+
+1. **Alles ist pro OS-Nutzer getrennt.** `userData` (globale Konfig, Logs,
+   Modelle) liegt im Nutzerprofil (Electron-Standard:
+   `~/Library/Application Support/voicewall` bzw. `%APPDATA%`), Firmenordner
+   liegen auf dem Desktop bzw. unter `~/VoiceWall/` des jeweiligen Nutzers.
+   Nutzer A sieht nie Konfiguration oder Diktate von Nutzer B (zusätzlich
+   POSIX 0700/0600 auf Firmenordner, `.voicewall/` und Konfigdateien).
+2. **Fast-User-Switching:** meldet sich ein zweiter Nutzer an und startet
+   VoiceWall, läuft eine EIGENE Instanz mit eigenem userData. Der
+   Single-Instance-Lock von Electron gilt pro userData-Pfad und damit pro
+   Nutzer-Session: zwei Nutzer kollidieren nicht, derselbe Nutzer doppelt
+   wird weiterhin blockiert (Risiko R13). Einzige geteilte Ressource wäre
+   der globale Hotkey; den registriert aber nur die Session im Vordergrund
+   wirksam, und macOS/Windows stellen Hintergrund-Sessions stumm.
+3. **Modelle werden pro Nutzer gespeichert** (userData/models). Das kostet
+   bei mehreren Nutzern Plattenplatz (574 MB je Nutzer), vermeidet aber
+   Schreibkonflikte und Rechtefragen an einem geteilten Ort. Ein geteilter
+   Modell-Cache wäre eine bewusste, spätere Optimierung (M6-Installer),
+   kein M5-Thema.
+4. **TCC-Freigaben (macOS)** sind ohnehin pro Nutzer: Mikrofon und
+   Bedienungshilfen muss jeder Nutzer einmal freigeben; der Wizard führt
+   jeden Nutzer einzeln hindurch.

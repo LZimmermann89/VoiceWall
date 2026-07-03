@@ -8,6 +8,33 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- M5: Ordner-als-Datenbank. Firmenordner-Anlage atomar (Temp-Ordner plus
+  Rename) und idempotent mit Struktur nach 4.4.1 (`.voicewall/` mit
+  manifest.json/config.json/tags.json/.schema-version, `Diktate/YYYY/MM/`,
+  `Exporte/`, `Papierkorb/`, POSIX 0700; fremde Ordner werden nie
+  beschrieben, Kollisionsvorschlag statt Ueberschreiben), Transkripte als
+  Markdown mit YAML-Front-Matter (eigener injektionssicherer Serializer/
+  Parser fuer das flache Schema, Entscheidung E13; Dateinamen
+  `YYYY-MM-DD_HHMMSS_<slug>.md` mit id-Suffix bei Kollision), CRUD mit
+  atomarem Schreiben und Containment-Pruefung nach `path.resolve` auch beim
+  LESEN (manipulierte Manifest-/Konfig-Pfade werden abgewiesen),
+  selbstheilendes Manifest (inkrementelle Updates, `rebuildManifest()` per
+  Front-Matter-Scan, NFC-normalisierte Pfadvergleiche) mit
+  In-Memory-Schnellsuche (Titel/Tags/Vorschau/Zeitraum/Quelle) und
+  tags.json-Pflege, zweistufige Konfiguration (firmenbezogen 0600 plus
+  globale firmen[]/aktiveFirma/diktatAutoSpeichern mit Pfad-Validierung
+  beim Laden), echte Migrationsroutine (backup-erst nach
+  `.voicewall/backups/`, Migration auf Kopie, Validierung, Swap, Rollback,
+  idempotent; Risiko R12, Entscheidung E14), Sync-Fallen-Erkennung
+  (iCloud-Desktop-Redirect via realpath, OneDrive-Muster plus
+  Env-Praefix, Dropbox, Google Drive; Risiko R8) mit lokaler
+  Alternativ-Strategie `~/VoiceWall/` plus Desktop-Verknuepfung
+  (Symlink/Junction, Entscheidung E15), Mehr-Firmen-Verwaltung mit
+  physischer Trennung, IPC/Preload-Bruecke (zod-validiert) und minimaler
+  Test-UI, Diktat-Flow-Anbindung (Auto-Speichern in der aktiven Firma,
+  Default AN sobald eine Firma existiert), Mehrbenutzer-/
+  Fast-User-Switching-Klaerung (Entscheidung E16, Kritik D7).
+
 - M4: Sicherheits- und Datenschutz-Fundament. Firmenname-Sanitisierung mit
   7-Stufen-Pipeline und Containment nach `path.resolve`
   (`src/main/storage/sanitize.ts`, 50 Angriffsklassen-Tests, inkl. NFD-/

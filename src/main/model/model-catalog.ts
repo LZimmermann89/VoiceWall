@@ -50,6 +50,14 @@ export const MODEL_DESCRIPTORS: readonly ModelDescriptor[] = [
   MODEL_CATALOG.sileroVad,
 ];
 
+/**
+ * Modellkennung fuer Diktat-Metadaten (Front-Matter-Feld `modell`,
+ * ABARBEITUNG 4.4.2): benennt Herkunftsmodell und Quantisierung des
+ * Katalog-Eintrags whisperQ5 (Beleg-Gedanke: welches Modell hat den Text
+ * erzeugt).
+ */
+export const TRANSCRIPT_MODEL_NAME = 'whisper-large-v3-turbo-german-q5_0';
+
 /** Ein SHA-256-Hex ist genau 64 Zeichen aus [0-9a-f]. */
 export function isValidSha256Hex(value: string): boolean {
   return /^[0-9a-f]{64}$/.test(value);

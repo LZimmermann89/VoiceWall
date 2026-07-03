@@ -33,10 +33,13 @@ import {
 import type { ActionResult, DeliveryResult } from '../../shared/schema';
 import type { OverlayStatePayload } from '../../shared/types';
 import type { Result } from '../../shared/result';
+import type { SaveDictateResult } from '../../shared/company';
 import { runClipboardSequence, realDelay } from '../clipboard/transcript-clipboard';
 import { readGlobalConfig, writeGlobalConfig } from '../config/config-store';
 import { IpcChannel } from '../ipc/channels';
 import type { Logger } from '../log/logger';
+import { TRANSCRIPT_MODEL_NAME } from '../model/model-catalog';
+import type { CompanyManager } from '../storage/companies';
 import { createOverlayWindow, showOverlayInactive } from '../overlay/overlay-window';
 import { createPasteAdapter, type PasteAdapter } from '../paste/index';
 import {
@@ -51,6 +54,8 @@ export interface FlowControllerDeps {
   readonly userDataPath: string;
   readonly logger: Logger;
   readonly orchestrator: DictationOrchestrator;
+  /** Firmenverwaltung (M5): Diktate optional in der aktiven Firma speichern. */
+  readonly companies: CompanyManager | null;
   /** Hauptfenster oeffnen/in den Vordergrund holen (Tray-Menue). */
   readonly openMainWindow: () => void;
   /** App beenden (Tray-Menue). */
@@ -70,6 +75,10 @@ export class DictationFlowController {
   private hotkeyRegistered = false;
   private lastTranscript: string | null = null;
   private sessionSegments: string[] = [];
+  /** Summierte Audiolaenge der Sitzung (fuer `dauer_sekunden`, M5). */
+  private sessionAudioMs = 0;
+  /** Audiolaenge des zuletzt zugestellten Diktats (fuer saveLastDictate). */
+  private lastAudioMs = 0;
 
   private overlay: BrowserWindow | null = null;
   private overlayHideTimer: NodeJS.Timeout | null = null;
@@ -97,11 +106,12 @@ export class DictationFlowController {
       this.deps.logger.warn(adapter.error);
     }
 
-    this.deps.orchestrator.setTranscriptListener((text) => {
+    this.deps.orchestrator.setTranscriptListener((text, audioMs) => {
       // Nur Segmente der laufenden Hotkey-Sitzung sammeln; die Test-UI
       // (Start-/Stop-Knoepfe) liefert weiterhin direkt ins Hauptfenster.
       if (this.state === 'recording' || this.state === 'transcribing') {
         this.sessionSegments.push(text);
+        this.sessionAudioMs += audioMs;
       }
     });
     this.deps.orchestrator.setFlowStatusProvider(() => this.flowStatus());
@@ -196,6 +206,7 @@ export class DictationFlowController {
 
   private async startRecording(): Promise<void> {
     this.sessionSegments = [];
+    this.sessionAudioMs = 0;
     const started = await this.deps.orchestrator.startDictation();
     if (!started.ok) {
       // Aufnahme kam nicht zustande: zurueck nach idle, Meldung anzeigen.
@@ -218,19 +229,22 @@ export class DictationFlowController {
   private async abortRecording(): Promise<void> {
     this.tray?.setRecording(false);
     this.sessionSegments = [];
+    this.sessionAudioMs = 0;
     this.hideOverlay();
     await this.deps.orchestrator.abortDictation();
   }
 
   private async deliverSession(): Promise<void> {
     const text = joinTranscriptSegments(this.sessionSegments);
+    const audioMs = this.sessionAudioMs;
     this.sessionSegments = [];
+    this.sessionAudioMs = 0;
     if (text.length === 0) {
       this.showOverlay({ kind: 'no-speech', message: null }, OVERLAY_DONE_VISIBLE_MS);
       this.dispatch('delivery-complete');
       return;
     }
-    const result = await this.deliverText(text);
+    const result = await this.deliverText(text, audioMs);
     if (result.pasted) {
       this.showOverlay(
         { kind: 'done', message: 'Text eingefuegt (und in der Zwischenablage).' },
@@ -252,10 +266,15 @@ export class DictationFlowController {
   /**
    * Stellt einen Text zu. Der Text bleibt unabhaengig vom Ergebnis als
    * lastTranscript im RAM und in der Zwischenablage verfuegbar, wenn nicht
-   * gepastet wurde (Resilienz-Primaerpfad).
+   * gepastet wurde (Resilienz-Primaerpfad). Ist Auto-Speichern aktiv und
+   * eine Firma vorhanden, wird der Text zusaetzlich als Diktat in der
+   * aktiven Firma abgelegt (M5; ein Speicherfehler bricht die Zustellung
+   * nie ab, er wird geloggt und gemeldet).
    */
-  private async deliverText(text: string): Promise<DeliveryResult> {
+  private async deliverText(text: string, audioMs = 0): Promise<DeliveryResult> {
     this.lastTranscript = text;
+    this.lastAudioMs = audioMs;
+    await this.autoSaveDictate(text, audioMs);
 
     const paste = this.resolvePaste();
     const sequence = await runClipboardSequence(
@@ -287,6 +306,55 @@ export class DictationFlowController {
       this.deps.orchestrator.notifyStatusChanged();
     }
     return { delivered: true, pasted, message };
+  }
+
+  /**
+   * Auto-Speichern (M5): legt das Diktat in der aktiven Firma ab, wenn der
+   * Schalter aktiv ist und eine Firma existiert (Default AN, sobald eine
+   * Firma angelegt wurde). Fehler stoppen die Zustellung nie.
+   */
+  private async autoSaveDictate(text: string, audioMs: number): Promise<void> {
+    const companies = this.deps.companies;
+    if (companies === null) {
+      return;
+    }
+    try {
+      if (!(await companies.isAutoSaveEnabled())) {
+        return;
+      }
+      const saved = await companies.saveDictate({
+        text,
+        dauerSekunden: Math.round(audioMs / 1000),
+        quelle: 'diktat',
+        modell: TRANSCRIPT_MODEL_NAME,
+      });
+      if (!saved.ok) {
+        this.deps.logger.warn(`Diktat konnte nicht gespeichert werden: ${saved.message}`);
+      }
+    } catch (error) {
+      this.deps.logger.error(
+        `Unerwarteter Fehler beim Diktat-Speichern: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /** Letztes Transkript manuell als Diktat speichern (IPC/Test-UI). */
+  private async saveLastDictate(): Promise<SaveDictateResult> {
+    if (this.deps.companies === null) {
+      return { ok: false, message: 'Die Firmenverwaltung ist nicht verfuegbar.' };
+    }
+    if (this.lastTranscript === null) {
+      return {
+        ok: false,
+        message: 'Es gibt noch kein Diktat. Bitte zuerst per Hotkey oder Testaufnahme diktieren.',
+      };
+    }
+    return this.deps.companies.saveDictate({
+      text: this.lastTranscript,
+      dauerSekunden: Math.round(this.lastAudioMs / 1000),
+      quelle: 'diktat',
+      modell: TRANSCRIPT_MODEL_NAME,
+    });
   }
 
   /**
@@ -486,6 +554,23 @@ export class DictationFlowController {
     );
 
     ipcMain.handle(IpcChannel.CopyLastTranscript, (): ActionResult => this.copyLastTranscript());
+
+    // M5: letztes Transkript manuell in der aktiven Firma speichern. Der
+    // Handler lebt hier (nicht im CompanyManager), weil nur der Flow das
+    // letzte Transkript im RAM haelt.
+    ipcMain.handle(IpcChannel.DictateSaveLast, async (): Promise<SaveDictateResult> => {
+      try {
+        return await this.saveLastDictate();
+      } catch (error) {
+        this.deps.logger.error(
+          `Unerwarteter Fehler beim Diktat-Speichern: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return {
+          ok: false,
+          message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
+        };
+      }
+    });
 
     ipcMain.handle(IpcChannel.OpenAccessibilitySettings, async (): Promise<ActionResult> => {
       const result = await openAccessibilitySettings();
