@@ -3,17 +3,44 @@
  * Firma. Liste mit Sortierung und Schnellsuche, kombinierbaren Filtern
  * (Zeitraum, Tags, Quelle), Detailansicht (Volltext als Textknoten, NIE als
  * HTML), Bearbeiten (Titel/Body/Tags, atomar), manuelle Notiz und Export
- * (Markdown/TXT nach Exporte/).
+ * (Markdown/TXT/PDF nach Exporte/).
+ *
+ * Seit M8 zusaetzlich: Volltextsuche ueber die Bodies (Umschalter, Treffer
+ * mit Kontext-Snippet), Mehrfachauswahl mit Stapel-Export (Fortschritt per
+ * aria-live), Tag-Batch-Rename ("Tags verwalten") und verschluesselter
+ * Einzel-Export (.vwenc) in der Detailansicht.
  *
  * Sicherheit: der Body wird ausschliesslich als React-Textknoten gerendert
  * (kein Roh-HTML-Einschub, kein Markdown-Rendering in v1); ein Diktat mit
  * HTML-artigem Inhalt kann so keinen Code ausfuehren (Stored-XSS-Regel 3.5).
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import type { DictateDetail, ManifestEntry, TranscriptQuelle } from '../../shared/company';
+import {
+  VWENC_MIN_PASSWORD_LENGTH,
+  type DictateDetail,
+  type ExportFormat,
+  type ExportProgress,
+  type ManifestEntry,
+  type TranscriptQuelle,
+} from '../../shared/company';
 import { QUELLE_LABELS, formatGermanDate, formatGermanDateTime } from './format';
+import { PasswordDialog } from './PasswordDialog';
 
 type SortKey = 'datum' | 'titel' | 'wortzahl';
+
+/** Auswahl im Stapel-Format-Menue (md zerfaellt in mit/ohne Kopf). */
+type BatchFormatChoice = 'md' | 'md-plain' | 'txt' | 'pdf';
+
+/** UI-Formatwahl zu IPC-Format plus Front-Matter-Flag. */
+function toExportFormat(choice: BatchFormatChoice): { format: ExportFormat; mit: boolean } {
+  if (choice === 'md') {
+    return { format: 'md', mit: true };
+  }
+  if (choice === 'md-plain') {
+    return { format: 'md', mit: false };
+  }
+  return { format: choice, mit: false };
+}
 
 interface RegisterViewProps {
   /** Wird nach Aenderungen aufgerufen (z. B. Soft-Delete), damit der
@@ -27,15 +54,20 @@ interface Filter {
   readonly von: string;
   readonly bis: string;
   readonly quelle: TranscriptQuelle | '';
+  /** M8: zusaetzlich in den Volltext-Bodies suchen. */
+  readonly volltext: boolean;
 }
 
-const EMPTY_FILTER: Filter = { text: '', tags: [], von: '', bis: '', quelle: '' };
+const EMPTY_FILTER: Filter = { text: '', tags: [], von: '', bis: '', quelle: '', volltext: false };
 
 /** Baut den IPC-Suchfilter aus dem UI-Filter (Datumsgrenzen zu ISO). */
 function toSearchFilter(filter: Filter): Parameters<typeof window.voicewall.listDictates>[0] {
   const result: Parameters<typeof window.voicewall.listDictates>[0] = {};
   if (filter.text.trim().length > 0) {
     result.text = filter.text.trim();
+    if (filter.volltext) {
+      result.volltext = true;
+    }
   }
   if (filter.tags.length > 0) {
     result.tags = [...filter.tags];
@@ -81,6 +113,17 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
   const [listError, setListError] = useState<string | null>(null);
   const [detail, setDetail] = useState<DictateDetail | null>(null);
   const [showNote, setShowNote] = useState(false);
+  const [showTagRename, setShowTagRename] = useState(false);
+  // Volltext-Snippets je Eintrag-id (nur bei aktiver Volltextsuche gefuellt).
+  const [snippets, setSnippets] = useState<ReadonlyMap<string, string>>(new Map());
+  // Stapel-Export: Auswahl (sichere relative Pfade), Format, Fortschritt.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [batchFormat, setBatchFormat] = useState<BatchFormatChoice>('md');
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<ExportProgress | null>(null);
+  const [batchNotice, setBatchNotice] = useState<string | null>(null);
+  const [batchRelPfad, setBatchRelPfad] = useState<string | null>(null);
+  const [batchError, setBatchError] = useState<string | null>(null);
   const backTargetRef = useRef<HTMLHeadingElement | null>(null);
 
   const loadTags = useCallback(async () => {
@@ -91,12 +134,54 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
     const result = await window.voicewall.listDictates(toSearchFilter(current));
     if (result.ok) {
       setEntries(result.eintraege);
+      setSnippets(new Map((result.volltextTreffer ?? []).map((t) => [t.id, t.snippet])));
       setListError(null);
     } else {
       setEntries(null);
+      setSnippets(new Map());
       setListError(result.message);
     }
   }, []);
+
+  /** Stapel-Export der uebergebenen Pfade (Fortschritt per aria-live). */
+  const runBatchExport = useCallback(
+    async (pfade: readonly string[]) => {
+      if (pfade.length === 0 || batchBusy) {
+        return;
+      }
+      setBatchBusy(true);
+      setBatchError(null);
+      setBatchNotice(null);
+      setBatchRelPfad(null);
+      setBatchProgress({ fertig: 0, gesamt: pfade.length });
+      const offProgress = window.voicewall.onExportProgress(setBatchProgress);
+      try {
+        const { format, mit } = toExportFormat(batchFormat);
+        const result = await window.voicewall.exportDictatesBatch({
+          pfade: [...pfade],
+          format,
+          mitFrontMatter: mit,
+        });
+        if (result.ok) {
+          const fehlerZusatz =
+            result.fehler.length > 0
+              ? ` ${String(result.fehler.length)} Einträge konnten nicht exportiert werden.`
+              : '';
+          setBatchNotice(
+            `${String(result.exportiert)} ${result.exportiert === 1 ? 'Eintrag' : 'Einträge'} exportiert nach: ${result.anzeigePfad}.${fehlerZusatz}`,
+          );
+          setBatchRelPfad(result.relPfad);
+        } else {
+          setBatchError(result.message);
+        }
+      } finally {
+        offProgress();
+        setBatchProgress(null);
+        setBatchBusy(false);
+      }
+    },
+    [batchBusy, batchFormat],
+  );
 
   useEffect(() => {
     void loadTags();
@@ -197,7 +282,30 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
         >
           Neue Notiz
         </button>
+        {knownTags.length > 0 && (
+          <button
+            type="button"
+            data-testid="register-manage-tags"
+            onClick={() => {
+              setShowTagRename(true);
+            }}
+          >
+            Tags verwalten
+          </button>
+        )}
       </div>
+
+      <label className="switch-row volltext-toggle">
+        <input
+          type="checkbox"
+          checked={filter.volltext}
+          data-testid="register-volltext"
+          onChange={(event) => {
+            setFilter((f) => ({ ...f, volltext: event.target.checked }));
+          }}
+        />{' '}
+        Auch im Volltext suchen (durchsucht die vollständigen Texte, etwas langsamer)
+      </label>
 
       <div className="filter-bar">
         <div className="filter-field">
@@ -287,13 +395,110 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
 
       {sorted === null && listError === null && <p className="placeholder">Wird geladen ...</p>}
 
+      {sorted !== null && sorted.length > 0 && (
+        <div className="batch-bar" data-testid="batch-bar">
+          <span className="batch-count" data-testid="batch-count">
+            {selected.size} ausgewählt
+          </span>
+          <label htmlFor="batch-format">Exportformat:</label>
+          <select
+            id="batch-format"
+            value={batchFormat}
+            disabled={batchBusy}
+            data-testid="batch-format"
+            onChange={(event) => {
+              setBatchFormat(event.target.value as BatchFormatChoice);
+            }}
+          >
+            <option value="md">Markdown (mit Kopf)</option>
+            <option value="md-plain">Markdown (ohne Kopf)</option>
+            <option value="txt">TXT</option>
+            <option value="pdf">PDF</option>
+          </select>
+          <button
+            type="button"
+            disabled={batchBusy || selected.size === 0}
+            data-testid="batch-export-selected"
+            onClick={() => void runBatchExport([...selected])}
+          >
+            Auswahl exportieren ({selected.size})
+          </button>
+          <button
+            type="button"
+            disabled={batchBusy}
+            data-testid="batch-export-filtered"
+            onClick={() => void runBatchExport(sorted.map((entry) => entry.pfad))}
+          >
+            Alle gefilterten exportieren ({sorted.length})
+          </button>
+          {selected.size > 0 && (
+            <button
+              type="button"
+              className="ghost"
+              disabled={batchBusy}
+              onClick={() => {
+                setSelected(new Set());
+              }}
+            >
+              Auswahl aufheben
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Fortschritt des Stapel-Exports (aria-live fuer Screenreader). */}
+      <p className="batch-progress" aria-live="polite" data-testid="batch-progress">
+        {batchProgress !== null
+          ? `Exportiere ${String(batchProgress.fertig)} von ${String(batchProgress.gesamt)} Einträgen ...`
+          : ''}
+      </p>
+
+      {batchError !== null && (
+        <p className="note error" role="alert" data-testid="batch-error">
+          {batchError}
+        </p>
+      )}
+      {batchNotice !== null && (
+        <div className="note" data-testid="batch-notice">
+          <p>{batchNotice}</p>
+          {batchRelPfad !== null && (
+            <button
+              type="button"
+              data-testid="batch-reveal"
+              onClick={() => void window.voicewall.revealExport(batchRelPfad)}
+            >
+              Im Finder zeigen
+            </button>
+          )}
+        </div>
+      )}
+
       {sorted !== null &&
         (sorted.length === 0 ? (
           <EmptyRegister hasFilter={filter !== EMPTY_FILTER} />
         ) : (
           <ol className="register-list" data-testid="register-list">
             {sorted.map((entry) => (
-              <li key={entry.id}>
+              <li key={entry.id} className="register-item">
+                <input
+                  type="checkbox"
+                  className="register-select"
+                  checked={selected.has(entry.pfad)}
+                  aria-label={`"${entry.titel}" für den Stapel-Export auswählen`}
+                  data-testid="register-select"
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setSelected((current) => {
+                      const next = new Set(current);
+                      if (checked) {
+                        next.add(entry.pfad);
+                      } else {
+                        next.delete(entry.pfad);
+                      }
+                      return next;
+                    });
+                  }}
+                />
                 <button
                   type="button"
                   className="register-row"
@@ -313,6 +518,11 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
                   </span>
                   {entry.vorschau.length > 0 && (
                     <span className="register-preview">{entry.vorschau}</span>
+                  )}
+                  {snippets.has(entry.id) && (
+                    <span className="register-snippet" data-testid="register-snippet">
+                      Volltext-Treffer: {snippets.get(entry.id)}
+                    </span>
                   )}
                   {entry.tags.length > 0 && (
                     <span className="register-tags">
@@ -336,6 +546,18 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
           }}
           onCreated={() => {
             setShowNote(false);
+            void refreshAll();
+          }}
+        />
+      )}
+
+      {showTagRename && (
+        <TagRenameDialog
+          knownTags={knownTags}
+          onClose={() => {
+            setShowTagRename(false);
+          }}
+          onRenamed={() => {
             void refreshAll();
           }}
         />
@@ -391,6 +613,7 @@ function DetailPanel(props: {
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [exportRelPfad, setExportRelPfad] = useState<string | null>(null);
+  const [showEncrypt, setShowEncrypt] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
 
   useEffect(() => {
@@ -459,7 +682,7 @@ function DetailPanel(props: {
   }, [detail, titel, body, tags, props]);
 
   const runExport = useCallback(
-    async (format: 'md' | 'txt', mitFrontMatter: boolean) => {
+    async (format: ExportFormat, mitFrontMatter: boolean) => {
       setBusy(true);
       setError(null);
       setNotice(null);
@@ -475,6 +698,35 @@ function DetailPanel(props: {
           setExportRelPfad(result.relPfad);
         } else {
           setError(result.message);
+        }
+      } finally {
+        setBusy(false);
+      }
+    },
+    [detail],
+  );
+
+  /** Verschluesselter Export (.vwenc): Passwort kommt aus dem Dialog. */
+  const runEncryptedExport = useCallback(
+    async (passwort: string) => {
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      setExportRelPfad(null);
+      try {
+        const result = await window.voicewall.exportDictateEncrypted({
+          pfad: detail.pfad,
+          passwort,
+        });
+        if (result.ok) {
+          setShowEncrypt(false);
+          setNotice(
+            `Verschlüsselt exportiert nach: ${result.anzeigePfad}. Ohne das Passwort ist die Datei nicht lesbar.`,
+          );
+          setExportRelPfad(result.relPfad);
+        } else {
+          setError(result.message);
+          setShowEncrypt(false);
         }
       } finally {
         setBusy(false);
@@ -603,6 +855,24 @@ function DetailPanel(props: {
               onClick={() => void runExport('txt', false)}
             >
               Export TXT
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              data-testid="export-pdf"
+              onClick={() => void runExport('pdf', true)}
+            >
+              Export PDF
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              data-testid="export-encrypted"
+              onClick={() => {
+                setShowEncrypt(true);
+              }}
+            >
+              Verschlüsselt exportieren (.vwenc)
             </button>
             <button
               type="button"
@@ -745,6 +1015,169 @@ function DetailPanel(props: {
           }}
         />
       )}
+
+      {showEncrypt && (
+        <PasswordDialog
+          titel="Verschlüsselt exportieren (.vwenc)"
+          beschreibung="Der Eintrag wird als Markdown mit AES-256-GCM verschlüsselt und im Ordner Exporte/ abgelegt. Entschlüsseln ist in der Beleg-Ansicht unter „Datei entschlüsseln“ möglich."
+          warnung="Wichtig: Das Passwort wird nirgends gespeichert. Geht es verloren, ist der Inhalt der Datei unwiederbringlich verloren."
+          bestaetigenText="Verschlüsselt exportieren"
+          minLength={VWENC_MIN_PASSWORD_LENGTH}
+          mitWiederholung={true}
+          busy={busy}
+          onSubmit={(passwort) => void runEncryptedExport(passwort)}
+          onCancel={() => {
+            setShowEncrypt(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tag-Batch-Rename ("Tags verwalten", M8)
+// ---------------------------------------------------------------------------
+
+function TagRenameDialog(props: {
+  readonly knownTags: readonly string[];
+  readonly onClose: () => void;
+  readonly onRenamed: () => void;
+}): ReactElement {
+  const [alt, setAlt] = useState(props.knownTags[0] ?? '');
+  const [neu, setNeu] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ergebnis, setErgebnis] = useState<string | null>(null);
+  const [fehlerListe, setFehlerListe] = useState<readonly string[]>([]);
+
+  const rename = useCallback(async () => {
+    const neuTag = neu.trim().normalize('NFC');
+    if (alt.length === 0 || neuTag.length === 0) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setErgebnis(null);
+    setFehlerListe([]);
+    try {
+      const result = await window.voicewall.renameTag({ alt, neu: neuTag });
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      const gesamt = result.geaendert + result.papierkorbGeaendert;
+      const papierkorbZusatz =
+        result.papierkorbGeaendert > 0
+          ? ` (davon ${String(result.papierkorbGeaendert)} im Papierkorb)`
+          : '';
+      setErgebnis(
+        `Tag „${alt}“ wurde zu „${neuTag}“ umbenannt: ${String(gesamt)} ${gesamt === 1 ? 'Eintrag' : 'Einträge'} aktualisiert${papierkorbZusatz}.`,
+      );
+      setFehlerListe(result.fehler);
+      setNeu('');
+      props.onRenamed();
+    } finally {
+      setBusy(false);
+    }
+  }, [alt, neu, props]);
+
+  return (
+    <div className="modal-overlay" role="presentation" onClick={props.onClose}>
+      <div
+        className="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tag-rename-title"
+        data-testid="tag-rename-dialog"
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+      >
+        <h3 id="tag-rename-title">Tags verwalten</h3>
+        <p className="notice">
+          Ein Tag wird firmenweit umbenannt: über alle Diktate und Notizen, einschließlich
+          Papierkorb.
+        </p>
+        <div className="field">
+          <label className="field-label" htmlFor="tag-rename-alt">
+            Bestehender Tag
+          </label>
+          <select
+            id="tag-rename-alt"
+            value={alt}
+            disabled={busy}
+            data-testid="tag-rename-alt"
+            onChange={(event) => {
+              setAlt(event.target.value);
+            }}
+          >
+            {props.knownTags.map((tag) => (
+              <option key={tag} value={tag}>
+                {tag}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor="tag-rename-neu">
+            Neuer Name <span className="req">*</span>
+          </label>
+          <input
+            id="tag-rename-neu"
+            type="text"
+            maxLength={80}
+            value={neu}
+            disabled={busy}
+            data-testid="tag-rename-neu"
+            onChange={(event) => {
+              setNeu(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void rename();
+              }
+            }}
+          />
+        </div>
+        {error !== null && (
+          <p className="note error" role="alert" data-testid="tag-rename-error">
+            {error}
+          </p>
+        )}
+        {ergebnis !== null && (
+          <div className="note" data-testid="tag-rename-ergebnis" aria-live="polite">
+            <p>{ergebnis}</p>
+            {fehlerListe.length > 0 && (
+              <ul>
+                {fehlerListe.map((meldung) => (
+                  <li key={meldung}>{meldung}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        <div className="actions">
+          <button
+            type="button"
+            className="primary"
+            disabled={busy || alt.length === 0 || neu.trim().length === 0}
+            data-testid="tag-rename-submit"
+            onClick={() => void rename()}
+          >
+            {busy ? 'Benennt um ...' : 'Umbenennen'}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={props.onClose}
+            data-testid="tag-rename-close"
+          >
+            Schließen
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,22 +3,29 @@
  * Dieses Modul darf weder Node- noch DOM-APIs verwenden.
  */
 import type {
+  BatchExportInput,
+  BatchExportResult,
   BelegInfoResult,
   CompanyDetails,
   CompanyListView,
   CompanyNamePreview,
   CompanyStorageStrategy,
   CreateCompanyResult,
+  DecryptFileResult,
   DictateDetailResult,
   DictateListResult,
   DictateMutationResult,
   DictateSearchFilter,
   DictateUpdateInput,
+  EncryptedExportInput,
   ExportInput,
+  ExportProgress,
   ExportResult,
   ManualNoteInput,
   SaveDictateResult,
   SyncCheckView,
+  TagRenameInput,
+  TagRenameResult,
   TrashListResult,
 } from './company';
 import type {
@@ -127,6 +134,18 @@ export interface VoiceWallBridge {
   readonly listTags: () => Promise<readonly string[]>;
   /** Beleg-Informationen (Modelle, Pruefsummen, Konsent, Log-Pfad). */
   readonly belegInfo: () => Promise<BelegInfoResult>;
+
+  // M8 (v1.1): Stapel-Export, Tag-Batch-Rename, verschluesselter Export.
+  /** Mehrere Diktate exportieren (Unterordner `Exporte/<datum>-stapel/`). */
+  readonly exportDictatesBatch: (input: BatchExportInput) => Promise<BatchExportResult>;
+  /** Abonniert den Fortschritt eines laufenden Stapel-Exports. */
+  readonly onExportProgress: (listener: (progress: ExportProgress) => void) => Unsubscribe;
+  /** Tag firmenweit umbenennen (alle Diktate inkl. Papierkorb). */
+  readonly renameTag: (input: TagRenameInput) => Promise<TagRenameResult>;
+  /** Diktat verschluesselt exportieren (.vwenc, AES-256-GCM). */
+  readonly exportDictateEncrypted: (input: EncryptedExportInput) => Promise<ExportResult>;
+  /** Eine .vwenc-Datei entschluesseln (Dateiauswahl im Main-Prozess). */
+  readonly decryptVwencFile: (passwort: string) => Promise<DecryptFileResult>;
   /**
    * Nur Dev/Test: injiziert ein vollstaendiges PCM-Segment direkt in die
    * Engine (deterministischer Beweis ohne echtes Mikrofon). Ohne aktiven

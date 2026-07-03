@@ -235,12 +235,29 @@ export const dictateSearchFilterSchema = z.object({
   /** Zeitraum: erstellt <= bis. */
   bis: isoDateTimeSchema.optional(),
   quelle: transcriptQuelleSchema.optional(),
+  /**
+   * M8, ABARBEITUNG 4.4.5: zusaetzlich die Markdown-Bodies durchsuchen
+   * (Streaming-Scan im Main-Prozess). Der Suchbegriff wird IMMER als
+   * Literal behandelt, nie als Regex oder Pfad (ReDoS-/Injektions-Regel 3.5).
+   */
+  volltext: z.boolean().optional(),
 });
 export type DictateSearchFilter = z.infer<typeof dictateSearchFilterSchema>;
 
-/** Ergebnis der Diktat-Liste/-Suche. */
+/** Ein Volltext-Treffer: Eintrag-id plus Kontext-Snippet aus dem Body. */
+export const volltextTrefferSchema = z.object({
+  id: z.string().min(1).max(120),
+  snippet: z.string().max(400),
+});
+export type VolltextTreffer = z.infer<typeof volltextTrefferSchema>;
+
+/** Ergebnis der Diktat-Liste/-Suche (Snippets nur bei Volltextsuche). */
 export const dictateListResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), eintraege: z.array(manifestEntrySchema) }),
+  z.object({
+    ok: z.literal(true),
+    eintraege: z.array(manifestEntrySchema),
+    volltextTreffer: z.array(volltextTrefferSchema).optional(),
+  }),
   z.object({ ok: z.literal(false), message: z.string() }),
 ]);
 export type DictateListResult = z.infer<typeof dictateListResultSchema>;
@@ -314,8 +331,8 @@ export const trashListResultSchema = z.discriminatedUnion('ok', [
 ]);
 export type TrashListResult = z.infer<typeof trashListResultSchema>;
 
-/** Exportformat pro Eintrag (v1: Markdown und reiner Text; PDF ist v1.1/M8). */
-export const exportFormatSchema = z.enum(['md', 'txt']);
+/** Exportformat pro Eintrag: Markdown, reiner Text oder PDF (M8). */
+export const exportFormatSchema = z.enum(['md', 'txt', 'pdf']);
 export type ExportFormat = z.infer<typeof exportFormatSchema>;
 
 /** Eingabe eines Exports: Quelle (sicherer relativer Pfad), Format, Optionen. */
@@ -377,3 +394,92 @@ export const belegInfoResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(false), message: z.string() }),
 ]);
 export type BelegInfoResult = z.infer<typeof belegInfoResultSchema>;
+
+// ---------------------------------------------------------------------------
+// M8 (v1.1, ABARBEITUNG 4.7): Stapel-Export, Tag-Batch-Rename,
+// verschluesselter Export (.vwenc).
+// ---------------------------------------------------------------------------
+
+/**
+ * Eingabe eines Stapel-Exports: mehrere sichere relative Quellpfade, ein
+ * Format. Bei mehr als einer Datei entsteht ein Unterordner
+ * `Exporte/<datum>-stapel/` (atomar: Temp-Ordner plus Rename).
+ */
+export const batchExportInputSchema = z.object({
+  pfade: z.array(safeRelativePathSchema).min(1).max(500),
+  format: exportFormatSchema,
+  /** Nur fuer Markdown relevant: mit oder ohne YAML-Front-Matter. */
+  mitFrontMatter: z.boolean().default(true),
+});
+export type BatchExportInput = z.infer<typeof batchExportInputSchema>;
+
+/**
+ * Ergebnis eines Stapel-Exports. `fehler` sammelt deutsche Meldungen der
+ * einzelnen fehlgeschlagenen Eintraege (Strategie: weiterlaufen und Fehler
+ * sammeln; jeder Datei-Schritt ist fuer sich atomar).
+ */
+export const batchExportResultSchema = z.discriminatedUnion('ok', [
+  z.object({
+    ok: z.literal(true),
+    anzeigePfad: z.string(),
+    relPfad: safeRelativePathSchema,
+    exportiert: z.number().int().min(0),
+    fehler: z.array(z.string()),
+  }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type BatchExportResult = z.infer<typeof batchExportResultSchema>;
+
+/** Fortschritt eines Stapel-Exports (Main -> Renderer, aria-live). */
+export const exportProgressSchema = z.object({
+  fertig: z.number().int().min(0),
+  gesamt: z.number().int().min(0),
+});
+export type ExportProgress = z.infer<typeof exportProgressSchema>;
+
+/** Eingabe des Tag-Batch-Renames (wirkt firmenweit, inkl. Papierkorb). */
+export const tagRenameInputSchema = z.object({
+  alt: tagSchema,
+  neu: tagSchema,
+});
+export type TagRenameInput = z.infer<typeof tagRenameInputSchema>;
+
+/**
+ * Ergebnis des Tag-Batch-Renames. `fehler` sammelt deutsche Meldungen
+ * einzelner nicht aktualisierbarer Dateien (der Batch laeuft weiter, das
+ * Manifest wird abschliessend aus dem tatsaechlichen Dateizustand atomar
+ * neu geschrieben und bleibt damit immer konsistent).
+ */
+export const tagRenameResultSchema = z.discriminatedUnion('ok', [
+  z.object({
+    ok: z.literal(true),
+    geaendert: z.number().int().min(0),
+    papierkorbGeaendert: z.number().int().min(0),
+    fehler: z.array(z.string()),
+  }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type TagRenameResult = z.infer<typeof tagRenameResultSchema>;
+
+/** Mindestlaenge des Passworts fuer den verschluesselten Export. */
+export const VWENC_MIN_PASSWORD_LENGTH = 12;
+
+/** Eingabe des verschluesselten Einzel-Exports (.vwenc, AES-256-GCM). */
+export const encryptedExportInputSchema = z.object({
+  pfad: safeRelativePathSchema,
+  passwort: z.string().min(VWENC_MIN_PASSWORD_LENGTH).max(1024),
+});
+export type EncryptedExportInput = z.infer<typeof encryptedExportInputSchema>;
+
+/** Eingabe des Entschluesselns (Dateiauswahl macht der Main-Prozess). */
+export const decryptFileInputSchema = z.object({
+  passwort: z.string().min(1).max(1024),
+});
+export type DecryptFileInput = z.infer<typeof decryptFileInputSchema>;
+
+/** Ergebnis des Entschluesselns einer .vwenc-Datei. */
+export const decryptFileResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), zielPfad: z.string() }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type DecryptFileResult = z.infer<typeof decryptFileResultSchema>;

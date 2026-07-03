@@ -18,13 +18,14 @@ import { basename, dirname, join } from 'node:path';
 export const TMP_PREFIX = '.voicewall-tmp-';
 
 /**
- * Schreibt `content` atomar nach `filePath` (Default-Rechte 0600). Bei einem
- * Fehler wird die Tempdatei entfernt und der Fehler weitergereicht; die
- * Zieldatei bleibt in ihrem vorherigen Zustand.
+ * Schreibt `content` (Text oder Binaerdaten, z. B. PDF/.vwenc seit M8)
+ * atomar nach `filePath` (Default-Rechte 0600). Bei einem Fehler wird die
+ * Tempdatei entfernt und der Fehler weitergereicht; die Zieldatei bleibt in
+ * ihrem vorherigen Zustand.
  */
 export async function writeFileAtomic(
   filePath: string,
-  content: string,
+  content: string | Uint8Array,
   mode = 0o600,
 ): Promise<void> {
   const tmpPath = join(

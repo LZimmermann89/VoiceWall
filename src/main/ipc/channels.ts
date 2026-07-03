@@ -68,6 +68,15 @@ export const IpcChannel = {
   DictateTagsList: 'dictate:tags-list',
   BelegInfo: 'beleg:info',
 
+  // M8 (v1.1): Stapel-Export (mit Fortschritts-Events), Tag-Batch-Rename,
+  // verschluesselter Export (.vwenc) und Entschluesseln in der App.
+  DictateExportBatch: 'dictate:export-batch',
+  /** Main -> Renderer: Fortschritt eines laufenden Stapel-Exports. */
+  DictateExportProgress: 'dictate:export-progress',
+  DictateRenameTag: 'dictate:rename-tag',
+  DictateExportEncrypted: 'dictate:export-encrypted',
+  DictateDecryptVwenc: 'dictate:decrypt-vwenc',
+
   // Nur in Dev/Test aktiv (siehe orchestrator/flow-controller): PCM-Injektion
   // und Diktat-Flow-Steuerung ohne echtes Mikrofon/echten OS-Paste.
   DevInjectPcm: 'dev:inject-pcm',
