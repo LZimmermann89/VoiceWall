@@ -68,9 +68,9 @@ const TRAILING_DOTS_AND_SPACES = /[. ]+$/;
 const WINDOWS_RESERVED_NAMES = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
 
 const EMPTY_MESSAGE =
-  'Der Firmenname enthaelt keine fuer einen Ordnernamen verwendbaren Zeichen. Bitte einen Namen mit Buchstaben oder Ziffern eingeben.';
+  'Der Firmenname enthält keine für einen Ordnernamen verwendbaren Zeichen. Bitte einen Namen mit Buchstaben oder Ziffern eingeben.';
 const RESERVED_MESSAGE =
-  'Dieser Name ist unter Windows ein reservierter Geraetename und kann nicht als Ordnername verwendet werden. Bitte einen anderen Namen waehlen.';
+  'Dieser Name ist unter Windows ein reservierter Gerätename und kann nicht als Ordnername verwendet werden. Bitte einen anderen Namen wählen.';
 
 /**
  * Sanitisiert einen rohen Firmennamen zu genau einem sicheren Pfadsegment
@@ -135,7 +135,7 @@ export function resolveContainedChildPath(
     return err({
       kind: 'containment',
       message:
-        'Ungueltiger Ordnername: der Pfad liegt ausserhalb des Zielordners. Bitte einen anderen Namen waehlen.',
+        'Ungültiger Ordnername: der Pfad liegt außerhalb des Zielordners. Bitte einen anderen Namen wählen.',
     });
   }
   const basis = path.resolve(baseDir);
@@ -151,7 +151,7 @@ export function resolveContainedChildPath(
     return err({
       kind: 'containment',
       message:
-        'Ungueltiger Ordnername: der Pfad liegt ausserhalb des Zielordners. Bitte einen anderen Namen waehlen.',
+        'Ungültiger Ordnername: der Pfad liegt außerhalb des Zielordners. Bitte einen anderen Namen wählen.',
     });
   }
   return ok(ziel);
@@ -183,7 +183,7 @@ export function buildCompanyDirPath(
   if (contained.value.length > MAX_TOTAL_PATH_LENGTH) {
     return err({
       kind: 'pfad-zu-lang',
-      message: `Der vollstaendige Ordnerpfad wuerde ${String(contained.value.length)} Zeichen lang (Windows-Grenze: ${String(MAX_TOTAL_PATH_LENGTH)}). Bitte einen kuerzeren Firmennamen waehlen.`,
+      message: `Der vollständige Ordnerpfad würde ${String(contained.value.length)} Zeichen lang (Windows-Grenze: ${String(MAX_TOTAL_PATH_LENGTH)}). Bitte einen kürzeren Firmennamen wählen.`,
     });
   }
   return ok({ segment: segment.value, dirPath: contained.value });

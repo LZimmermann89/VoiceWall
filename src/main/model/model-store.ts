@@ -103,7 +103,7 @@ async function verifyFile(
   if (actualSha !== descriptor.sha256) {
     return err({
       kind: 'corrupt',
-      message: `Die Modelldatei ${descriptor.fileName} ist beschaedigt (Pruefsumme stimmt nicht). Sie muss neu geladen werden.`,
+      message: `Die Modelldatei ${descriptor.fileName} ist beschädigt (Prüfsumme stimmt nicht). Sie muss neu geladen werden.`,
     });
   }
   marker[descriptor.fileName] = {

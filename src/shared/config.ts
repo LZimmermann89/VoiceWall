@@ -90,7 +90,7 @@ export function isValidHotkeyAccelerator(value: string): boolean {
 /** Zod-Schema fuer einen gueltigen Hotkey-Accelerator (deutsche Meldung). */
 export const hotkeyAcceleratorSchema = z.string().min(1).refine(isValidHotkeyAccelerator, {
   message:
-    'Ungueltige Tastenkombination. Bitte mindestens eine Modifier-Taste (z. B. CommandOrControl, Alt, Shift) und genau eine Taste angeben, etwa "CommandOrControl+Shift+D".',
+    'Ungültige Tastenkombination. Bitte mindestens eine Modifier-Taste (z. B. CommandOrControl, Alt, Shift) und genau eine Taste angeben, etwa "CommandOrControl+Shift+D".',
 });
 
 /**

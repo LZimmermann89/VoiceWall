@@ -95,7 +95,7 @@ export function parseRegistryDesktopValue(
 }
 
 const DESKTOP_MISSING_MESSAGE =
-  'Der Desktop-Ordner wurde nicht gefunden. Bitte im Einrichtungs-Assistenten einen Zielordner fuer den Firmenordner auswaehlen.';
+  'Der Desktop-Ordner wurde nicht gefunden. Bitte im Einrichtungs-Assistenten einen Zielordner für den Firmenordner auswählen.';
 
 /**
  * Liefert den absoluten Pfad des Desktop-Ordners oder ein Fehler-Result,

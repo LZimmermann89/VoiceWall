@@ -327,7 +327,7 @@ export class CompanyManager {
         linkName: created.value.ordnername,
       });
       verknuepfungHinweis = link.ok
-        ? `Auf dem Desktop liegt eine Verknuepfung "${created.value.ordnername}"; die Diktate selbst bleiben im lokalen Ordner ${created.value.dirPath}.`
+        ? `Auf dem Desktop liegt eine Verknüpfung "${created.value.ordnername}"; die Diktate selbst bleiben im lokalen Ordner ${created.value.dirPath}.`
         : `Hinweis: ${link.error}`;
     }
 
@@ -360,7 +360,7 @@ export class CompanyManager {
       return {
         ok: false,
         message:
-          'Diese Firma ist nicht in der Liste der gueltigen Firmenordner. Bitte die Firma zuerst anlegen oder oeffnen.',
+          'Diese Firma ist nicht in der Liste der gültigen Firmenordner. Bitte die Firma zuerst anlegen oder öffnen.',
       };
     }
     const config = await this.loadConfig();
@@ -381,7 +381,7 @@ export class CompanyManager {
       return {
         ok: false,
         message:
-          'Dieser Ordner ist kein gueltiger VoiceWall-Firmenordner an einem erlaubten Ort (Desktop oder ~/VoiceWall).',
+          'Dieser Ordner ist kein gültiger VoiceWall-Firmenordner an einem erlaubten Ort (Desktop oder ~/VoiceWall).',
       };
     }
     const migration = await migrateCompanyFolder(normalized);
@@ -491,7 +491,7 @@ export class CompanyManager {
     ipcMain.handle(IpcChannel.CompanyPreviewName, (_event, raw: unknown): CompanyNamePreview => {
       const parsed = z.string().min(1).max(300).safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungueltige Eingabe fuer den Firmennamen.' };
+        return { ok: false, message: 'Ungültige Eingabe für den Firmennamen.' };
       }
       return this.previewName(parsed.data);
     });
@@ -509,7 +509,7 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<CreateCompanyResult>({
           ok: false,
-          message: parsed.error.issues[0]?.message ?? 'Ungueltige Eingabe fuer die Firmen-Anlage.',
+          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für die Firmen-Anlage.',
           vorschlag: null,
         });
       }
@@ -533,7 +533,7 @@ export class CompanyManager {
     ipcMain.handle(IpcChannel.CompanySetActive, (_event, raw: unknown) => {
       const parsed = z.string().min(1).max(2048).safeParse(raw);
       if (!parsed.success) {
-        return Promise.resolve({ ok: false as const, message: 'Ungueltiger Firmenpfad.' });
+        return Promise.resolve({ ok: false as const, message: 'Ungültiger Firmenpfad.' });
       }
       return guard<{ ok: true } | { ok: false; message: string }>(
         {
@@ -555,7 +555,7 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<DictateListResult>({
           ok: false,
-          message: 'Ungueltiger Suchfilter.',
+          message: 'Ungültiger Suchfilter.',
         });
       }
       return guard<DictateListResult>(
@@ -572,7 +572,7 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve({
           ok: false as const,
-          message: 'Ungueltige Eingabe fuer den Auto-Speichern-Schalter.',
+          message: 'Ungültige Eingabe für den Auto-Speichern-Schalter.',
         });
       }
       return guard<{ ok: true } | { ok: false; message: string }>(

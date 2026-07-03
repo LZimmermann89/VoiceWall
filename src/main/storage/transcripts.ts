@@ -140,7 +140,7 @@ function resolveInExpectedRoot(
   const normalized = relPfad.normalize('NFC');
   if (normalized !== expectedRoot && !normalized.startsWith(`${expectedRoot}/`)) {
     return err(
-      `Ungueltiger Pfad: erwartet wird ein Eintrag unterhalb von "${expectedRoot}/". Der Eintrag wird abgewiesen.`,
+      `Ungültiger Pfad: erwartet wird ein Eintrag unterhalb von "${expectedRoot}/". Der Eintrag wird abgewiesen.`,
     );
   }
   return resolved;
@@ -185,7 +185,7 @@ export async function createTranscript(
   const checked = transcriptMetaSchema.safeParse(meta);
   if (!checked.success) {
     return err(
-      `Diktat-Metadaten sind ungueltig: ${checked.error.issues[0]?.message ?? 'unbekannt'}`,
+      `Diktat-Metadaten sind ungültig: ${checked.error.issues[0]?.message ?? 'unbekannt'}`,
     );
   }
 
@@ -256,7 +256,7 @@ export async function readTranscript(
   }
   const parsed = parseFrontMatter(content);
   if (!parsed.ok) {
-    return err(`Das Diktat ist beschaedigt: ${parsed.error}`);
+    return err(`Das Diktat ist beschädigt: ${parsed.error}`);
   }
   const meta = transcriptMetaSchema.safeParse(parsed.value.meta);
   if (!meta.success) {
@@ -308,7 +308,7 @@ export async function updateTranscript(
   const checked = transcriptMetaSchema.safeParse(meta);
   if (!checked.success) {
     return err(
-      `Diktat-Metadaten sind ungueltig: ${checked.error.issues[0]?.message ?? 'unbekannt'}`,
+      `Diktat-Metadaten sind ungültig: ${checked.error.issues[0]?.message ?? 'unbekannt'}`,
     );
   }
   const resolved = resolveInExpectedRoot(companyDir, relPfad, DIKTATE_DIR);
@@ -406,7 +406,7 @@ export async function restoreTranscript(
   try {
     await stat(targetResult.value);
     return err(
-      'Am Zielort existiert bereits eine Datei mit diesem Namen. Bitte zuerst den bestehenden Eintrag pruefen.',
+      'Am Zielort existiert bereits eine Datei mit diesem Namen. Bitte zuerst den bestehenden Eintrag prüfen.',
     );
   } catch {
     // Ziel frei: gut.
@@ -435,13 +435,13 @@ export async function hardDeleteTranscript(
     return resolved;
   }
   if (dirname(resolved.value) !== resolve(companyDir, PAPIERKORB_DIR)) {
-    return err('Endgueltiges Loeschen ist nur direkt aus dem Papierkorb erlaubt.');
+    return err('Endgültiges Löschen ist nur direkt aus dem Papierkorb erlaubt.');
   }
   try {
     await rm(resolved.value);
   } catch (error) {
     return err(
-      `Das Diktat konnte nicht endgueltig geloescht werden: ${error instanceof Error ? error.message : String(error)}`,
+      `Das Diktat konnte nicht endgültig gelöscht werden: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
   return ok(undefined);

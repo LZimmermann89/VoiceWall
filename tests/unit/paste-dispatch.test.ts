@@ -27,7 +27,7 @@ describe('createPasteAdapter', () => {
     const result = createPasteAdapter('linux');
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error).toContain('nicht unterstuetzt');
+      expect(result.error).toContain('nicht unterstützt');
       expect(result.error).toContain('Zwischenablage');
     }
   });

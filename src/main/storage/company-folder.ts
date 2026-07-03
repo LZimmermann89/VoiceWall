@@ -232,7 +232,7 @@ export async function createCompanyFolder(
     // Fremder Ordner: NICHT hineinschreiben, Vorschlag fuer die Rueckfrage.
     return err({
       kind: 'fremder-ordner',
-      message: `Der Ordner "${existingName}" existiert bereits und ist kein VoiceWall-Ordner. VoiceWall schreibt nicht in fremde Ordner. Bitte einen anderen Namen waehlen, z. B. den Vorschlag uebernehmen.`,
+      message: `Der Ordner "${existingName}" existiert bereits und ist kein VoiceWall-Ordner. VoiceWall schreibt nicht in fremde Ordner. Bitte einen anderen Namen wählen, z. B. den Vorschlag übernehmen.`,
       vorschlag: suggestAlternativeName(entries, segment),
     });
   }

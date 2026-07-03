@@ -14,7 +14,7 @@ import { err, ok, type Result } from '../../shared/result';
 import { isSafeRelativePath } from '../../shared/company';
 
 const CONTAINMENT_MESSAGE =
-  'Ungueltiger Pfad: der Eintrag zeigt ausserhalb des Firmenordners und wird abgewiesen.';
+  'Ungültiger Pfad: der Eintrag zeigt außerhalb des Firmenordners und wird abgewiesen.';
 
 /**
  * Loest einen relativen Pfad gegen einen Basisordner auf und verifiziert,

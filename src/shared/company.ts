@@ -34,7 +34,7 @@ export const tagSchema = z
   .min(1)
   .max(80)
   // eslint-disable-next-line no-control-regex
-  .regex(/^[^\u0000-\u001F\u007F]+$/, 'Tags duerfen keine Steuerzeichen enthalten.');
+  .regex(/^[^\u0000-\u001F\u007F]+$/, 'Tags dürfen keine Steuerzeichen enthalten.');
 
 /**
  * Sicherer relativer Pfad innerhalb des Firmenordners: keine absoluten
@@ -59,7 +59,7 @@ export function isSafeRelativePath(value: string): boolean {
 
 export const safeRelativePathSchema = z
   .string()
-  .refine(isSafeRelativePath, 'Ungueltiger oder unsicherer relativer Pfad.');
+  .refine(isSafeRelativePath, 'Ungültiger oder unsicherer relativer Pfad.');
 
 /** Front-Matter-Metadaten eines Diktats (ABARBEITUNG 4.4.2, flaches Schema). */
 export const transcriptMetaSchema = z.object({
@@ -195,7 +195,7 @@ export const companyDetailsSchema = z.object({
     .max(200)
     .default('')
     .refine((value) => value.length === 0 || EMAIL_LAX_PATTERN.test(value), {
-      message: 'Bitte eine gueltige E-Mail-Adresse eingeben (z. B. name@firma.de).',
+      message: 'Bitte eine gültige E-Mail-Adresse eingeben (z. B. name@firma.de).',
     }),
   standort: z.string().max(120).default(''),
   hinweis: z.string().max(2000).default(''),

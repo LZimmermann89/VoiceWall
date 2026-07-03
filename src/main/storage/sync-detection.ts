@@ -108,9 +108,9 @@ function detectProviderByPattern(realPath: string): SyncProvider | null {
 function buildHinweis(provider: SyncProvider): string {
   return (
     `Achtung: Dieser Speicherort wird von ${PROVIDER_LABELS[provider]} in die Cloud synchronisiert. ` +
-    'Diktate wuerden damit das "100 Prozent lokal"-Versprechen verlassen. Empfehlung: Diktate in den ' +
-    'lokalen Ordner ~/VoiceWall legen und auf dem Desktop nur eine Verknuepfung anzeigen. Die Wahl ' +
-    'bleibt bei Ihnen; VoiceWall aendert nichts ohne Bestaetigung.'
+    'Diktate würden damit das "100 Prozent lokal"-Versprechen verlassen. Empfehlung: Diktate in den ' +
+    'lokalen Ordner ~/VoiceWall legen und auf dem Desktop nur eine Verknüpfung anzeigen. Die Wahl ' +
+    'bleibt bei Ihnen; VoiceWall ändert nichts ohne Bestätigung.'
   );
 }
 
@@ -235,7 +235,7 @@ export async function createDesktopLink(
       }
     }
     return err(
-      `Auf dem Desktop existiert bereits ein Eintrag namens "${options.linkName}". VoiceWall ueberschreibt nichts; bitte den Eintrag pruefen oder einen anderen Namen waehlen.`,
+      `Auf dem Desktop existiert bereits ein Eintrag namens "${options.linkName}". VoiceWall überschreibt nichts; bitte den Eintrag prüfen oder einen anderen Namen wählen.`,
     );
   } catch {
     // lstat fehlgeschlagen: Pfad ist frei, Verknuepfung anlegen.
@@ -246,7 +246,7 @@ export async function createDesktopLink(
     return ok(linkPath);
   } catch (error) {
     return err(
-      `Die Desktop-Verknuepfung konnte nicht angelegt werden: ${error instanceof Error ? error.message : String(error)}`,
+      `Die Desktop-Verknüpfung konnte nicht angelegt werden: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }

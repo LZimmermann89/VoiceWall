@@ -49,7 +49,7 @@ export function createTrayController(handlers: TrayHandlers): TrayController {
           label: recording ? 'Diktat stoppen' : 'Diktat starten',
           click: handlers.onToggleDictation,
         },
-        { label: 'VoiceWall oeffnen', click: handlers.onOpenWindow },
+        { label: 'VoiceWall öffnen', click: handlers.onOpenWindow },
         { type: 'separator' },
         { label: 'VoiceWall beenden', click: handlers.onQuit },
       ]),
@@ -60,7 +60,7 @@ export function createTrayController(handlers: TrayHandlers): TrayController {
   return {
     setRecording: (recording) => {
       tray.setImage(recording ? recordingIcon : idleIcon);
-      tray.setToolTip(recording ? 'VoiceWall: Aufnahme laeuft' : 'VoiceWall');
+      tray.setToolTip(recording ? 'VoiceWall: Aufnahme läuft' : 'VoiceWall');
       applyMenu(recording);
     },
     destroy: () => {

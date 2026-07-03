@@ -115,7 +115,7 @@ async function startCapture(): Promise<void> {
     capture.reportError(
       `Der Mikrofonzugriff ist fehlgeschlagen (${
         error instanceof Error ? error.message : String(error)
-      }). Bitte pruefen, ob ein Mikrofon angeschlossen ist und VoiceWall Zugriff hat.`,
+      }). Bitte prüfen, ob ein Mikrofon angeschlossen ist und VoiceWall Zugriff hat.`,
     );
   } finally {
     starting = false;

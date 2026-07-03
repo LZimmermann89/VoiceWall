@@ -217,7 +217,7 @@ export class WhisperEngineManager {
     });
     if (this.restarts >= MAX_RESTARTS) {
       const message =
-        'Die Spracherkennung ist mehrfach abgestuerzt und konnte nicht neu gestartet werden. Bitte VoiceWall neu starten; bleibt der Fehler, das Log unter userData pruefen.';
+        'Die Spracherkennung ist mehrfach abgestürzt und konnte nicht neu gestartet werden. Bitte VoiceWall neu starten; bleibt der Fehler, das Log unter userData prüfen.';
       this.logger.error(message);
       this.callbacks.onFatal(message);
       settleStart(err(message));

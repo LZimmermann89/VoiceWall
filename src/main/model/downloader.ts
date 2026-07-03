@@ -70,7 +70,7 @@ export async function downloadModel(
       kind: 'network',
       message: `Der Modell-Download ist fehlgeschlagen (Netzwerkfehler: ${
         error instanceof Error ? error.message : String(error)
-      }). Bitte die Internetverbindung pruefen und erneut versuchen. Nach dem einmaligen Download laeuft VoiceWall vollstaendig offline.`,
+      }). Bitte die Internetverbindung prüfen und erneut versuchen. Nach dem einmaligen Download läuft VoiceWall vollständig offline.`,
     });
   }
 
@@ -79,7 +79,7 @@ export async function downloadModel(
       kind: 'http-status',
       message: `Der Server hat den Modell-Download abgelehnt (HTTP ${String(
         response.status,
-      )}). Bitte spaeter erneut versuchen oder die Modell-Quelle pruefen.`,
+      )}). Bitte später erneut versuchen oder die Modell-Quelle prüfen.`,
     });
   }
 
@@ -110,7 +110,7 @@ export async function downloadModel(
       kind: 'io',
       message: `Der Modell-Download konnte nicht gespeichert werden (${
         error instanceof Error ? error.message : String(error)
-      }). Bitte freien Speicherplatz und Schreibrechte pruefen.`,
+      }). Bitte freien Speicherplatz und Schreibrechte prüfen.`,
     });
   }
 
@@ -120,11 +120,11 @@ export async function downloadModel(
     await rm(partPath, { force: true });
     return err({
       kind: 'size-mismatch',
-      message: `Die heruntergeladene Datei hat eine unerwartete Groesse (${String(
+      message: `Die heruntergeladene Datei hat eine unerwartete Größe (${String(
         receivedBytes,
       )} statt ${String(
         options.expectedByteSize,
-      )} Bytes). Die Datei wurde geloescht. Bitte den Download erneut starten.`,
+      )} Bytes). Die Datei wurde gelöscht. Bitte den Download erneut starten.`,
     });
   }
 
@@ -133,7 +133,7 @@ export async function downloadModel(
     return err({
       kind: 'checksum-mismatch',
       message:
-        'Die Pruefsumme der heruntergeladenen Modelldatei stimmt nicht mit dem erwarteten Wert ueberein. Die Datei wurde aus Sicherheitsgruenden geloescht. Bitte den Download erneut starten; tritt der Fehler wiederholt auf, ist die Quelle nicht vertrauenswuerdig.',
+        'Die Prüfsumme der heruntergeladenen Modelldatei stimmt nicht mit dem erwarteten Wert überein. Die Datei wurde aus Sicherheitsgründen gelöscht. Bitte den Download erneut starten; tritt der Fehler wiederholt auf, ist die Quelle nicht vertrauenswürdig.',
     });
   }
 
