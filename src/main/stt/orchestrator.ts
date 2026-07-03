@@ -15,6 +15,7 @@
  * Segment werden Ringpuffer und Engine-Pending aktiv genullt.
  */
 import { BrowserWindow, ipcMain, type IpcMainEvent } from 'electron';
+import { z } from 'zod';
 import type {
   AccessibilityState,
   AppStatus,
@@ -72,6 +73,9 @@ const DEFAULT_FLOW_STATUS: FlowStatus = {
 /** Timeout fuer das Warten auf das letzte Segment beim Hotkey-Stop. */
 const FLUSH_TIMEOUT_MS = 30_000;
 
+/** Fehlermeldungen des Capture-Fensters: nur begrenzte Strings. */
+const captureErrorSchema = z.string().min(1).max(1000);
+
 export class DictationOrchestrator {
   private consentGranted = false;
   private consentLoaded = false;
@@ -97,13 +101,46 @@ export class DictationOrchestrator {
     });
   }
 
+  /**
+   * Faengt unerwartete Fehler eines invoke-Handlers ab: geloggt wird lokal,
+   * der Renderer erhaelt NUR eine generische deutsche Meldung, nie einen
+   * rohen Stacktrace oder interne Pfade (ABARBEITUNG 3.5).
+   */
+  private async guarded(
+    action: () => Promise<{ ok: true } | { ok: false; message: string }>,
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    try {
+      return await action();
+    } catch (error) {
+      this.deps.logger.error(
+        `Unerwarteter interner Fehler in einem IPC-Handler: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return {
+        ok: false,
+        message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
+      };
+    }
+  }
+
   /** Registriert alle IPC-Handler des STT-Kerns. */
   register(): void {
-    ipcMain.handle(IpcChannel.GetStatus, () => this.getStatus());
-    ipcMain.handle(IpcChannel.GrantConsent, () => this.grantConsent());
-    ipcMain.handle(IpcChannel.PrepareModels, () => this.prepareModels());
-    ipcMain.handle(IpcChannel.StartDictation, () => this.startDictation());
-    ipcMain.handle(IpcChannel.StopDictation, () => this.stopDictation());
+    ipcMain.handle(IpcChannel.GetStatus, async () => {
+      try {
+        return await this.getStatus();
+      } catch (error) {
+        this.deps.logger.error(
+          `Statusabruf fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        // Nie den rohen Fehler an den Renderer geben: bewusst OHNE cause,
+        // damit garantiert nichts Internes ueber IPC serialisiert wird.
+        // eslint-disable-next-line preserve-caught-error
+        throw new Error('Interner Fehler beim Statusabruf. Details stehen im lokalen Log.');
+      }
+    });
+    ipcMain.handle(IpcChannel.GrantConsent, () => this.guarded(() => this.grantConsent()));
+    ipcMain.handle(IpcChannel.PrepareModels, () => this.guarded(() => this.prepareModels()));
+    ipcMain.handle(IpcChannel.StartDictation, () => this.guarded(() => this.startDictation()));
+    ipcMain.handle(IpcChannel.StopDictation, () => this.guarded(() => this.stopDictation()));
 
     // Nachrichten des Capture-Fensters.
     ipcMain.on(IpcChannel.CapturePcm, (_event: IpcMainEvent, pcm: unknown) => {
@@ -113,8 +150,10 @@ export class DictationOrchestrator {
       }
     });
     ipcMain.on(IpcChannel.CaptureError, (_event: IpcMainEvent, message: unknown) => {
-      if (typeof message === 'string') {
-        this.setError(message);
+      // Zod-Schema an der Vertrauensgrenze: nur begrenzte Strings akzeptieren.
+      const parsed = captureErrorSchema.safeParse(message);
+      if (parsed.success) {
+        this.setError(parsed.data);
       }
     });
     ipcMain.on(IpcChannel.CaptureStarted, () => {
@@ -131,7 +170,7 @@ export class DictationOrchestrator {
         if (buffer === null) {
           return { ok: false as const, message: 'Kein gueltiger PCM-Puffer.' };
         }
-        return this.injectSegment(buffer);
+        return this.guarded(() => this.injectSegment(buffer));
       });
     }
   }

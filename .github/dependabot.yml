@@ -1,0 +1,32 @@
+# Dependabot: woechentliche, gruppierte Dependency-Updates (ABARBEITUNG 3.8).
+# Lockfile-Diffs werden reviewt, nie blind gemergt; die CI (verify-checksums,
+# npm audit, Tests) ist das Gate fuer jeden Update-PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    groups:
+      npm-dependencies:
+        patterns:
+          - '*'
+        # Das native Whisper-Addon aendert die hinterlegten SHA-256-Konstanten
+        # (scripts/verify-checksums.mjs) und wird deshalb einzeln reviewt.
+        exclude-patterns:
+          - '@fugood/*'
+      whisper-addon:
+        patterns:
+          - '@fugood/*'
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin

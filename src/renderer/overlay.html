@@ -2,7 +2,13 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <!-- Harte CSP wie im Hauptfenster: keine externen Quellen, kein Inline. -->
+    <!--
+      Aktive CSP des OVERLAY-FENSTERS ("Ich hoere zu"), ABARBEITUNG 3.3:
+      harte Minimal-Policy wie im Hauptfenster, keine externen Quellen, kein
+      Inline. BEWUSST kein worker-src, kein media-src, kein img-src: das
+      Overlay braucht nichts davon; alles faellt auf default-src 'self'
+      zurueck. connect-src 'self' verbietet jeden externen Request.
+    -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
