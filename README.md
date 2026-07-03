@@ -189,9 +189,10 @@ Vor-Ort-Installationsdienst (`WIDERRUF.md`,
 
 ## Lizenz
 
-Proprietär, alle Rechte vorbehalten; Einsichtnahme zum Zweck der
-Prüfung vor der Installation ist ausdrücklich gestattet. Details in
-`LICENSE`. Drittlizenzen und Attributionen: `THIRD_PARTY_LICENSES.md`
+MIT-Lizenz (siehe `LICENSE`): VoiceWall ist kostenlos nutzbar, der
+Quellcode ist zum Prüfen, Selbst-Installieren und Weitergeben frei.
+Wer die Einrichtung nicht selbst machen möchte, bekommt sie als
+Vor-Ort-Dienstleistung für einmalig 49 Euro (siehe `rechtstexte/`). Drittlizenzen und Attributionen: `THIRD_PARTY_LICENSES.md`
 und `NOTICE` (unter anderem whisper.cpp, @fugood/whisper.node, das
 GGML-Modell primeline/whisper-large-v3-turbo-german in der
 cstr-Konvertierung, Silero VAD v5.1.2, React, zod, Electron/Chromium).

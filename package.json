@@ -3,7 +3,7 @@
   "version": "1.0.0-rc.1",
   "private": true,
   "description": "VoiceWall: 100 Prozent lokales, DSGVO-konformes Sprachdiktiergeraet fuer Mac und Windows.",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "author": "Lars Zimmermann",
   "type": "module",
   "main": "out/main/index.js",
