@@ -187,6 +187,17 @@ DSGVO-Beleg-Blatt für die Kundendokumentation
 Vor-Ort-Installationsdienst (`WIDERRUF.md`,
 `MUSTER-WIDERRUFSFORMULAR.md`).
 
+## Unterstützung
+
+Wenn VoiceWall Ihnen nützt und Sie die Weiterentwicklung fördern
+möchten, freuen wir uns über Ihre Unterstützung:
+`[Unterstützungs-Link wird ergänzt, z. B. GitHub Sponsors]`.
+Bewusst "Unterstützung" und nicht "Spende": Anbieterin ist eine GmbH,
+Zuwendungen sind steuerlich reguläre Betriebseinnahmen und keine
+gemeinnützigen Spenden. Die Anwendung selbst enthält keinerlei
+Unterstützungs- oder Zahlungsaufrufe, das gehört zum Kernversprechen
+(keine externen Verbindungen, keine Ablenkung im Prüfinstrument).
+
 ## Lizenz
 
 Proprietär, alle Rechte vorbehalten; Einsichtnahme zum Zweck der
