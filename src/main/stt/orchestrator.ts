@@ -32,9 +32,15 @@ import {
   readConsent,
   recordConsent,
 } from '../consent/consent-store';
+import { readGlobalConfig } from '../config/config-store';
 import { IpcChannel } from '../ipc/channels';
 import type { Logger } from '../log/logger';
-import { MODEL_CATALOG } from '../model/model-catalog';
+import {
+  ALL_MODEL_DESCRIPTORS,
+  MODEL_CATALOG,
+  whisperDescriptorFor,
+  type WhisperModelChoice,
+} from '../model/model-catalog';
 import { ensureModel, getModelStatuses } from '../model/model-store';
 import { ensureMicrophoneAccess } from '../permission/microphone';
 import { DEFAULT_ENGINE_TUNING, WhisperEngineManager } from '../whisper/engine-manager';
@@ -79,6 +85,8 @@ const captureErrorSchema = z.string().min(1).max(1000);
 export class DictationOrchestrator {
   private consentGranted = false;
   private consentLoaded = false;
+  /** Whisper-Modellwahl (globale Konfig; Wizard-Schritt Modell, M6). */
+  private modelChoice: WhisperModelChoice = 'q5_0';
   private microphoneState: MicrophoneState = 'not-checked';
   private engineReady = false;
   private dictationActive = false;
@@ -178,7 +186,28 @@ export class DictationOrchestrator {
   private async loadInitialState(): Promise<void> {
     const consent = await readConsent(this.deps.userDataPath);
     this.consentGranted = isConsentCurrent(consent);
+    // Modellwahl aus der globalen Konfig (Default Q5_0).
+    const config = await readGlobalConfig(this.deps.userDataPath, this.deps.logger);
+    this.modelChoice = config.modell;
     this.consentLoaded = true;
+  }
+
+  /**
+   * Setzt die Whisper-Modellwahl (Wizard/Konfig). Ein Wechsel beendet eine
+   * ggf. laufende Engine, damit der naechste Start das gewaehlte Modell
+   * laedt. Persistiert wird die Wahl vom FlowController (Konfig-Besitzer).
+   */
+  async setModelChoice(choice: WhisperModelChoice): Promise<void> {
+    if (this.modelChoice === choice) {
+      return;
+    }
+    this.modelChoice = choice;
+    if (this.engine !== null) {
+      await this.engine.shutdown();
+      this.engine = null;
+      this.engineReady = false;
+    }
+    await this.broadcastStatus();
   }
 
   /** Laedt den persistierten Zustand (Einwilligung) fruehzeitig. */
@@ -223,18 +252,26 @@ export class DictationOrchestrator {
     if (!this.consentLoaded) {
       await this.loadInitialState();
     }
-    const statuses = await getModelStatuses(this.deps.userDataPath);
+    // Status ALLER bekannten Modelle (der Wizard zeigt auch das optionale
+    // fp16-Modell); betriebsbereit ist die App, sobald das GEWAEHLTE
+    // Whisper-Modell plus VAD vorhanden und verifiziert sind.
+    const statuses = await getModelStatuses(this.deps.userDataPath, ALL_MODEL_DESCRIPTORS);
     const models = statuses.map((status) => ({
       id: status.descriptor.id,
       label: status.descriptor.label,
       present: status.present,
+      byteSize: status.descriptor.byteSize,
     }));
+    const requiredIds = [whisperDescriptorFor(this.modelChoice).id, MODEL_CATALOG.sileroVad.id];
     const flow = this.flowStatusProvider?.() ?? DEFAULT_FLOW_STATUS;
     return {
       consentGranted: this.consentGranted,
       microphoneState: this.microphoneState,
       models,
-      modelsReady: models.every((model) => model.present),
+      modelChoice: this.modelChoice,
+      modelsReady: models
+        .filter((model) => requiredIds.includes(model.id))
+        .every((model) => model.present),
       engineReady: this.engineReady,
       dictationActive: this.dictationActive,
       lastError: this.lastError,
@@ -286,9 +323,9 @@ export class DictationOrchestrator {
     return { ok: true };
   }
 
-  /** Fehlende Modelle laden und Engine starten. */
+  /** Fehlende Modelle (gewaehltes Whisper plus VAD) laden und Engine starten. */
   async prepareModels(): Promise<{ ok: true } | { ok: false; message: string }> {
-    const descriptors = [MODEL_CATALOG.whisperQ5, MODEL_CATALOG.sileroVad];
+    const descriptors = [whisperDescriptorFor(this.modelChoice), MODEL_CATALOG.sileroVad];
     for (const descriptor of descriptors) {
       const result = await ensureModel(this.deps.userDataPath, descriptor, {
         allowDownload: true,
@@ -320,8 +357,9 @@ export class DictationOrchestrator {
     if (this.engine !== null && this.engine.isReady) {
       return { ok: true };
     }
-    const statuses = await getModelStatuses(this.deps.userDataPath);
-    const whisper = statuses.find((status) => status.descriptor.id === 'whisper-q5');
+    const whisperId = whisperDescriptorFor(this.modelChoice).id;
+    const statuses = await getModelStatuses(this.deps.userDataPath, ALL_MODEL_DESCRIPTORS);
+    const whisper = statuses.find((status) => status.descriptor.id === whisperId);
     const silero = statuses.find((status) => status.descriptor.id === 'silero-vad');
     if (whisper === undefined || silero === undefined || !whisper.present || !silero.present) {
       const message =

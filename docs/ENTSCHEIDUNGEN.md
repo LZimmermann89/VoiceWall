@@ -310,3 +310,107 @@ war, wessen Desktop, Konfiguration und TCC-Freigaben gelten.
 4. **TCC-Freigaben (macOS)** sind ohnehin pro Nutzer: Mikrofon und
    Bedienungshilfen muss jeder Nutzer einmal freigeben; der Wizard führt
    jeden Nutzer einzeln hindurch.
+
+## E17: electron-builder nur als --dir-Packager, Signierung im Setup-Skript (M6)
+
+**Kontext:** Für die TCC-Persistenz braucht macOS ein echtes App-Bundle mit
+stabiler `CFBundleIdentifier` (M1-Spike F4). Zur Wahl standen ein eigener
+Bundle-Bauplan (Electron.app kopieren, Plist patchen) oder electron-builder.
+
+**Entscheidung:** `electron-builder` (devDependency 26.15.3, reines
+JavaScript, kein Go-Binary, kein Compiler) mit ausschließlich `--dir`-Target:
+kein Installer-Artefakt, kein Auto-Update, kein Publish. Konfiguration in
+`electron-builder.yml`. Drei bewusste Abweichungen von den Defaults:
+
+1. `electronDist: node_modules/electron/dist`: das Packaging verwendet das
+   bereits per `npm ci` bezogene Electron-Binary und lädt beim Bauen nichts
+   aus dem Netz nach (offline-fähig, On-Site-Bedingung). Für das dir-Target
+   werden auch keine Zusatzwerkzeuge (NSIS, winCodeSign) geladen.
+2. `mac.identity: null`: electron-builder signiert NICHT. Die
+   Ad-hoc-Signierung (`codesign -s - --force --deep`) macht Schritt 5 des
+   Setup-Skripts mit anschließender Verifikation der Bundle-ID; damit ist
+   der TCC-relevante Signierzeitpunkt dokumentiert und liegt beim Installer,
+   nicht im Build-Werkzeug.
+3. `npmRebuild/nodeGypRebuild: false`: es wird nie kompiliert (prebuilt
+   Whisper-Binaries, compilerfreie Kette). `asarUnpack: **/*.node` legt die
+   nativen Binaries neben das asar (Loader-Anforderung).
+
+Windows ist als dir-Target deklariert, wird aber nur auf einer
+Windows-Maschine gebaut (lokal und CI bauen macOS).
+
+## E18: App-Icon wird programmatisch erzeugt, keine Binaerdatei im Repo (M6)
+
+`scripts/generate-icon.mjs` rendert das Icon (dunkles abgerundetes Quadrat,
+Schallwellen-Glyphe in Elfenbein, mittlerer Balken Siegel-Grün) per
+Signed-Distance-Funktionen mit Supersampling und kodiert die PNGs mit einem
+eigenen Mini-Encoder (nur node:zlib, CRC32 von Hand). `iconutil` (macOS
+Bordwerkzeug) baut daraus das .icns. Kein Download, kein Grafik-Tool, keine
+Binärdatei im Repo; das Packaging (`npm run package`) erzeugt das Icon
+idempotent bei Bedarf neu. Damit bleibt das Icon reproduzierbar und
+auditierbar (Farbwerte identisch mit der UI-Palette in styles.css).
+
+## E19: Ready-Signal der App ist eine Marker-Datei, kein Port (M6)
+
+Das Setup-Skript (Schritt 7) wartet aktiv auf den App-Start. Da VoiceWall
+bewusst keinen Netzwerk-Port öffnet (IPC statt HTTP, ABARBEITUNG 3.2),
+schreibt der Main-Prozess nach `app.whenReady` eine Marker-Datei
+`userData/app-ready.json` (PID, Version, Startzeit, Modus 0600). Das Skript
+pollt auf diese Datei (Fallback: Prozess-Existenz) statt blind zu schlafen.
+Ein Health-HTTP-Endpunkt wäre eine neue Angriffsfläche für genau das
+Feature, dessen Abwesenheit das Produkt verkauft.
+
+## E20: Wizard schreibt vor "Einrichten" keine Konfiguration; einzige Ausnahme ist der explizite Modell-Download (M6)
+
+ABARBEITUNG 4.2 verlangt: kein Schritt schreibt vor der Bestätigung ins
+Dateisystem. Umsetzung: Einwilligung, Hotkey, Modellwahl und Firmendaten
+werden im Wizard nur im React-Zustand gehalten und erst bei "Einrichten"
+über die bestehenden IPCs persistiert (grantConsent, setModelChoice,
+setHotkey, createCompany; letzteres ist die atomare M5-Anlage). Der
+Hotkey-Livetest registriert die Kombination nur fluechtig und gibt sie
+sofort wieder frei (eigener IPC `wizard:test-hotkey`, persistiert nichts).
+Zwei dokumentierte Ausnahmen: (1) der EXPLIZITE Modell-Download legt die
+Modelldateien (geteilte Infrastruktur im App-Support-Ordner, keine
+Nutzer-/Firmendaten) ab, inklusive der Modellwahl in der globalen Konfig,
+weil ein 574-MB-Download ohne Dateisystem-Schreiben nicht existiert; (2)
+die informierte Einwilligung wird beim Einrichten mit Zeitstempel
+dokumentiert (auditfester Nachweis, gewollt).
+
+## E21: fp16-Modellwahl ist verdrahtet, Q4-Notnagel ist bewusst v1.1 (M6)
+
+Der Wizard bietet nach der 2.2-Tabelle Q5_0 (Standard, immer) und fp16
+("Maximale Genauigkeit", nur bei >= 16 GB RAM und >= 6 Kernen wählbar; die
+Kernzahl kommt aus os.cpus(), auf Apple Silicon physisch, auf Intel mit
+Hyper-Threading eine großzügige Näherung, dokumentiert). Die Wahl steht in
+der globalen Konfig (`modell`), Engine und Downloader folgen ihr
+(orchestrator). Die fp16-SHA-256 stammt aus dem Hugging-Face-LFS-OID
+(der OID IST der Inhalts-SHA-256); der unabhängige Selbst-Hash-Quercheck
+(R14) steht für die 1,6-GB-Datei noch aus, schlimmster Fall ist ein
+abgelehnter Download. Eine Q4-Notvariante existiert im DE-Repo (cstr)
+nicht; sie käme aus den ggerganov-Fallbacks und braucht eigene Hashes und
+Schwachhardware-Tests, deshalb bewusst v1.1 (im Wizard als Hinweis genannt).
+
+## E22: Barrierefreiheit der M6-UI (BFSG-Grundlagen, Kritik D4)
+
+**Erfüllt in v1 (Wizard und Übergangs-Hauptansicht):**
+
+- Vollständige Tastatur-Bedienbarkeit: alle Controls sind fokussierbar und
+  in logischer Tab-Reihenfolge; der E2E-Test belegt, dass die Controls des
+  Firmendaten-Schritts per Tab erreichbar sind.
+- Sichtbarer Fokus: 2px-Siegel-Grün-Ring mit 2px Versatz auf allen
+  interaktiven Elementen (styles.css, `:focus-visible`).
+- Genau eine H1 je Ansicht (App-Shell-Wortmarke); Schritt-Überschriften
+  sind H2 und erhalten beim Schrittwechsel programmatisch den Fokus
+  (Screenreader-Ansage des neuen Schritts).
+- `aria-live="polite"` für Download-Fortschritt und Hotkey-Testergebnis;
+  Fehlermeldungen mit `role="alert"` und `aria-describedby` am Feld;
+  Labels an allen Formularfeldern; Radiogruppen mit `role="radiogroup"`
+  und `aria-label`.
+- Kontraste rechnerisch AA: Tinte auf Papier 14,9:1, Sekundärtext 6,3:1,
+  Siegel-Grün 6,8:1, Fehlerrot 6,5:1, Warnton 6,1:1 (Nachweis als
+  Kommentar in src/renderer/styles.css).
+- Kein Informationsverlust durch Farbe allein (Status immer auch als Text).
+
+**Bewusst v1.1 (offen, ehrlich):** Screenreader-Praxistest mit VoiceOver/
+NVDA (bisher nur strukturelle ARIA-Korrektheit), `prefers-reduced-motion`
+(v1 hat fast keine Animationen), Zoom-Test 200 %, vollständige
+BFSG-Konformitätserklärung (M9-Rechtstexte), Overlay-Fenster-Semantik.

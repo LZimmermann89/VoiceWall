@@ -1,23 +1,26 @@
 /**
  * E2E-Smoke-Tests gegen die gebaute App (vorher `npm run build` ausführen):
- * 1. Die App startet, zeigt genau eine H1 mit "VoiceWall" und die Status-UI
- *    (belegt zugleich, dass die IPC-Brücke ueber getStatus funktioniert).
- * 2. Single-Instance-Lock: Eine zweite Instanz beendet sich sofort von
- *    selbst, während die erste weiterläuft.
+ * 1. Die App startet (mit Testfirma), zeigt genau eine H1 mit "VoiceWall"
+ *    und die Status-UI der Hauptansicht (belegt zugleich, dass die
+ *    IPC-Brücke über getStatus funktioniert).
+ * 2. Single-Instance-Lock: Eine zweite Instanz (dasselbe Test-userData)
+ *    beendet sich sofort von selbst, während die erste weiterläuft.
  * 3. (Nur lokal, Modelle vorhanden) Dev-PCM-Injektion: ein injiziertes
  *    Test-WAV erscheint als korrekter deutscher Text in der UI. Echtes
  *    Mikrofon wird NICHT verwendet.
+ *
+ * Seit M6 laufen alle Läufe vollständig isoliert in Testverzeichnissen
+ * (launch.ts); die echte Konfiguration des Rechners wird nie berührt.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, test, _electron as electron } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import electronPath from 'electron';
 import { modelsAvailable } from '../integration/model-fixtures';
-import { getMainUiWindow } from './main-window';
+import { builtMainEntry, launchApp } from './launch';
 
 const projectRoot = join(import.meta.dirname, '../..');
-const builtMainEntry = join(projectRoot, 'out/main/index.js');
 const fixtureWav = join(projectRoot, 'tests/fixtures/testdiktat-de.wav');
 
 test.beforeAll(() => {
@@ -29,14 +32,12 @@ test.beforeAll(() => {
 });
 
 test('App startet mit genau einer sichtbaren H1 und sichtbarer Status-UI', async () => {
-  const app = await electron.launch({ args: [builtMainEntry], cwd: projectRoot });
+  const { app, window } = await launchApp({ withCompany: true });
   try {
-    const window = await getMainUiWindow(app);
-
     const headings = window.locator('h1');
     await expect(headings).toHaveCount(1);
     await expect(headings.first()).toBeVisible();
-    await expect(headings.first()).toHaveText('VoiceWall');
+    await expect(headings.first()).toContainText('VoiceWall');
 
     // Status-UI sichtbar: das Rendern der Statusliste belegt zugleich, dass
     // getStatus ueber die IPC-Bruecke aufgeloest wurde.
@@ -49,16 +50,22 @@ test('App startet mit genau einer sichtbaren H1 und sichtbarer Status-UI', async
 });
 
 test('Single-Instance-Lock: zweite Instanz beendet sich sofort', async () => {
-  const app = await electron.launch({ args: [builtMainEntry], cwd: projectRoot });
+  const { app, window, userDataDir, baseDir } = await launchApp({ withCompany: true });
   try {
-    await getMainUiWindow(app);
+    await expect(window.locator('h1')).toContainText('VoiceWall');
 
-    // Zweite Instanz direkt über das Electron-Binary starten. Sie muss sich
-    // wegen requestSingleInstanceLock() ohne Fenster selbst beenden.
+    // Zweite Instanz mit demselben Test-userData starten (der Lock gilt pro
+    // userData-Pfad). Sie muss sich wegen requestSingleInstanceLock() ohne
+    // Fenster selbst beenden.
     const secondInstanceExitCode = await new Promise<number | null>((resolve, reject) => {
       const child = spawn(electronPath as unknown as string, [builtMainEntry], {
         cwd: projectRoot,
         stdio: 'ignore',
+        env: {
+          ...process.env,
+          VOICEWALL_TEST_USER_DATA: userDataDir,
+          VOICEWALL_TEST_BASE_DIR: baseDir,
+        },
       });
       const timeout = setTimeout(() => {
         child.kill('SIGKILL');
@@ -105,15 +112,9 @@ function wavPcmBase64(wavPath: string): string {
 test('Dev-PCM-Injektion liefert korrekten deutschen Text in der UI (kein echtes Mikrofon)', async () => {
   // Nur lokal mit vorhandenen Modellen; CI hat kein 574-MB-Modell.
   test.skip(!modelsAvailable, 'Modelle nicht vorhanden, Injektions-Beweis uebersprungen.');
-  const app = await electron.launch({
-    args: [builtMainEntry],
-    cwd: projectRoot,
-    // Test-IPC-Kanal (PCM-Injektion) nur fuer diesen Lauf aktivieren.
-    env: { ...process.env, VOICEWALL_ENABLE_TEST_IPC: '1' },
-  });
+  const { app, window } = await launchApp({ withCompany: true, linkModels: true });
   try {
-    const window = await getMainUiWindow(app);
-    await expect(window.locator('h1')).toHaveText('VoiceWall');
+    await expect(window.locator('h1')).toContainText('VoiceWall');
 
     const base64 = wavPcmBase64(fixtureWav);
     // PCM injizieren: base64 -> Uint8Array -> frischer ArrayBuffer im Renderer.

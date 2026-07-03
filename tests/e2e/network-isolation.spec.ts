@@ -17,12 +17,11 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { expect, test, _electron as electron, type ElectronApplication } from '@playwright/test';
+import { expect, test, type ElectronApplication } from '@playwright/test';
 import { modelsAvailable } from '../integration/model-fixtures';
-import { getMainUiWindow } from './main-window';
+import { builtMainEntry, launchApp } from './launch';
 
 const projectRoot = join(import.meta.dirname, '../..');
-const builtMainEntry = join(projectRoot, 'out/main/index.js');
 const fixtureWav = join(projectRoot, 'tests/fixtures/testdiktat-de.wav');
 
 /** Nur diese Schemata/Praefixe gelten als lokal. */
@@ -69,15 +68,13 @@ test.beforeAll(() => {
 });
 
 test('Null nicht-lokale Requests waehrend eines kompletten Diktat-Flows; Nicht-media-Berechtigungen werden abgelehnt', async () => {
-  const app = await electron.launch({
-    args: [builtMainEntry],
-    cwd: projectRoot,
-    env: { ...process.env, VOICEWALL_ENABLE_TEST_IPC: '1' },
-  });
+  const { app, window } = await launchApp({ withCompany: true, linkModels: true });
   try {
     await startNetworkRecorder(app);
-    const window = await getMainUiWindow(app);
-    await expect(window.locator('h1')).toHaveText('VoiceWall');
+    // Fenster neu laden, damit der Recorder auch die lokalen file://-Loads
+    // der Seite selbst aufzeichnet (Beleg, dass er wirklich mitschreibt).
+    await window.reload();
+    await expect(window.locator('h1')).toContainText('VoiceWall');
 
     // --- Berechtigungs-Haertung: Nicht-media wird zentral abgelehnt. -------
     const notificationPermission = await window.evaluate(async () => {

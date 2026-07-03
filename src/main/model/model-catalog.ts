@@ -13,7 +13,7 @@
 
 export interface ModelDescriptor {
   /** Interner Schluessel. */
-  readonly id: 'whisper-q5' | 'silero-vad';
+  readonly id: 'whisper-q5' | 'whisper-fp16' | 'silero-vad';
   /** Dateiname im Modellordner (userData/models). */
   readonly fileName: string;
   /** Stabile Download-URL (resolve/main), niemals die CDN-URL. */
@@ -35,6 +35,24 @@ export const MODEL_CATALOG = {
     sha256: '15e92e3db0993c52fffa781513eec9253475331c1be808f8fb409285c9d9d030',
     label: 'Deutsches Whisper-Modell (large-v3-turbo, Q5_0)',
   },
+  /**
+   * Optionales fp16-Modell "Maximale Genauigkeit" (ABARBEITUNG 2.2/4.2.3).
+   * Nur fuer starke Hardware (>= 16 GB RAM und >= 6 Kerne, Wizard-Gating).
+   * SHA-256-Herkunft (2026-07-03): Hugging-Face-LFS-OID aus
+   * `api/models/cstr/whisper-large-v3-turbo-german-ggml/tree/main` (der OID
+   * IST der SHA-256, gegen den HF die Datei selbst verifiziert). Der
+   * unabhaengige Selbst-Hash-Quercheck (R14, wie beim Q5_0 im M1-Spike)
+   * steht fuer diese 1,6-GB-Datei noch aus; schlimmster Fall bei falscher
+   * Konstante ist ein abgelehnter Download, nie eine falsch akzeptierte Datei.
+   */
+  whisperFp16: {
+    id: 'whisper-fp16',
+    fileName: 'ggml-model.bin',
+    url: 'https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml/resolve/main/ggml-model.bin',
+    byteSize: 1_624_555_275,
+    sha256: '6eb2e025198a6cbac7bdb1e86e278f5de002e583aae7bdfcf5183ef8da16decd',
+    label: 'Deutsches Whisper-Modell (large-v3-turbo, fp16, maximale Genauigkeit)',
+  },
   sileroVad: {
     id: 'silero-vad',
     fileName: 'ggml-silero-v5.1.2.bin',
@@ -45,18 +63,43 @@ export const MODEL_CATALOG = {
   },
 } as const satisfies Record<string, ModelDescriptor>;
 
+/** Alle bekannten Modelle (fuer Manifest-Sync und Statusanzeigen). */
+export const ALL_MODEL_DESCRIPTORS: readonly ModelDescriptor[] = [
+  MODEL_CATALOG.whisperQ5,
+  MODEL_CATALOG.whisperFp16,
+  MODEL_CATALOG.sileroVad,
+];
+
+/**
+ * Pflichtmodelle des Standardbetriebs (Q5_0 plus VAD). Das fp16-Modell ist
+ * eine optionale Wahl im Wizard und wird nur bei Auswahl geladen.
+ */
 export const MODEL_DESCRIPTORS: readonly ModelDescriptor[] = [
   MODEL_CATALOG.whisperQ5,
   MODEL_CATALOG.sileroVad,
 ];
 
+/** Whisper-Modellwahl des Nutzers (globale Konfig, Wizard Schritt Modell). */
+export type WhisperModelChoice = 'q5_0' | 'fp16';
+
+/** Liefert den Whisper-Descriptor zur Modellwahl. */
+export function whisperDescriptorFor(choice: WhisperModelChoice): ModelDescriptor {
+  return choice === 'fp16' ? MODEL_CATALOG.whisperFp16 : MODEL_CATALOG.whisperQ5;
+}
+
 /**
  * Modellkennung fuer Diktat-Metadaten (Front-Matter-Feld `modell`,
- * ABARBEITUNG 4.4.2): benennt Herkunftsmodell und Quantisierung des
- * Katalog-Eintrags whisperQ5 (Beleg-Gedanke: welches Modell hat den Text
- * erzeugt).
+ * ABARBEITUNG 4.4.2): benennt Herkunftsmodell und Quantisierung
+ * (Beleg-Gedanke: welches Modell hat den Text erzeugt).
  */
 export const TRANSCRIPT_MODEL_NAME = 'whisper-large-v3-turbo-german-q5_0';
+
+/** Modellkennung fuer Diktat-Metadaten je Modellwahl. */
+export function transcriptModelName(choice: WhisperModelChoice): string {
+  return choice === 'fp16'
+    ? 'whisper-large-v3-turbo-german-fp16'
+    : 'whisper-large-v3-turbo-german-q5_0';
+}
 
 /** Ein SHA-256-Hex ist genau 64 Zeichen aus [0-9a-f]. */
 export function isValidSha256Hex(value: string): boolean {

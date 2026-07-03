@@ -135,6 +135,15 @@ export const globalConfigSchema = z
      * Firma speichern. Effektiv nur, sobald eine Firma existiert (Default AN).
      */
     diktatAutoSpeichern: z.boolean().default(true),
+    /**
+     * Whisper-Modellwahl (M6-Wizard, ABARBEITUNG 2.2/4.2.3): Q5_0 ist der
+     * Standard; fp16 ("Maximale Genauigkeit") ist nur fuer starke Hardware
+     * gedacht und wird im Wizard entsprechend gegated. Die Wahl bestimmt,
+     * welches Whisper-Modell Engine und Download verwenden; die
+     * Integritaetsentscheidung haengt weiterhin ausschliesslich an den
+     * SHA-256-Konstanten des Katalogs (E11).
+     */
+    modell: z.enum(['q5_0', 'fp16']).default('q5_0'),
     /** Informative Modellpfad-Struktur (nie sicherheitsrelevant, siehe oben). */
     modellPfade: z.record(z.string(), z.string().max(2048)).default({}),
   })
@@ -154,6 +163,7 @@ export function defaultGlobalConfig(): GlobalConfig {
     firmen: [],
     aktiveFirma: null,
     diktatAutoSpeichern: true,
+    modell: 'q5_0',
     modellPfade: {},
   };
 }

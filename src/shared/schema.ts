@@ -25,8 +25,14 @@ export const modelStatusSchema = z.object({
   id: z.string(),
   label: z.string(),
   present: z.boolean(),
+  /** Erwartete Dateigroesse in Bytes (fuer die Download-Anzeige im Wizard). */
+  byteSize: z.number().int().nonnegative(),
 });
 export type ModelStatusView = z.infer<typeof modelStatusSchema>;
+
+/** Whisper-Modellwahl (Wizard Schritt Modell; Q5_0 ist der Standard). */
+export const modelChoiceSchema = z.enum(['q5_0', 'fp16']);
+export type ModelChoiceView = z.infer<typeof modelChoiceSchema>;
 
 /** Zustand des systemweiten Diktat-Flows (siehe shared/dictation-flow.ts). */
 export const dictationFlowStateSchema = z.enum(['idle', 'recording', 'transcribing', 'delivering']);
@@ -48,6 +54,8 @@ export const appStatusSchema = z.object({
   consentGranted: z.boolean(),
   microphoneState: microphoneStateSchema,
   models: z.array(modelStatusSchema),
+  /** Aktive Whisper-Modellwahl (globale Konfig). */
+  modelChoice: modelChoiceSchema,
   modelsReady: z.boolean(),
   engineReady: z.boolean(),
   dictationActive: z.boolean(),
@@ -110,3 +118,20 @@ export const actionResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(false), message: z.string() }),
 ]);
 export type ActionResult = z.infer<typeof actionResultSchema>;
+
+/**
+ * System- und App-Informationen fuer den Wizard (M6): Hardware-Erkennung fuer
+ * die Modellempfehlung (ABARBEITUNG 2.2) und die Beleg-Zeile im Footer.
+ * `fp16Erlaubt` gilt bei mindestens 16 GB RAM und mindestens 6 Kernen.
+ */
+export const systemInfoSchema = z.object({
+  platform: z.string(),
+  arch: z.string(),
+  cpuKerne: z.number().int().positive(),
+  ramGb: z.number().positive(),
+  fp16Erlaubt: z.boolean(),
+  appVersion: z.string(),
+  /** Kurzform des SHA-256 des Standard-Whisper-Modells (Pruefstempel). */
+  modellPruefsumme: z.string(),
+});
+export type SystemInfo = z.infer<typeof systemInfoSchema>;

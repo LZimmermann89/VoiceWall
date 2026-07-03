@@ -22,6 +22,7 @@ import {
   deliveryResultSchema,
   modelProgressSchema,
   pingResponseSchema,
+  systemInfoSchema,
   transcriptPayloadSchema,
 } from '../shared/schema';
 import type { Unsubscribe, VoiceWallBridge } from '../shared/types';
@@ -77,13 +78,24 @@ const bridge: VoiceWallBridge = {
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.CopyLastTranscript)),
   openAccessibilitySettings: async () =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.OpenAccessibilitySettings)),
+  systemInfo: async () => systemInfoSchema.parse(await ipcRenderer.invoke(IpcChannel.SystemInfo)),
+  testHotkey: async (accelerator) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.WizardTestHotkey, accelerator)),
+  setModelChoice: async (choice) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetModelChoice, choice)),
   listCompanies: async () =>
     companyListViewSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanyList)),
   previewCompanyName: async (name) =>
     companyNamePreviewSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanyPreviewName, name)),
-  createCompany: async (name, strategie) =>
+  createCompany: async (name, strategie, details, modell, ordnername) =>
     createCompanyResultSchema.parse(
-      await ipcRenderer.invoke(IpcChannel.CompanyCreate, { name, strategie }),
+      await ipcRenderer.invoke(IpcChannel.CompanyCreate, {
+        name,
+        strategie,
+        details,
+        modell,
+        ordnername,
+      }),
     ),
   setActiveCompany: async (pfad) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanySetActive, pfad)),

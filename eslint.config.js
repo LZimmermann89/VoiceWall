@@ -161,6 +161,10 @@ export default tseslint.config(
       globals: {
         console: 'readonly',
         process: 'readonly',
+        // Node-Globals der Build-/Vendor-Skripte (fetch seit Node 18 global).
+        fetch: 'readonly',
+        Buffer: 'readonly',
+        URL: 'readonly',
       },
     },
   },

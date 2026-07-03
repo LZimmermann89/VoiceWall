@@ -133,7 +133,7 @@ test('M5: Firma anlegen, Diktat-Flow speichert wohlgeformte .md, Suche findet si
   });
   try {
     const window = await getMainUiWindow(app);
-    await expect(window.locator('h1')).toHaveText('VoiceWall');
+    await expect(window.locator('h1')).toContainText('VoiceWall');
     const api = bridge(window);
 
     // 1. Vorschau (Wizard-Schritt) und Anlage der Firma.
