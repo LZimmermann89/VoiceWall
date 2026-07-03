@@ -105,6 +105,11 @@ export interface CompanyManagerDeps {
   /** App-Kennung fuer `erstelltMit` in neuen Firmen-Konfigs. */
   readonly appVersion: string;
   readonly now?: () => Date;
+  /**
+   * Injektionspunkt fuer Tests (deterministische Nachstellung des
+   * Lade-Timings der globalen Konfiguration). Default: readGlobalConfig.
+   */
+  readonly readConfig?: () => Promise<GlobalConfig>;
 }
 
 export interface SaveDictateInput {
@@ -149,12 +154,39 @@ export function titleFromText(text: string): string {
 
 export class CompanyManager {
   private config: GlobalConfig | null = null;
+  /** Laufender Erst-Ladevorgang der Konfig (genau EIN Disk-Read, geteilt). */
+  private configLoading: Promise<GlobalConfig> | null = null;
 
   constructor(private readonly deps: CompanyManagerDeps) {}
 
-  /** Laedt die globale Konfiguration (einmalig, weitere Zugriffe gecacht). */
+  /**
+   * Laedt die globale Konfiguration (einmalig, weitere Zugriffe gecacht).
+   *
+   * WICHTIG (Lost-Update-Abwehr): Frueher stand hier
+   * `this.config ??= await readGlobalConfig(...)`. Das prueft `this.config`
+   * VOR dem await und weist NACH dem await bedingungslos zu. Ein
+   * `persistConfig()` (z. B. `createCompany` setzt die aktive Firma), das
+   * innerhalb dieses Fensters abschliesst, wurde vom verspaetet
+   * aufloesenden, veralteten Ladeergebnis wieder ueberschrieben; die soeben
+   * angelegte Firma war dann "weg" ("Keine aktive Firma"). Sichtbar nur
+   * unter Last (mehrere parallele IPC-Aufrufe beim App-Start), daher flaky.
+   *
+   * Deshalb jetzt: (1) der Erst-Read wird als Promise memoisiert, es gibt
+   * nie zwei konkurrierende Reads; (2) nach dem await wird das Ladeergebnis
+   * nur SYNCHRON per `??=` uebernommen, d. h. ein zwischenzeitlich per
+   * persistConfig gesetzter (neuerer) Zustand gewinnt immer. Regressions-
+   * Beweis: tests/unit/companies.test.ts ("Kein Lost-Update ...").
+   */
   private async loadConfig(): Promise<GlobalConfig> {
-    this.config ??= await readGlobalConfig(this.deps.userDataPath, this.deps.logger);
+    if (this.config !== null) {
+      return this.config;
+    }
+    this.configLoading ??= (
+      this.deps.readConfig ?? (() => readGlobalConfig(this.deps.userDataPath, this.deps.logger))
+    )();
+    const geladen = await this.configLoading;
+    // Synchroner Check ohne await dazwischen: kein Lost-Update mehr moeglich.
+    this.config ??= geladen;
     return this.config;
   }
 
