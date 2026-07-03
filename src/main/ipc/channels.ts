@@ -24,6 +24,9 @@ export const IpcChannel = {
   SetClipboardRestore: 'config:set-clipboard-restore',
   CopyLastTranscript: 'dictation:copy-last',
   OpenAccessibilitySettings: 'system:open-accessibility',
+  // Loest den offiziellen macOS-Freigabe-Dialog aus (traegt die App mit
+  // AKTUELLER Signatur in die Bedienungshilfen-Liste ein).
+  RequestAccessibility: 'system:request-accessibility',
 
   // Rechtstexte (M9): Impressums-Quelle im Browser oeffnen. Der Handler
   // uebergibt AUSSCHLIESSLICH die statische URL aus shared/impressum.ts;

@@ -46,6 +46,7 @@ import {
   ACCESSIBILITY_MISSING_MESSAGE,
   getAccessibilityState,
   openAccessibilitySettings,
+  requestAccessibilityGrant,
 } from '../permission/accessibility';
 import type { DictationOrchestrator, FlowStatus } from '../stt/orchestrator';
 import { createTrayController, type TrayController } from '../tray/tray';
@@ -648,6 +649,18 @@ export class DictationFlowController {
     ipcMain.handle(IpcChannel.OpenAccessibilitySettings, async (): Promise<ActionResult> => {
       const result = await openAccessibilitySettings();
       return result.ok ? { ok: true } : { ok: false, message: result.error };
+    });
+
+    ipcMain.handle(IpcChannel.RequestAccessibility, (): ActionResult => {
+      const state = requestAccessibilityGrant();
+      if (state === 'granted') {
+        return { ok: true };
+      }
+      return {
+        ok: false,
+        message:
+          'macOS hat den Freigabe-Dialog angezeigt. Bitte dort "Systemeinstellungen öffnen" wählen, den Schalter für VoiceWall aktivieren und danach VoiceWall über den Knopf neu starten. Wichtig nach einem Update: einen bereits vorhandenen alten VoiceWall-Eintrag vorher mit dem Minus-Symbol entfernen, er gehört zur alten Programmversion.',
+      };
     });
 
     // Kopieren-Knopf des Overlays (fire-and-forget).

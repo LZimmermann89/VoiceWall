@@ -36,6 +36,25 @@ export function getAccessibilityState(): AccessibilityState {
   return systemPreferences.isTrustedAccessibilityClient(false) ? 'granted' : 'missing';
 }
 
+/**
+ * Fordert die Bedienungshilfen-Freigabe ueber den OFFIZIELLEN macOS-Dialog an
+ * (isTrustedAccessibilityClient(true)). Vorteil gegenueber dem manuellen Weg:
+ * macOS traegt die App dabei selbst mit ihrer AKTUELLEN Code-Signatur in die
+ * Liste ein. Das entschaerft die Stale-Entry-Falle nach Rebuilds: ein alter
+ * Listeneintrag zeigt den Schalter "an", ist aber an den cdhash des alten
+ * Builds gebunden und gilt fuer die neue App nicht (M1-Befund F4, im
+ * Praxistest am 03.07.2026 real aufgetreten).
+ */
+export function requestAccessibilityGrant(): AccessibilityState {
+  if (process.platform !== 'darwin') {
+    return 'not-applicable';
+  }
+  // true: macOS zeigt den System-Dialog und legt den Listeneintrag fuer die
+  // laufende (aktuelle) App an. Rueckgabe ist der Stand JETZT; nach dem
+  // Erteilen in den Systemeinstellungen ist oft ein App-Neustart noetig.
+  return systemPreferences.isTrustedAccessibilityClient(true) ? 'granted' : 'missing';
+}
+
 /** Oeffnet den Bedienungshilfen-Bereich der macOS-Systemeinstellungen. */
 export async function openAccessibilitySettings(): Promise<Result<void, string>> {
   if (process.platform !== 'darwin') {

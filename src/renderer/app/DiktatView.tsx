@@ -175,10 +175,21 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
               &quot;Bedienungshilfen&quot;. Ohne Freigabe bleibt der Text in der Zwischenablage
               (Cmd+V zum Einfügen). So geht es: Knopf drücken, dann VoiceWall in der Liste
               aktivieren und das Diktat erneut ausführen. Was VoiceWall mit der Freigabe tut und was
-              nicht, steht in docs/ACCESSIBILITY.md. Hinweis: macOS meldet eine frisch erteilte
-              Freigabe an das laufende Programm oft erst nach einem Neustart, dafür gibt es den
-              zweiten Knopf.
+              nicht, steht in docs/ACCESSIBILITY.md. Zwei Stolpersteine: 1. Nach einem Update zeigt
+              ein ALTER VoiceWall-Eintrag in der Liste den Schalter als aktiv, gilt aber nur für die
+              alte Programmversion: den alten Eintrag mit dem Minus-Symbol entfernen, dann über
+              &quot;Freigabe anfordern&quot; neu eintragen lassen. 2. macOS meldet eine frisch
+              erteilte Freigabe an das laufende Programm oft erst nach einem Neustart, dafür gibt es
+              den Neustart-Knopf.
             </p>
+            <button
+              type="button"
+              disabled={busy}
+              data-testid="request-accessibility"
+              onClick={() => void runAction(() => window.voicewall.requestAccessibility())}
+            >
+              Freigabe anfordern (macOS-Dialog)
+            </button>{' '}
             <button
               type="button"
               disabled={busy}

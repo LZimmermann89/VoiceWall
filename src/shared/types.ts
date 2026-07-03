@@ -62,6 +62,8 @@ export interface VoiceWallBridge {
   readonly stopDictation: () => Promise<ActionResult>;
   /** App kontrolliert neu starten (TCC-Freigaben, siehe DiktatView). */
   readonly relaunchApp: () => Promise<ActionResult>;
+  /** Offiziellen macOS-Bedienungshilfen-Dialog ausloesen (aktuelle Signatur). */
+  readonly requestAccessibility: () => Promise<ActionResult>;
   /** Abonniert Statusaenderungen. */
   readonly onStatus: (listener: (status: AppStatus) => void) => Unsubscribe;
   /** Abonniert Modell-Download-Fortschritt. */

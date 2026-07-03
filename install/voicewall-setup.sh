@@ -282,7 +282,16 @@ if [ "${OS_NAME}" = "darwin" ]; then
       fail "Signatur-Verifikation fehlgeschlagen: Bundle-ID ${BUNDLE_ID} nicht in codesign -dv."
     log "  Signatur verifiziert: Identifier=${BUNDLE_ID}, Signature=adhoc."
     log "  WICHTIG (M1-Befund F4): Jeder Rebuild aendert den cdhash und bricht damit erteilte TCC-Freigaben."
-    log "  Re-Grant-Schritt: Systemeinstellungen -> Datenschutz und Sicherheit -> Bedienungshilfen bzw. Mikrofon -> VoiceWall erneut aktivieren."
+    # Veraltete TCC-Eintraege der ALTEN Signatur zuruecksetzen: ein alter
+    # Bedienungshilfen-Eintrag zeigt sonst "an", gilt aber nicht fuer den
+    # neuen Build (Stale-Entry-Falle, Praxistest 03.07.2026). tccutil wirkt
+    # nur auf die eigene Bundle-ID und ist gefahrlos wiederholbar.
+    if tccutil reset Accessibility "${BUNDLE_ID}" >>"${LOG_FILE}" 2>&1; then
+      log "  Veralteter Bedienungshilfen-Eintrag zurueckgesetzt (tccutil reset Accessibility ${BUNDLE_ID})."
+    else
+      log "  Hinweis: tccutil reset nicht moeglich (ok bei Erstinstallation)."
+    fi
+    log "  Re-Grant-Schritt: In der App den Knopf 'Freigabe anfordern (macOS-Dialog)' nutzen (traegt die NEUE Signatur ein), danach VoiceWall neu starten. Mikrofon fragt macOS beim ersten Aufnahmeversuch automatisch neu ab."
   fi
 fi
 

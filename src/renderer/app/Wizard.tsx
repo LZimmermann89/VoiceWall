@@ -1176,6 +1176,14 @@ function StepBedienungshilfen(
         <button
           type="button"
           onClick={() => {
+            void window.voicewall.requestAccessibility();
+          }}
+        >
+          Freigabe anfordern (macOS-Dialog)
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             void window.voicewall.openAccessibilitySettings();
           }}
         >
