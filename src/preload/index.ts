@@ -63,6 +63,8 @@ const bridge: VoiceWallBridge = {
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.StartDictation)),
   stopDictation: async () =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.StopDictation)),
+  relaunchApp: async () =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SystemRelaunch)),
   onStatus: (listener) =>
     subscribe(IpcChannel.StatusChanged, (raw) => appStatusSchema.parse(raw), listener),
   onModelProgress: (listener) =>

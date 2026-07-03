@@ -4,10 +4,16 @@
     <meta charset="UTF-8" />
     <!--
       Aktive CSP des CAPTURE-FENSTERS (verstecktes Aufnahmefenster),
-      ABARBEITUNG 3.3. Das einzige Fenster mit worker-/media-Ausnahmen:
-      - worker-src/child-src blob:: das AudioWorklet-Modul wird als Blob-URL
-        geladen (file://-Falle unter Electron, siehe ABARBEITUNG 2.1).
-        blob:-URLs sind immer lokal erzeugt, nie ein Netzwerk-Kanal.
+      ABARBEITUNG 3.3. Das einzige Fenster mit worker-/media-/blob-Ausnahmen:
+      - script-src 'self' blob:: Chromium prueft AudioWorklet-Module gegen
+        script-src, NICHT gegen worker-src. Ohne blob: schlaegt addModule
+        mit "Unable to load a worklet's module." fehl (empirisch belegt in
+        Electron 43, siehe docs/ENTSCHEIDUNGEN.md E34). blob: gilt nur in
+        diesem versteckten Fenster ohne jeden Nutzerinhalt; blob:-URLs sind
+        immer lokal erzeugt, nie ein Netzwerk-Kanal, und connect-src 'self'
+        blockiert weiterhin jede Exfiltration.
+      - worker-src/child-src blob:: derselbe Blob-Weg fuer Worker-Kontexte
+        (file://-Falle unter Electron, siehe ABARBEITUNG 2.1).
       - media-src 'self' blob:: Medienquellen des getUserMedia-/Worklet-Pfads
         bleiben lokal; externe Medien-Hosts sind verboten.
       - connect-src 'self': keine externen Requests aus dem Capture-Fenster.
@@ -15,7 +21,7 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'; worker-src blob:; child-src blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; script-src 'self' blob:; style-src 'self'; worker-src blob:; child-src blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
     />
     <title>VoiceWall Audio-Capture</title>
   </head>

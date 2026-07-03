@@ -30,6 +30,12 @@ export interface LaunchOptions {
   readonly withConsent?: boolean;
   /** Zusaetzliche Umgebungsvariablen. */
   readonly env?: Readonly<Record<string, string>>;
+  /**
+   * Zusaetzliche Chromium-/Electron-Kommandozeilenargumente (z. B.
+   * --use-fake-device-for-media-stream fuer den echten Aufnahmepfad ohne
+   * physisches Mikrofon und ohne TCC-Dialog).
+   */
+  readonly extraArgs?: readonly string[];
 }
 
 export interface LaunchedApp {
@@ -109,7 +115,7 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
   }
 
   const app = await electron.launch({
-    args: [builtMainEntry],
+    args: [builtMainEntry, ...(options.extraArgs ?? [])],
     cwd: projectRoot,
     env: {
       ...process.env,

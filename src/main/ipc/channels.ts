@@ -82,6 +82,10 @@ export const IpcChannel = {
   DictateExportEncrypted: 'dictate:export-encrypted',
   DictateDecryptVwenc: 'dictate:decrypt-vwenc',
 
+  // App kontrolliert neu starten (macOS: frisch erteilte TCC-Freigaben
+  // werden einem laufenden Prozess oft erst nach Neustart gemeldet).
+  SystemRelaunch: 'system:relaunch',
+
   // Nur in Dev/Test aktiv (siehe orchestrator/flow-controller): PCM-Injektion
   // und Diktat-Flow-Steuerung ohne echtes Mikrofon/echten OS-Paste.
   DevInjectPcm: 'dev:inject-pcm',

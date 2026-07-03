@@ -1164,6 +1164,12 @@ function StepBedienungshilfen(
             So geht es: Knopf drücken, dann VoiceWall in der Liste aktivieren (ggf. über das
             Plus-Symbol hinzufügen), danach hier &quot;Status aktualisieren&quot; wählen.
           </p>
+          <p>
+            Wichtig: macOS meldet eine frisch erteilte Freigabe an ein bereits laufendes Programm
+            oft erst nach einem Neustart des Programms. Bleibt der Status hier auf &quot;noch nicht
+            erteilt&quot;, schließen Sie die Einrichtung einfach normal ab und starten VoiceWall
+            danach einmal neu (der Knopf dafür steht anschließend im Bereich Diktat).
+          </p>
         </div>
       )}
       <div className="actions">

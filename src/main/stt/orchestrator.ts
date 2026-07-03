@@ -14,7 +14,7 @@
  * Kein Audio auf Platte: PCM existiert nur als ArrayBuffer im RAM. Nach jedem
  * Segment werden Ringpuffer und Engine-Pending aktiv genullt.
  */
-import { BrowserWindow, ipcMain, type IpcMainEvent } from 'electron';
+import { app, BrowserWindow, ipcMain, type IpcMainEvent } from 'electron';
 import { z } from 'zod';
 import type {
   AccessibilityState,
@@ -149,6 +149,16 @@ export class DictationOrchestrator {
     ipcMain.handle(IpcChannel.PrepareModels, () => this.guarded(() => this.prepareModels()));
     ipcMain.handle(IpcChannel.StartDictation, () => this.guarded(() => this.startDictation()));
     ipcMain.handle(IpcChannel.StopDictation, () => this.guarded(() => this.stopDictation()));
+    // Kontrollierter Neustart: macOS meldet frisch erteilte TCC-Freigaben
+    // (Bedienungshilfen) einem laufenden Prozess oft erst nach Neustart.
+    ipcMain.handle(IpcChannel.SystemRelaunch, () => {
+      app.relaunch();
+      // exit(0) statt quit(): keine erneuten Dialoge/Interceptoren im Weg.
+      setTimeout(() => {
+        app.exit(0);
+      }, 150);
+      return { ok: true as const };
+    });
 
     // Nachrichten des Capture-Fensters.
     ipcMain.on(IpcChannel.CapturePcm, (_event: IpcMainEvent, pcm: unknown) => {
