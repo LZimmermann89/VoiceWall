@@ -24,7 +24,7 @@
  */
 import { mkdir, realpath as fsRealpath, lstat, readlink, symlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, posix, resolve, win32 } from 'node:path';
 import { err, ok, type Result } from '../../shared/result';
 
 export type SyncProvider = 'icloud' | 'onedrive' | 'dropbox' | 'google-drive';
@@ -124,7 +124,12 @@ export async function checkSyncExposure(
   targetPath: string,
   deps: SyncDetectionDeps = defaultSyncDeps(),
 ): Promise<SyncCheckResult> {
-  const realPath = await deps.realpath(resolve(targetPath));
+  // Pfadmodul anhand der INJIZIERTEN Plattform waehlen, nicht anhand des
+  // Hosts: sonst wuerde der Windows-CI-Runner injizierte POSIX-Pfade mit
+  // Laufwerksbuchstaben aufloesen (und umgekehrt) und die Praefix-Vergleiche
+  // liefen ins Leere.
+  const p = deps.platform === 'win32' ? win32 : posix;
+  const realPath = await deps.realpath(p.resolve(targetPath));
 
   let provider = detectProviderByPattern(realPath);
 
@@ -137,7 +142,7 @@ export async function checkSyncExposure(
     const comparableTarget = comparablePath(realPath);
     if (
       oneDriveRoots.some((root) => {
-        const comparableRoot = comparablePath(resolve(root));
+        const comparableRoot = comparablePath(p.resolve(root));
         return (
           comparableTarget === comparableRoot || comparableTarget.startsWith(`${comparableRoot}/`)
         );
@@ -151,9 +156,9 @@ export async function checkSyncExposure(
   // nicht existiert: liegt der REALE Desktop unter Mobile Documents, ist
   // jeder Desktop-Zielpfad betroffen.
   if (provider === null && deps.platform === 'darwin') {
-    const desktop = join(deps.homedir(), 'Desktop');
+    const desktop = p.join(deps.homedir(), 'Desktop');
     const comparableTarget = comparablePath(realPath);
-    const comparableDesktop = comparablePath(resolve(desktop));
+    const comparableDesktop = comparablePath(p.resolve(desktop));
     if (
       comparableTarget === comparableDesktop ||
       comparableTarget.startsWith(`${comparableDesktop}/`)
