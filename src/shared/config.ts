@@ -93,7 +93,22 @@ export const hotkeyAcceleratorSchema = z.string().min(1).refine(isValidHotkeyAcc
     'Ungueltige Tastenkombination. Bitte mindestens eine Modifier-Taste (z. B. CommandOrControl, Alt, Shift) und genau eine Taste angeben, etwa "CommandOrControl+Shift+D".',
 });
 
-/** Globale Konfigurationsdatei (userData/config.json). */
+/**
+ * Globale Konfigurationsdatei (userData/config.json).
+ *
+ * M5 ergaenzt die Firmenverwaltung (ABARBEITUNG 4.5/4.6): `firmen` (absolute
+ * Pfade der Firmenordner), `aktiveFirma` und `diktatAutoSpeichern`. Die neuen
+ * Felder haben Defaults, damit bestehende M3/M4-Konfigdateien unveraendert
+ * gueltig bleiben. WICHTIG: den Pfaden aus `firmen`/`aktiveFirma` wird nie
+ * blind gefolgt; der Main-Prozess validiert sie beim Laden gegen die
+ * erwarteten Elternverzeichnisse und den VoiceWall-Marker
+ * (storage/companies.ts), ungueltige Eintraege werden ignoriert und geloggt.
+ *
+ * `modellPfade` ist eine rein informative, kompatible Erweiterung (Struktur
+ * aus ABARBEITUNG 4.5). Die Wahrheitsquelle fuer Modelle bleibt der
+ * TypeScript-Katalog plus SHA-256-Pruefung (model-store.ts, Entscheidung
+ * E11); Ladeentscheidungen haengen NIE an diesen Konfig-Pfaden.
+ */
 export const globalConfigSchema = z
   .object({
     schemaVersion: z.number().int().positive(),
@@ -111,6 +126,17 @@ export const globalConfigSchema = z
         restoreDelayMs: z.number().int().min(200).max(10_000),
       })
       .passthrough(),
+    /** Absolute Pfade aller bekannten Firmenordner (Main validiert beim Laden). */
+    firmen: z.array(z.string().min(1).max(2048)).max(200).default([]),
+    /** Absoluter Pfad der aktiven Firma oder null. */
+    aktiveFirma: z.string().min(1).max(2048).nullable().default(null),
+    /**
+     * Diktate nach erfolgreicher Transkription automatisch in der aktiven
+     * Firma speichern. Effektiv nur, sobald eine Firma existiert (Default AN).
+     */
+    diktatAutoSpeichern: z.boolean().default(true),
+    /** Informative Modellpfad-Struktur (nie sicherheitsrelevant, siehe oben). */
+    modellPfade: z.record(z.string(), z.string().max(2048)).default({}),
   })
   .passthrough();
 
@@ -125,5 +151,9 @@ export function defaultGlobalConfig(): GlobalConfig {
       restorePrevious: true,
       restoreDelayMs: DEFAULT_CLIPBOARD_RESTORE_DELAY_MS,
     },
+    firmen: [],
+    aktiveFirma: null,
+    diktatAutoSpeichern: true,
+    modellPfade: {},
   };
 }

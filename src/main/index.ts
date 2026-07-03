@@ -10,6 +10,9 @@ import { app, BrowserWindow, globalShortcut, session } from 'electron';
 import { DictationFlowController } from './dictation/flow-controller';
 import { registerIpcHandlers } from './ipc/handlers';
 import { createLogger, type Logger } from './log/logger';
+import { CompanyManager } from './storage/companies';
+import { resolveDesktopDir } from './storage/paths';
+import { localStorageBaseDir } from './storage/sync-detection';
 import { DictationOrchestrator } from './stt/orchestrator';
 
 // App-Namen fruehzeitig und deterministisch setzen. Ohne dies liefe die App
@@ -18,9 +21,27 @@ import { DictationOrchestrator } from './stt/orchestrator';
 // den Modell-, Log- und Konfig-Ordner (macOS: ~/Library/Application Support/voicewall).
 app.setName('voicewall');
 
+// Nur Dev/Test (E2E-Isolation, nie im Produkt): userData auf ein temporaeres
+// Verzeichnis umlenken, damit Tests weder die echte Konfiguration noch echte
+// Firmenordner beruehren. Muss vor app.whenReady() geschehen.
+const testUserData = process.env['VOICEWALL_TEST_USER_DATA'];
+if (testUserData !== undefined && testUserData.length > 0 && !app.isPackaged) {
+  app.setPath('userData', testUserData);
+}
+
+/**
+ * Nur Dev/Test: ersetzt den Desktop-Basisordner der Firmenverwaltung durch
+ * ein Testverzeichnis (E2E legt Firmenordner nie auf dem echten Desktop an).
+ */
+function testBaseDir(): string | null {
+  const value = process.env['VOICEWALL_TEST_BASE_DIR'];
+  return value !== undefined && value.length > 0 && !app.isPackaged ? value : null;
+}
+
 let mainWindow: BrowserWindow | null = null;
 let orchestrator: DictationOrchestrator | null = null;
 let flowController: DictationFlowController | null = null;
+let companyManager: CompanyManager | null = null;
 
 /**
  * Der Dev-/Test-PCM-Injektionskanal ist nur aktiv, wenn er explizit per
@@ -201,10 +222,30 @@ if (!hasSingleInstanceLock) {
     // das erste Fenster warten, deterministisch haelt.
     mainWindow = createMainWindow();
 
+    // Firmenverwaltung (M5, Ordner-als-Datenbank). Der Desktop wird pro
+    // Zugriff aufgeloest (OneDrive-/Known-Folder-Umleitung, paths.ts); im
+    // Test ersetzt VOICEWALL_TEST_BASE_DIR den Desktop vollstaendig.
+    const testBase = testBaseDir();
+    companyManager = new CompanyManager({
+      userDataPath: app.getPath('userData'),
+      logger,
+      appVersion: `VoiceWall ${app.getVersion()}`,
+      resolveDesktop: async () => {
+        if (testBase !== null) {
+          return testBase;
+        }
+        const desktop = await resolveDesktopDir();
+        return desktop.ok ? desktop.value : null;
+      },
+      localBase: testBase !== null ? join(testBase, 'VoiceWall-lokal') : localStorageBaseDir(),
+    });
+    companyManager.register();
+
     flowController = new DictationFlowController({
       userDataPath: app.getPath('userData'),
       logger,
       orchestrator,
+      companies: companyManager,
       openMainWindow,
       quitApp: () => {
         app.quit();

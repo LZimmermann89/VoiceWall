@@ -38,6 +38,16 @@ export const IpcChannel = {
   OverlayState: 'overlay:state',
   OverlayCopyLast: 'overlay:copy-last',
 
+  // Firmenverwaltung und Diktat-Speicher (M5, Ordner-als-Datenbank).
+  CompanyList: 'company:list',
+  CompanyPreviewName: 'company:preview-name',
+  CompanyCreate: 'company:create',
+  CompanySetActive: 'company:set-active',
+  CompanyCheckSync: 'company:check-sync',
+  DictateSaveLast: 'dictate:save-last',
+  DictateList: 'dictate:list',
+  SetDictateAutoSave: 'config:set-dictate-auto-save',
+
   // Nur in Dev/Test aktiv (siehe orchestrator/flow-controller): PCM-Injektion
   // und Diktat-Flow-Steuerung ohne echtes Mikrofon/echten OS-Paste.
   DevInjectPcm: 'dev:inject-pcm',

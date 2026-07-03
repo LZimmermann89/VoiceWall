@@ -8,6 +8,14 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { IpcChannel } from '../main/ipc/channels';
 import {
+  companyListViewSchema,
+  companyNamePreviewSchema,
+  createCompanyResultSchema,
+  dictateListResultSchema,
+  saveDictateResultSchema,
+  syncCheckViewSchema,
+} from '../shared/company';
+import {
   actionResultSchema,
   appStatusSchema,
   audioLevelSchema,
@@ -69,6 +77,24 @@ const bridge: VoiceWallBridge = {
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.CopyLastTranscript)),
   openAccessibilitySettings: async () =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.OpenAccessibilitySettings)),
+  listCompanies: async () =>
+    companyListViewSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanyList)),
+  previewCompanyName: async (name) =>
+    companyNamePreviewSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanyPreviewName, name)),
+  createCompany: async (name, strategie) =>
+    createCompanyResultSchema.parse(
+      await ipcRenderer.invoke(IpcChannel.CompanyCreate, { name, strategie }),
+    ),
+  setActiveCompany: async (pfad) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanySetActive, pfad)),
+  checkDesktopSync: async () =>
+    syncCheckViewSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanyCheckSync)),
+  saveLastDictate: async () =>
+    saveDictateResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateSaveLast)),
+  listDictates: async (filter) =>
+    dictateListResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateList, filter)),
+  setDictateAutoSave: async (enabled) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetDictateAutoSave, enabled)),
   devInjectPcm: async (pcm) => {
     try {
       return actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevInjectPcm, pcm));

@@ -9,6 +9,7 @@
  */
 import { StrictMode, useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { CompanyListView, ManifestEntry } from '../shared/company';
 import type { AppStatus, ModelProgress, TranscriptPayload } from '../shared/schema';
 import './styles.css';
 
@@ -41,12 +42,39 @@ function App(): ReactElement {
   const [notice, setNotice] = useState<string | null>(null);
   const levelDecay = useRef<number | null>(null);
 
+  // Firmenverwaltung (M5, minimale Test-UI; die echte Verwaltung folgt in M7).
+  const [companies, setCompanies] = useState<CompanyListView | null>(null);
+  const [companyNameInput, setCompanyNameInput] = useState('');
+  const [companyPreview, setCompanyPreview] = useState<string | null>(null);
+  const [companyNotice, setCompanyNotice] = useState<string | null>(null);
+  const [localStrategy, setLocalStrategy] = useState(false);
+  const [dictates, setDictates] = useState<ManifestEntry[] | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+
   const refreshStatus = useCallback(async () => {
     setStatus(await window.voicewall.getStatus());
   }, []);
 
+  const refreshCompanies = useCallback(async () => {
+    setCompanies(await window.voicewall.listCompanies());
+  }, []);
+
+  const refreshDictates = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    const result = await window.voicewall.listDictates(
+      trimmed.length === 0 ? {} : { text: trimmed },
+    );
+    if (result.ok) {
+      setDictates(result.eintraege);
+    } else {
+      setDictates(null);
+      setCompanyNotice(result.message);
+    }
+  }, []);
+
   useEffect(() => {
     void refreshStatus();
+    void refreshCompanies();
     const offStatus = window.voicewall.onStatus(setStatus);
     const offProgress = window.voicewall.onModelProgress(setProgress);
     const offTranscript = window.voicewall.onTranscript((payload: TranscriptPayload) => {
@@ -66,7 +94,7 @@ function App(): ReactElement {
       offLevel();
       offError();
     };
-  }, [refreshStatus]);
+  }, [refreshStatus, refreshCompanies]);
 
   // Pegel langsam abklingen lassen, damit die Anzeige nicht springt.
   useEffect(() => {
@@ -251,6 +279,207 @@ function App(): ReactElement {
               Systemeinstellungen oeffnen
             </button>
           </div>
+        )}
+      </section>
+
+      <section aria-label="Firmen und Diktate">
+        <h2>Firmen und Diktate</h2>
+        <div className="actions">
+          <label htmlFor="company-name-input">Neue Firma:</label>
+          <input
+            id="company-name-input"
+            type="text"
+            value={companyNameInput}
+            placeholder="z. B. Müller & Söhne GmbH"
+            data-testid="company-name-input"
+            onChange={(event) => {
+              setCompanyNameInput(event.target.value);
+              setCompanyPreview(null);
+            }}
+          />
+          <button
+            type="button"
+            disabled={busy || companyNameInput.trim().length === 0}
+            data-testid="company-preview-button"
+            onClick={() =>
+              void runAction(async () => {
+                const preview = await window.voicewall.previewCompanyName(companyNameInput.trim());
+                if (preview.ok) {
+                  setCompanyPreview(preview.ordnername);
+                }
+                return preview;
+              })
+            }
+          >
+            Ordnername pruefen
+          </button>
+          <button
+            type="button"
+            disabled={busy || companyNameInput.trim().length === 0}
+            data-testid="company-create-button"
+            onClick={() =>
+              void runAction(async () => {
+                const result = await window.voicewall.createCompany(
+                  companyNameInput.trim(),
+                  localStrategy ? 'lokal-mit-verknuepfung' : 'desktop',
+                );
+                if (result.ok) {
+                  setCompanyNotice(
+                    [
+                      result.uebernommen
+                        ? `Bestehender Firmenordner "${result.ordnername}" uebernommen.`
+                        : `Firma "${result.ordnername}" angelegt.`,
+                      result.syncWarnung ?? '',
+                      result.verknuepfungHinweis ?? '',
+                    ]
+                      .filter((part) => part.length > 0)
+                      .join(' '),
+                  );
+                  setCompanyNameInput('');
+                  setCompanyPreview(null);
+                  await refreshCompanies();
+                  await refreshDictates(searchInput);
+                  return { ok: true as const };
+                }
+                return {
+                  ok: false as const,
+                  message:
+                    result.vorschlag === null
+                      ? result.message
+                      : `${result.message} Vorschlag: ${result.vorschlag}`,
+                };
+              })
+            }
+          >
+            Firma anlegen
+          </button>
+        </div>
+        {companyPreview !== null && (
+          <p className="notice" data-testid="company-preview">
+            Ordnername: {companyPreview}
+          </p>
+        )}
+        <div className="actions">
+          <label>
+            <input
+              type="checkbox"
+              checked={localStrategy}
+              disabled={busy}
+              onChange={(event) => {
+                setLocalStrategy(event.target.checked);
+              }}
+            />{' '}
+            Lokal unter ~/VoiceWall speichern, auf dem Desktop nur Verknuepfung (empfohlen bei
+            Cloud-Sync)
+          </label>
+        </div>
+        <div className="actions">
+          <label>
+            <input
+              type="checkbox"
+              checked={companies?.autoSpeichern ?? false}
+              disabled={busy || (companies?.firmen.length ?? 0) === 0}
+              data-testid="dictate-auto-save"
+              onChange={(event) =>
+                void runAction(async () => {
+                  const result = await window.voicewall.setDictateAutoSave(event.target.checked);
+                  await refreshCompanies();
+                  return result;
+                })
+              }
+            />{' '}
+            Diktate automatisch in der aktiven Firma speichern
+          </label>
+          <button
+            type="button"
+            disabled={busy || lastTranscript === null || (companies?.firmen.length ?? 0) === 0}
+            data-testid="save-last-dictate"
+            onClick={() =>
+              void runAction(async () => {
+                const result = await window.voicewall.saveLastDictate();
+                if (result.ok) {
+                  setCompanyNotice(`Diktat gespeichert: ${result.pfad}`);
+                  await refreshDictates(searchInput);
+                  return { ok: true as const };
+                }
+                return result;
+              })
+            }
+          >
+            Letztes Diktat speichern
+          </button>
+        </div>
+        {companies !== null && companies.firmen.length > 0 ? (
+          <ul className="status-list" data-testid="company-list">
+            {companies.firmen.map((firma) => (
+              <li key={firma.pfad}>
+                {firma.aktiv ? <strong>{firma.anzeigename} (aktiv)</strong> : firma.anzeigename}{' '}
+                {!firma.aktiv && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      void runAction(async () => {
+                        const result = await window.voicewall.setActiveCompany(firma.pfad);
+                        await refreshCompanies();
+                        await refreshDictates(searchInput);
+                        return result;
+                      })
+                    }
+                  >
+                    Aktivieren
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="placeholder" data-testid="company-list-empty">
+            Noch keine Firma angelegt.
+          </p>
+        )}
+        <div className="actions">
+          <label htmlFor="dictate-search-input">Diktate durchsuchen:</label>
+          <input
+            id="dictate-search-input"
+            type="text"
+            value={searchInput}
+            placeholder="Titel, Tag oder Textanfang"
+            data-testid="dictate-search-input"
+            onChange={(event) => {
+              setSearchInput(event.target.value);
+            }}
+          />
+          <button
+            type="button"
+            disabled={busy || (companies?.firmen.length ?? 0) === 0}
+            data-testid="dictate-search-button"
+            onClick={() => void refreshDictates(searchInput)}
+          >
+            Anzeigen
+          </button>
+        </div>
+        {dictates !== null &&
+          (dictates.length === 0 ? (
+            <p className="placeholder" data-testid="dictate-list-empty">
+              Keine Diktate gefunden.
+            </p>
+          ) : (
+            <ol className="transcript-list" data-testid="dictate-list">
+              {dictates.map((entry) => (
+                <li key={entry.id}>
+                  <span className="transcript-text">{entry.titel}</span>
+                  <span className="transcript-meta">
+                    {entry.erstellt} · {entry.wortzahl} Woerter · {entry.pfad}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ))}
+        {companyNotice !== null && (
+          <p className="notice" data-testid="company-notice">
+            {companyNotice}
+          </p>
         )}
       </section>
 
