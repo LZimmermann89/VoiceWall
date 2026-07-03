@@ -19,7 +19,7 @@
  *   testbar bleiben.
  */
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, rm, stat } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import {
   transcriptMetaSchema,
@@ -236,6 +236,43 @@ export async function createTranscript(
     return ok({ meta: checked.data, relPfad: toRelPfad(companyDir, filePath) });
   }
   return err('Das Diktat konnte nicht angelegt werden (Dateinamens-Kollision).');
+}
+
+/**
+ * Listet alle Diktate im Papierkorb (flache `.md`-Dateien direkt unter
+ * `Papierkorb/`). Nicht lesbare/kaputte Dateien werden uebersprungen (nie
+ * geloescht), damit ein einzelnes beschaedigtes Diktat die Liste nicht
+ * verhindert. Neueste (nach `erstellt`) zuerst.
+ */
+export async function listPapierkorb(
+  companyDir: string,
+): Promise<Result<TranscriptDocument[], string>> {
+  const dirResult = resolveInsideDir(companyDir, PAPIERKORB_DIR);
+  if (!dirResult.ok) {
+    return dirResult;
+  }
+  let names: string[];
+  try {
+    names = await readdir(dirResult.value);
+  } catch {
+    // Kein Papierkorb-Ordner (noch nie etwas geloescht): leere Liste.
+    return ok([]);
+  }
+  const docs: TranscriptDocument[] = [];
+  for (const name of names) {
+    if (!name.endsWith('.md') || name.startsWith('.')) {
+      continue;
+    }
+    const doc = await readTranscript(companyDir, `${PAPIERKORB_DIR}/${name}`, PAPIERKORB_DIR);
+    if (doc.ok) {
+      docs.push(doc.value);
+    }
+  }
+  return ok(
+    docs.sort((a, b) =>
+      a.meta.erstellt < b.meta.erstellt ? 1 : a.meta.erstellt > b.meta.erstellt ? -1 : 0,
+    ),
+  );
 }
 
 /** Liest ein Diktat (Containment-gesichert, Schema-validiert). */

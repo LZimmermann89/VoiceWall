@@ -19,25 +19,39 @@
  */
 import { mkdir, readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
-import { ipcMain } from 'electron';
+import { ipcMain, shell } from 'electron';
 import { z } from 'zod';
 import {
   companyConfigSchema,
   companyDetailsSchema,
   companyStorageStrategySchema,
   dictateSearchFilterSchema,
+  dictateUpdateInputSchema,
+  exportInputSchema,
+  manualNoteInputSchema,
+  safeRelativePathSchema,
+  type BelegInfoResult,
   type CompanyDetails,
   type CompanyInfo,
   type CompanyListView,
   type CompanyNamePreview,
   type CompanyStorageStrategy,
   type CreateCompanyResult,
+  type DictateDetailResult,
   type DictateListResult,
+  type DictateMutationResult,
   type DictateSearchFilter,
+  type DictateUpdateInput,
+  type ExportInput,
+  type ExportResult,
+  type ManualNoteInput,
   type SaveDictateResult,
   type SyncCheckView,
   type TranscriptQuelle,
+  type TrashListResult,
 } from '../../shared/company';
+import type { ActionResult } from '../../shared/schema';
+import { collectBelegInfo } from '../beleg/beleg-info';
 import type { GlobalConfig } from '../../shared/config';
 import { readGlobalConfig, writeGlobalConfig } from '../config/config-store';
 import { IpcChannel } from '../ipc/channels';
@@ -45,6 +59,7 @@ import type { Logger } from '../log/logger';
 import { migrateCompanyFolder } from './migration';
 import {
   CONFIG_FILE,
+  EXPORTE_DIR,
   VOICEWALL_DIR,
   createCompanyFolder,
   isVoiceWallFolder,
@@ -53,10 +68,13 @@ import { isDirectChildOf } from './containment';
 import {
   addKnownTags,
   buildManifestEntry,
+  readKnownTags,
   readManifestWithHealing,
+  removeManifestEntry,
   searchManifest,
   upsertManifestEntry,
 } from './manifest';
+import { exportTranscript } from './export';
 import { sanitizeCompanyName } from './sanitize';
 import {
   checkSyncExposure,
@@ -64,7 +82,16 @@ import {
   localStorageBaseDir,
   type SyncCheckResult,
 } from './sync-detection';
-import { createTranscript, readTranscript } from './transcripts';
+import {
+  createTranscript,
+  hardDeleteTranscript,
+  listPapierkorb,
+  readTranscript,
+  restoreTranscript,
+  softDeleteTranscript,
+  updateTranscript,
+} from './transcripts';
+import { resolveInsideDir } from './containment';
 
 export interface CompanyManagerDeps {
   readonly userDataPath: string;
@@ -465,6 +492,239 @@ export class CompanyManager {
     return result.ok ? { ok: true, body: result.value.body } : { ok: false, message: result.error };
   }
 
+  // ------------------------------------------------------------------
+  // Verwaltungs-UI (M7): Detail, Bearbeiten, Notiz, Tags, Export,
+  // Papierkorb, Beleg. Alle Operationen arbeiten AUSSCHLIESSLICH im
+  // Ordner der aktiven Firma; Pfade sind stets sichere relative Pfade,
+  // die der Main-Prozess selbst aufloest und auf Containment prueft.
+  // ------------------------------------------------------------------
+
+  private async requireActiveDir(): Promise<
+    { ok: true; dir: string } | { ok: false; message: string }
+  > {
+    const companyDir = await this.activeCompanyDir();
+    if (companyDir === null) {
+      return {
+        ok: false,
+        message: 'Keine aktive Firma. Bitte zuerst eine Firma anlegen oder aktivieren.',
+      };
+    }
+    return { ok: true, dir: companyDir };
+  }
+
+  /** Vollstaendige Detailansicht eines Diktats (Metadaten plus Body). */
+  async getDictate(relPfad: string): Promise<DictateDetailResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const doc = await readTranscript(active.dir, relPfad);
+    if (!doc.ok) {
+      return { ok: false, message: doc.error };
+    }
+    return {
+      ok: true,
+      detail: { meta: doc.value.meta, body: doc.value.body, pfad: doc.value.relPfad },
+    };
+  }
+
+  /**
+   * Bearbeitet ein Diktat: Titel, Body und/oder Tags. Die update-API fuehrt
+   * `geaendert`/`version` atomar nach; das Manifest wird inkrementell
+   * aktualisiert und neue Tags landen in tags.json.
+   */
+  async updateDictate(input: DictateUpdateInput): Promise<DictateMutationResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const changes: {
+      titel?: string;
+      body?: string;
+      tags?: readonly string[];
+    } = {};
+    if (input.titel !== undefined) {
+      changes.titel = input.titel;
+    }
+    if (input.body !== undefined) {
+      changes.body = input.body;
+    }
+    if (input.tags !== undefined) {
+      changes.tags = input.tags;
+    }
+    const updated = await updateTranscript(active.dir, input.pfad, changes);
+    if (!updated.ok) {
+      return { ok: false, message: updated.error };
+    }
+    const entry = buildManifestEntry(updated.value.meta, updated.value.relPfad, updated.value.body);
+    await upsertManifestEntry(active.dir, entry);
+    if (updated.value.meta.tags.length > 0) {
+      await addKnownTags(active.dir, updated.value.meta.tags);
+    }
+    this.deps.logger.info('Diktat bearbeitet.', { version: updated.value.meta.version });
+    return { ok: true, eintrag: entry, version: updated.value.meta.version };
+  }
+
+  /** Legt eine manuelle Notiz an (Quelle `manuell`, ohne Diktat). */
+  async createManualNote(input: ManualNoteInput): Promise<SaveDictateResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const created = await createTranscript(active.dir, {
+      titel: input.titel,
+      body: input.body,
+      sprache: 'de',
+      // Kein Erkennungsmodell: manuelle Eingabe. Der Wert dokumentiert die Herkunft.
+      modell: 'manuell',
+      dauerSekunden: 0,
+      tags: [],
+      quelle: 'manuell',
+    });
+    if (!created.ok) {
+      return { ok: false, message: created.error };
+    }
+    await upsertManifestEntry(
+      active.dir,
+      buildManifestEntry(created.value.meta, created.value.relPfad, input.body),
+    );
+    this.deps.logger.info('Manuelle Notiz angelegt.');
+    return { ok: true, pfad: created.value.relPfad, id: created.value.meta.id };
+  }
+
+  /** Soft-Delete: verschiebt ein Diktat in den Papierkorb, blendet es im Index aus. */
+  async softDeleteDictate(relPfad: string): Promise<ActionResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const doc = await readTranscript(active.dir, relPfad);
+    if (!doc.ok) {
+      return { ok: false, message: doc.error };
+    }
+    const moved = await softDeleteTranscript(active.dir, relPfad);
+    if (!moved.ok) {
+      return { ok: false, message: moved.error };
+    }
+    await removeManifestEntry(active.dir, doc.value.meta.id);
+    this.deps.logger.info('Diktat in den Papierkorb verschoben.');
+    return { ok: true };
+  }
+
+  /** Papierkorb-Liste der aktiven Firma. */
+  async listTrash(): Promise<TrashListResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const docs = await listPapierkorb(active.dir);
+    if (!docs.ok) {
+      return { ok: false, message: docs.error };
+    }
+    return {
+      ok: true,
+      eintraege: docs.value.map((doc) => buildManifestEntry(doc.meta, doc.relPfad, doc.body)),
+    };
+  }
+
+  /** Stellt ein Diktat aus dem Papierkorb wieder her und aktualisiert den Index. */
+  async restoreDictate(papierkorbRelPfad: string): Promise<ActionResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const restored = await restoreTranscript(active.dir, papierkorbRelPfad);
+    if (!restored.ok) {
+      return { ok: false, message: restored.error };
+    }
+    const doc = await readTranscript(active.dir, restored.value.relPfad);
+    if (doc.ok) {
+      await upsertManifestEntry(
+        active.dir,
+        buildManifestEntry(doc.value.meta, doc.value.relPfad, doc.value.body),
+      );
+    }
+    this.deps.logger.info('Diktat aus dem Papierkorb wiederhergestellt.');
+    return { ok: true };
+  }
+
+  /** Endgueltiges Loeschen aus dem Papierkorb (unwiderruflich). */
+  async hardDeleteDictate(papierkorbRelPfad: string): Promise<ActionResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const removed = await hardDeleteTranscript(active.dir, papierkorbRelPfad);
+    if (!removed.ok) {
+      return { ok: false, message: removed.error };
+    }
+    this.deps.logger.info('Diktat endgültig gelöscht.');
+    return { ok: true };
+  }
+
+  /** Exportiert ein Diktat als Markdown/TXT nach `Exporte/`. */
+  async exportDictate(input: ExportInput): Promise<ExportResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const result = await exportTranscript(
+      active.dir,
+      input.pfad,
+      input.format,
+      input.mitFrontMatter,
+    );
+    if (!result.ok) {
+      return { ok: false, message: result.error };
+    }
+    this.deps.logger.info('Diktat exportiert.', { format: input.format });
+    return { ok: true, anzeigePfad: result.value.absPfad, relPfad: result.value.relPfad };
+  }
+
+  /**
+   * Zeigt eine Exportdatei im Datei-Manager (Finder/Explorer). Der relative
+   * Pfad wird im Main-Prozess erneut gegen `Exporte/` aufgeloest und auf
+   * Containment geprueft (ein statischer, gepruefter Pfad; nie roh vom
+   * Renderer verwendet).
+   */
+  async revealExport(relPfad: string): Promise<ActionResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const normalized = relPfad.normalize('NFC');
+    if (normalized !== EXPORTE_DIR && !normalized.startsWith(`${EXPORTE_DIR}/`)) {
+      return { ok: false, message: 'Ungültiger Exportpfad.' };
+    }
+    const resolved = resolveInsideDir(active.dir, normalized);
+    if (!resolved.ok) {
+      return { ok: false, message: resolved.error };
+    }
+    shell.showItemInFolder(resolved.value);
+    return { ok: true };
+  }
+
+  /** Bekannte Tags der aktiven Firma (Autocomplete/Filter). */
+  async listTags(): Promise<readonly string[]> {
+    const companyDir = await this.activeCompanyDir();
+    if (companyDir === null) {
+      return [];
+    }
+    return readKnownTags(companyDir);
+  }
+
+  /** Beleg-Informationen (Modelle, Pruefsummen, Konsent, Log-Pfad). */
+  async belegInfo(): Promise<BelegInfoResult> {
+    const config = await this.loadConfig();
+    const beleg = await collectBelegInfo({
+      userDataPath: this.deps.userDataPath,
+      appVersion: this.deps.appVersion,
+      platform: process.platform,
+      modelChoice: config.modell,
+    });
+    return { ok: true, beleg };
+  }
+
   /**
    * Registriert die IPC-Handler der Firmenverwaltung. Jeder Handler
    * validiert seine Eingabe mit zod und antwortet mit typisierten Results;
@@ -586,5 +846,114 @@ export class CompanyManager {
         },
       );
     });
+
+    const internalError =
+      'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.';
+    const relPathHandler = <T>(
+      channel: string,
+      badInput: T,
+      internal: T,
+      action: (relPfad: string) => Promise<T>,
+    ): void => {
+      ipcMain.handle(channel, (_event, raw: unknown) => {
+        const parsed = safeRelativePathSchema.safeParse(raw);
+        if (!parsed.success) {
+          return Promise.resolve(badInput);
+        }
+        return guard<T>(internal, () => action(parsed.data));
+      });
+    };
+
+    const actionBadInput: ActionResult = { ok: false, message: 'Ungültige Eingabe.' };
+    const actionInternal: ActionResult = { ok: false, message: internalError };
+
+    ipcMain.handle(IpcChannel.DictateGet, (_event, raw: unknown) => {
+      const parsed = safeRelativePathSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<DictateDetailResult>({
+          ok: false,
+          message: 'Ungültiger Diktat-Pfad.',
+        });
+      }
+      return guard<DictateDetailResult>({ ok: false, message: internalError }, () =>
+        this.getDictate(parsed.data),
+      );
+    });
+
+    ipcMain.handle(IpcChannel.DictateUpdate, (_event, raw: unknown) => {
+      const parsed = dictateUpdateInputSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<DictateMutationResult>({
+          ok: false,
+          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für die Bearbeitung.',
+        });
+      }
+      return guard<DictateMutationResult>({ ok: false, message: internalError }, () =>
+        this.updateDictate(parsed.data),
+      );
+    });
+
+    ipcMain.handle(IpcChannel.DictateCreateManual, (_event, raw: unknown) => {
+      const parsed = manualNoteInputSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<SaveDictateResult>({
+          ok: false,
+          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für die Notiz.',
+        });
+      }
+      return guard<SaveDictateResult>({ ok: false, message: internalError }, () =>
+        this.createManualNote(parsed.data),
+      );
+    });
+
+    relPathHandler<ActionResult>(
+      IpcChannel.DictateSoftDelete,
+      actionBadInput,
+      actionInternal,
+      (relPfad) => this.softDeleteDictate(relPfad),
+    );
+    relPathHandler<ActionResult>(
+      IpcChannel.DictateRestore,
+      actionBadInput,
+      actionInternal,
+      (relPfad) => this.restoreDictate(relPfad),
+    );
+    relPathHandler<ActionResult>(
+      IpcChannel.DictateHardDelete,
+      actionBadInput,
+      actionInternal,
+      (relPfad) => this.hardDeleteDictate(relPfad),
+    );
+    relPathHandler<ActionResult>(
+      IpcChannel.DictateRevealExport,
+      actionBadInput,
+      actionInternal,
+      (relPfad) => this.revealExport(relPfad),
+    );
+
+    ipcMain.handle(IpcChannel.DictateExport, (_event, raw: unknown) => {
+      const parsed = exportInputSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<ExportResult>({
+          ok: false,
+          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für den Export.',
+        });
+      }
+      return guard<ExportResult>({ ok: false, message: internalError }, () =>
+        this.exportDictate(parsed.data),
+      );
+    });
+
+    ipcMain.handle(IpcChannel.DictateTrashList, () =>
+      guard<TrashListResult>({ ok: false, message: internalError }, () => this.listTrash()),
+    );
+
+    ipcMain.handle(IpcChannel.DictateTagsList, () =>
+      guard<readonly string[]>([], () => this.listTags()),
+    );
+
+    ipcMain.handle(IpcChannel.BelegInfo, () =>
+      guard<BelegInfoResult>({ ok: false, message: internalError }, () => this.belegInfo()),
+    );
   }
 }

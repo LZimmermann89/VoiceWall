@@ -414,3 +414,62 @@ Schwachhardware-Tests, deshalb bewusst v1.1 (im Wizard als Hinweis genannt).
 NVDA (bisher nur strukturelle ARIA-Korrektheit), `prefers-reduced-motion`
 (v1 hat fast keine Animationen), Zoom-Test 200 %, vollständige
 BFSG-Konformitätserklärung (M9-Rechtstexte), Overlay-Fenster-Semantik.
+
+## E23: Verwaltungs-UI als Ansichts-Container ohne Router (M7)
+
+Die Verwaltungs-UI (`src/renderer/app/MainView.tsx`) ist ein schlanker
+Container mit vier Ansichten (Diktat, Register, Papierkorb, Beleg) plus
+prominentem Firmen-Umschalter oben. Bewusst KEIN Router-Paket: der
+Ansichtswechsel ist ein `useState`-Umschalter (wie schon in M6 vorbereitet),
+das spart eine Abhängigkeit und hält die CSP eng.
+
+- **Startansicht ist "Diktat"** (der operative Kopfbereich: Status, letztes
+  Diktat mit Kopieren-Knopf, Hotkey, Testaufnahme). Das Register
+  (Aktenverzeichnis) ist einen Klick entfernt. Grund: die tägliche
+  Kernhandlung ist das Diktat; die frühere Hauptansicht bleibt so vollständig
+  erreichbar (Anforderung "Diktat-Integration").
+- **Remount-Strategie:** Register- und Papierkorb-Ansicht werden per React-
+  `key` an die aktive Firma gebunden. Ein Firmenwechsel lädt damit den
+  getrennten Bestand frisch (Remount); Datenänderungen INNERHALB einer Firma
+  (Bearbeiten, Soft-Delete) lösen bewusst KEINEN Remount aus, damit der
+  Detail-/Bearbeiten-Zustand erhalten bleibt.
+- **Genau eine sichtbare H1** trägt die App-Shell (Wortmarke); jede Ansicht
+  hat eine H2 (`.view-title`), Abschnitte darunter H3. Beim Ansichtswechsel
+  erhält die H2 programmatisch den Fokus (Screenreader-Ansage). Der bisherige
+  Smoke-Test wurde auf diese H2/H3-Hierarchie angepasst.
+
+## E24: Sicherheit der Verwaltungs-UI (Containment, Stored-XSS) (M7)
+
+- **Pfade kommen nie roh vom Renderer.** Der Renderer nennt ausschließlich
+  sichere relative Pfade (IDs bzw. `Diktate/…`, `Papierkorb/…`, `Exporte/…`);
+  der Main-Prozess löst sie selbst auf und prüft Containment nach
+  `path.resolve` (containment.ts, sanitize.ts). Das gilt auch für den
+  "Im Finder zeigen"-Aufruf: `revealExport` bekommt nur den relativen
+  Exportpfad, prüft ihn erneut gegen `Exporte/` und ruft erst dann
+  `shell.showItemInFolder` mit dem selbst aufgelösten absoluten Pfad.
+- **Stored-XSS:** der Diktat-Body wird ausschließlich als React-Textknoten
+  gerendert, nie als Roh-HTML, kein Markdown-Rendering in v1. Ein Diktat mit
+  Inhalt wie `<img src=x onerror=…><script>…` erscheint als Text; es entsteht
+  kein `img`-/`script`-Element und kein Skript läuft. Der E2E-Test
+  `tests/e2e/manage.spec.ts` (XSS-Probe) belegt das.
+- **Jeder IPC-Handler** validiert seine Eingabe mit zod, antwortet mit
+  typisierten Result-Objekten (deutsche Fehlermeldung mit nächstem Schritt)
+  und reicht nie Stacktraces über die Prozessgrenze.
+
+## E25: Export MD/TXT in v1, PDF/Volltext/Tag-Batch-Rename bewusst v1.1 (M7)
+
+Der v1-Export (`src/main/storage/export.ts`) schreibt Markdown (mit oder ohne
+YAML-Front-Matter, wählbar) und reinen Text (nur Body) atomar nach `Exporte/`
+im Firmenordner, Kollisionen lösen ein Zufalls-Suffix (nie überschreiben).
+
+**Bewusst v1.1 (M8), in der UI nicht angeboten:**
+
+- **PDF-Export** (via `webContents.printToPDF()`, DoD-Pflicht echte Umlaute).
+- **Volltextsuche über die Bodies** (v1 sucht schnell über das Manifest:
+  Titel, Tags, Vorschau). Die UI nennt die Schnellsuche entsprechend.
+- **Tag-Batch-Rename** über alle betroffenen Diktate (atomarer Manifest-
+  Rewrite). v1 kann Tags pro Diktat hinzufügen/entfernen mit Autocomplete
+  aus `tags.json`; ein firmenweites Umbenennen fehlt bewusst.
+
+Damit verschiebt sich das Kernprodukt nicht hinter UI-Ausbau; M8 zieht diese
+drei Posten sauber nach.

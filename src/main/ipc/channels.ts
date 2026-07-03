@@ -53,6 +53,21 @@ export const IpcChannel = {
   DictateList: 'dictate:list',
   SetDictateAutoSave: 'config:set-dictate-auto-save',
 
+  // Verwaltungs-UI (M7, ABARBEITUNG 4.8): Detail, Bearbeiten, Tags, Notiz,
+  // Export, Papierkorb, Beleg. Jeder Handler validiert per zod; Pfade werden
+  // NIE roh uebergeben (nur sichere relative Pfade, Aufloesung im Main).
+  DictateGet: 'dictate:get',
+  DictateUpdate: 'dictate:update',
+  DictateCreateManual: 'dictate:create-manual',
+  DictateSoftDelete: 'dictate:soft-delete',
+  DictateRestore: 'dictate:restore',
+  DictateHardDelete: 'dictate:hard-delete',
+  DictateExport: 'dictate:export',
+  DictateRevealExport: 'dictate:reveal-export',
+  DictateTrashList: 'dictate:trash-list',
+  DictateTagsList: 'dictate:tags-list',
+  BelegInfo: 'beleg:info',
+
   // Nur in Dev/Test aktiv (siehe orchestrator/flow-controller): PCM-Injektion
   // und Diktat-Flow-Steuerung ohne echtes Mikrofon/echten OS-Paste.
   DevInjectPcm: 'dev:inject-pcm',

@@ -1288,11 +1288,11 @@ Die Roadmap ist streng sequenziell. Sie ist bewusst so geschnitten, dass die dre
 **Ziel:** Die zweite Saeule neben dem Diktat, auf das v1-Notwendige geschnitten (Kritik C3).
 
 **Aufgaben (Checkliste):**
-- [ ] **v1:** Liste, Schnellsuche (Manifest), Tags, MD/TXT-Export, Soft-Delete/Papierkorb, Detailansicht, Bearbeiten (atomar, `geaendert`/`version` nachfuehren), Firmen-Umschalter, Beleg-Ansicht ("0 externe Verbindungen", Modellversion, SBOM-Link).
-- [ ] **Explizit v1.1 (nicht v1):** PDF-Export, Volltext-Cache, Tag-Batch-Rename. So markieren, damit sich das Kernprodukt nicht hinter UI-Ausbau verschiebt.
-- [ ] Genau eine sichtbare H1 je Ansicht (Konsistenz-Standard des Auftraggebers).
+- [x] **v1:** Liste (`RegisterView`, sortierbar Datum/Titel/Wortzahl), Schnellsuche (Manifest) plus Filter (Zeitraum, Tags-Mehrfachauswahl, Quelle), Tags (Hinzufuegen/Entfernen mit Autocomplete aus `tags.json`), MD/TXT-Export (`storage/export.ts`, atomar nach `Exporte/`, mit "Im Finder zeigen"), Soft-Delete/Papierkorb (`TrashView`, Wiederherstellen, endgueltig loeschen mit Bestaetigungsdialog), Detailansicht (Volltext als Textknoten, kein HTML), Bearbeiten (atomar, `geaendert`/`version` nachgefuehrt), manuelle Notiz (Quelle `manuell`), Firmen-Umschalter (oben, prominent) plus "Neue Firma einrichten" (bestehender Wizard-Flow), Beleg-Ansicht (`BelegView`: "0 externe Verbindungen", Modellversion + SHA-256 + Pfad, eingebetteter Netzwerk-Selbsttest, Konsent-Zeitstempel, App-Version, Log-Pfad).
+- [x] **Explizit v1.1 (nicht v1):** PDF-Export, Volltextsuche ueber Bodies, Tag-Batch-Rename. In der UI nicht angeboten; in `docs/ENTSCHEIDUNGEN.md` E25 als bewusst v1.1 (M8) dokumentiert.
+- [x] Genau eine sichtbare H1 je Ansicht (App-Shell-Wortmarke; jede Ansicht H2, Abschnitte H3; Fokus wandert beim Ansichtswechsel auf die H2).
 
-**Definition of Done:** Diktat anlegen, per Schnellsuche finden, bearbeiten, taggen, als MD/TXT exportieren, per Soft-Delete loeschen und wiederherstellen; Firmenwechsel laedt getrennten Bestand; alle Operationen schreiben atomar; Netzwerk-Tab null externe Requests; v1.1-Posten sind sichtbar zurueckgestellt.
+**Definition of Done:** ERFUELLT. Diktat anlegen (manuelle Notiz), per Schnellsuche finden, bearbeiten, taggen, als MD/TXT exportieren, per Soft-Delete loeschen und wiederherstellen; Firmenwechsel laedt getrennten Bestand (E2E mit zwei Firmen); alle Operationen schreiben atomar; Netzwerk-Tab null externe Requests (network-isolation.spec.ts gruen); v1.1-Posten sichtbar zurueckgestellt. Belegt durch `tests/e2e/manage.spec.ts` (inkl. XSS-Probe) und `tests/unit/export.test.ts`.
 
 **Aufwand:** 6 bis 8 PT.
 

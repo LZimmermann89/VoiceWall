@@ -39,9 +39,12 @@ test('App startet mit genau einer sichtbaren H1 und sichtbarer Status-UI', async
     await expect(headings.first()).toBeVisible();
     await expect(headings.first()).toContainText('VoiceWall');
 
-    // Status-UI sichtbar: das Rendern der Statusliste belegt zugleich, dass
-    // getStatus ueber die IPC-Bruecke aufgeloest wurde.
-    await expect(window.getByRole('heading', { name: 'Status', level: 2 })).toBeVisible();
+    // Status-UI sichtbar (Ansicht "Diktat" ist die Startansicht der
+    // Verwaltung): das Rendern der Statusliste belegt zugleich, dass
+    // getStatus ueber die IPC-Bruecke aufgeloest wurde. Die Ansichts-
+    // Ueberschrift ist eine H2, die Abschnitts-Ueberschriften sind H3 (M7).
+    await expect(window.getByRole('heading', { name: 'Diktat', level: 2 })).toBeVisible();
+    await expect(window.getByRole('heading', { name: 'Status', level: 3 })).toBeVisible();
     await expect(window.getByText('Einwilligung:')).toBeVisible();
     await expect(window.getByRole('button', { name: 'Testaufnahme starten' })).toBeVisible();
   } finally {
