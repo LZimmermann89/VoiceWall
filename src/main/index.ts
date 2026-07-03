@@ -6,7 +6,8 @@
  */
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, globalShortcut } from 'electron';
+import { DictationFlowController } from './dictation/flow-controller';
 import { registerIpcHandlers } from './ipc/handlers';
 import { createLogger } from './log/logger';
 import { DictationOrchestrator } from './stt/orchestrator';
@@ -19,6 +20,7 @@ app.setName('voicewall');
 
 let mainWindow: BrowserWindow | null = null;
 let orchestrator: DictationOrchestrator | null = null;
+let flowController: DictationFlowController | null = null;
 
 /**
  * Der Dev-/Test-PCM-Injektionskanal ist nur aktiv, wenn er explizit per
@@ -94,12 +96,9 @@ if (!hasSingleInstanceLock) {
   hardenCrashDumps();
 
   app.on('second-instance', () => {
-    if (mainWindow !== null) {
-      if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-      }
-      mainWindow.focus();
-    }
+    // Fenster wieder oeffnen bzw. nach vorn holen (auch wenn es seit M3 bei
+    // laufender Tray-App geschlossen sein kann).
+    openMainWindow();
   });
 
   // Navigations-Härtung für alle WebContents: keine Navigation weg vom
@@ -111,19 +110,34 @@ if (!hasSingleInstanceLock) {
     contents.setWindowOpenHandler(() => ({ action: 'deny' }));
   });
 
-  // Auch auf macOS beenden, wenn alle Fenster zu sind: Ohne sichtbares Fenster
-  // gibt es aktuell keinen Grund weiterzulaufen (kein Tray, kein
-  // Hintergrund-Diktat in diesem Meilenstein).
+  // Seit M3 lebt die App nach dem Onboarding (Einwilligung erteilt) ohne
+  // Fenster weiter: Tray und globaler Hotkey tragen das systemweite Diktat.
+  // Vor dem Onboarding gibt es weder Hotkey-Nutzen noch Tray-Erwartung,
+  // dann beendet das Schliessen des Fensters die App (M0-Verhalten).
   app.on('window-all-closed', () => {
-    app.quit();
+    if (!(orchestrator?.isOnboarded() ?? false)) {
+      app.quit();
+    }
+  });
+
+  // macOS: Klick auf das Dock-Icon oeffnet das Fenster wieder.
+  app.on('activate', () => {
+    openMainWindow();
   });
 
   // Engine-Kind geordnet beenden, bevor die App schliesst.
   app.on('before-quit', () => {
+    flowController?.shutdown();
+    flowController = null;
     void orchestrator?.shutdown();
   });
 
-  void app.whenReady().then(() => {
+  // Hotkey systemweit freigeben, sonst bliebe er nach dem Beenden haengen.
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+  });
+
+  void app.whenReady().then(async () => {
     registerIpcHandlers();
     const logger = createLogger(app.getPath('userData'));
     orchestrator = new DictationOrchestrator({
@@ -135,6 +149,41 @@ if (!hasSingleInstanceLock) {
       useGpu: process.platform === 'darwin',
     });
     orchestrator.register();
+    // Einwilligungs-Status frueh laden: window-all-closed braucht ihn synchron.
+    await orchestrator.init();
+
+    // Hauptfenster VOR dem FlowController erzeugen: es bleibt damit das
+    // erste Fenster (Overlay kommt danach), was Tests und Werkzeuge, die auf
+    // das erste Fenster warten, deterministisch haelt.
     mainWindow = createMainWindow();
+
+    flowController = new DictationFlowController({
+      userDataPath: app.getPath('userData'),
+      logger,
+      orchestrator,
+      openMainWindow,
+      quitApp: () => {
+        app.quit();
+      },
+      enableTestIpc: isTestIpcEnabled(),
+    });
+    await flowController.init();
+    // Frisch registrierte M3-Statusanteile (Hotkey, Accessibility) anzeigen.
+    orchestrator.notifyStatusChanged();
   });
+}
+
+/** Oeffnet das Hauptfenster bzw. holt es in den Vordergrund (Tray/Dock). */
+function openMainWindow(): void {
+  if (mainWindow !== null && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
+  if (app.isReady()) {
+    mainWindow = createMainWindow();
+  }
 }

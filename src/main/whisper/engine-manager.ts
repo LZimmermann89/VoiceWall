@@ -62,6 +62,8 @@ export class WhisperEngineManager {
   private shuttingDown = false;
   private requestCounter = 0;
   private readonly pending = new Map<string, PendingSegment>();
+  /** Wartende flushAndWait-Aufrufer (Hotkey-Stop), aufgeloest bei flush-done. */
+  private readonly pendingFlushes = new Map<string, () => void>();
   private readonly workerPath = join(import.meta.dirname, 'engine.worker.js');
 
   constructor(
@@ -160,6 +162,14 @@ export class WhisperEngineManager {
           this.callbacks.onSilence();
         }
         return;
+      case 'flush-done': {
+        const waiter = this.pendingFlushes.get(event.requestId);
+        if (waiter !== undefined) {
+          this.pendingFlushes.delete(event.requestId);
+          waiter();
+        }
+        return;
+      }
       case 'transcribe-error':
         this.logger.error(`Transkriptionsfehler: ${event.message}`);
         if (event.requestId !== undefined) {
@@ -178,6 +188,12 @@ export class WhisperEngineManager {
     for (const [requestId] of this.pending) {
       this.resolvePending(requestId, err('Engine wurde beendet, bevor ein Ergebnis vorlag.'));
     }
+    // Wartende Flushes aufloesen (der Aufrufer arbeitet mit dem bis dahin
+    // eingegangenen Text weiter; haengen darf er nie).
+    for (const [, waiter] of this.pendingFlushes) {
+      waiter();
+    }
+    this.pendingFlushes.clear();
     if (this.shuttingDown) {
       this.logger.info('Whisper-Engine planmaessig beendet.');
       return;
@@ -232,6 +248,35 @@ export class WhisperEngineManager {
   /** Laufendes Segment jetzt verarbeiten (z. B. bei Stop der Aufnahme). */
   flush(): void {
     this.post({ type: 'flush' });
+  }
+
+  /**
+   * Wie flush(), wartet aber deterministisch, bis der Worker das letzte
+   * Segment verarbeitet hat (alle Transkript-Events sind dann zugestellt).
+   * Ein Timeout schuetzt gegen einen haengenden Worker; der Aufrufer arbeitet
+   * dann mit dem bis dahin eingegangenen Text weiter.
+   */
+  flushAndWait(timeoutMs: number): Promise<void> {
+    if (!this.ready || this.child === null) {
+      return Promise.resolve();
+    }
+    this.requestCounter += 1;
+    const requestId = `flush-${String(this.requestCounter)}`;
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        if (this.pendingFlushes.delete(requestId)) {
+          this.logger.warn(
+            `Flush-Timeout nach ${String(timeoutMs)} ms: verarbeite mit bisherigem Text weiter.`,
+          );
+          resolve();
+        }
+      }, timeoutMs);
+      this.pendingFlushes.set(requestId, () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      this.post({ type: 'flush', requestId });
+    });
   }
 
   /** Laufendes Segment ohne Transkription verwerfen. */

@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { expect, test, _electron as electron } from '@playwright/test';
 import electronPath from 'electron';
 import { modelsAvailable } from '../integration/model-fixtures';
+import { getMainUiWindow } from './main-window';
 
 const projectRoot = join(import.meta.dirname, '../..');
 const builtMainEntry = join(projectRoot, 'out/main/index.js');
@@ -30,7 +31,7 @@ test.beforeAll(() => {
 test('App startet mit genau einer sichtbaren H1 und sichtbarer Status-UI', async () => {
   const app = await electron.launch({ args: [builtMainEntry], cwd: projectRoot });
   try {
-    const window = await app.firstWindow();
+    const window = await getMainUiWindow(app);
 
     const headings = window.locator('h1');
     await expect(headings).toHaveCount(1);
@@ -50,7 +51,7 @@ test('App startet mit genau einer sichtbaren H1 und sichtbarer Status-UI', async
 test('Single-Instance-Lock: zweite Instanz beendet sich sofort', async () => {
   const app = await electron.launch({ args: [builtMainEntry], cwd: projectRoot });
   try {
-    await app.firstWindow();
+    await getMainUiWindow(app);
 
     // Zweite Instanz direkt über das Electron-Binary starten. Sie muss sich
     // wegen requestSingleInstanceLock() ohne Fenster selbst beenden.
@@ -75,8 +76,9 @@ test('Single-Instance-Lock: zweite Instanz beendet sich sofort', async () => {
 
     expect(secondInstanceExitCode).toBe(0);
 
-    // Die erste Instanz läuft weiter und hat unverändert genau ein Fenster.
-    expect(app.windows()).toHaveLength(1);
+    // Die erste Instanz läuft weiter und hat ihr Hauptfenster unverändert
+    // (seit M3 existiert zusätzlich das Diktat-Overlay als zweites Fenster).
+    expect(app.windows().filter((page) => page.url().includes('index.html'))).toHaveLength(1);
   } finally {
     await app.close();
   }
@@ -110,7 +112,7 @@ test('Dev-PCM-Injektion liefert korrekten deutschen Text in der UI (kein echtes 
     env: { ...process.env, VOICEWALL_ENABLE_TEST_IPC: '1' },
   });
   try {
-    const window = await app.firstWindow();
+    const window = await getMainUiWindow(app);
     await expect(window.locator('h1')).toHaveText('VoiceWall');
 
     const base64 = wavPcmBase64(fixtureWav);

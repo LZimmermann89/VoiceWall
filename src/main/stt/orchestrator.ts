@@ -15,7 +15,13 @@
  * Segment werden Ringpuffer und Engine-Pending aktiv genullt.
  */
 import { BrowserWindow, ipcMain, type IpcMainEvent } from 'electron';
-import type { AppStatus, MicrophoneState } from '../../shared/schema';
+import type {
+  AccessibilityState,
+  AppStatus,
+  DictationFlowStateView,
+  HotkeyStatus,
+  MicrophoneState,
+} from '../../shared/schema';
 import { createCaptureWindow } from '../audio/capture-window';
 import { DEFAULT_MAX_SAMPLES, PcmRingBuffer } from '../audio/ring-buffer';
 import { rmsFromInt16 } from '../../shared/pcm';
@@ -43,12 +49,38 @@ export interface OrchestratorDeps {
   readonly useGpu: boolean;
 }
 
+/**
+ * M3-Statusanteile des systemweiten Diktats. Liefert der FlowController per
+ * Provider; solange keiner registriert ist, gelten neutrale Defaults.
+ */
+export interface FlowStatus {
+  readonly flowState: DictationFlowStateView;
+  readonly hotkey: HotkeyStatus;
+  readonly accessibility: AccessibilityState;
+  readonly lastTranscript: string | null;
+  readonly clipboardRestoreEnabled: boolean;
+}
+
+const DEFAULT_FLOW_STATUS: FlowStatus = {
+  flowState: 'idle',
+  hotkey: { accelerator: '', registered: false },
+  accessibility: 'not-applicable',
+  lastTranscript: null,
+  clipboardRestoreEnabled: true,
+};
+
+/** Timeout fuer das Warten auf das letzte Segment beim Hotkey-Stop. */
+const FLUSH_TIMEOUT_MS = 30_000;
+
 export class DictationOrchestrator {
   private consentGranted = false;
+  private consentLoaded = false;
   private microphoneState: MicrophoneState = 'not-checked';
   private engineReady = false;
   private dictationActive = false;
   private lastError: string | null = null;
+  private transcriptListener: ((text: string) => void) | null = null;
+  private flowStatusProvider: (() => FlowStatus) | null = null;
 
   private engine: WhisperEngineManager | null = null;
   private captureWindow: BrowserWindow | null = null;
@@ -107,10 +139,45 @@ export class DictationOrchestrator {
   private async loadInitialState(): Promise<void> {
     const consent = await readConsent(this.deps.userDataPath);
     this.consentGranted = isConsentCurrent(consent);
+    this.consentLoaded = true;
+  }
+
+  /** Laedt den persistierten Zustand (Einwilligung) fruehzeitig. */
+  async init(): Promise<void> {
+    await this.loadInitialState();
+  }
+
+  /**
+   * True, sobald das Onboarding einmal durchlaufen wurde (Einwilligung
+   * erteilt). Steuert das window-all-closed-Verhalten: erst danach lebt die
+   * App ohne Fenster weiter (Tray + Hotkey).
+   */
+  isOnboarded(): boolean {
+    return this.consentGranted;
+  }
+
+  /** Registriert den zusaetzlichen Transkript-Empfaenger (FlowController). */
+  setTranscriptListener(listener: ((text: string) => void) | null): void {
+    this.transcriptListener = listener;
+  }
+
+  /** Registriert die M3-Statusanteile (FlowController). */
+  setFlowStatusProvider(provider: (() => FlowStatus) | null): void {
+    this.flowStatusProvider = provider;
+  }
+
+  /** Stoesst eine Statusmeldung an das Hauptfenster an (fuer den Controller). */
+  notifyStatusChanged(): void {
+    void this.broadcastStatus();
+  }
+
+  /** Meldet einen Fehler des Diktat-Flows (M3) an Log und UI. */
+  reportFlowError(message: string): void {
+    this.setError(message);
   }
 
   async getStatus(): Promise<AppStatus> {
-    if (this.microphoneState === 'not-checked') {
+    if (!this.consentLoaded) {
       await this.loadInitialState();
     }
     const statuses = await getModelStatuses(this.deps.userDataPath);
@@ -119,6 +186,7 @@ export class DictationOrchestrator {
       label: status.descriptor.label,
       present: status.present,
     }));
+    const flow = this.flowStatusProvider?.() ?? DEFAULT_FLOW_STATUS;
     return {
       consentGranted: this.consentGranted,
       microphoneState: this.microphoneState,
@@ -127,6 +195,11 @@ export class DictationOrchestrator {
       engineReady: this.engineReady,
       dictationActive: this.dictationActive,
       lastError: this.lastError,
+      flowState: flow.flowState,
+      hotkey: flow.hotkey,
+      accessibility: flow.accessibility,
+      lastTranscript: flow.lastTranscript,
+      clipboardRestoreEnabled: flow.clipboardRestoreEnabled,
     };
   }
 
@@ -231,6 +304,8 @@ export class DictationOrchestrator {
             durationMs: event.durationMs,
             audioMs: event.audioMs,
           });
+          // M3: der FlowController sammelt Segmente des Hotkey-Diktats.
+          this.transcriptListener?.(event.text);
           // Segment fertig: Ringpuffer aktiv nullen (kein Rohaudio im RAM halten).
           this.ringBuffer.clear();
         },
@@ -304,6 +379,35 @@ export class DictationOrchestrator {
     this.dictationActive = false;
     await this.broadcastStatus();
     return { ok: true };
+  }
+
+  /**
+   * Hotkey-Stop (M3): Aufnahme beenden und deterministisch warten, bis die
+   * Engine das letzte Segment verarbeitet hat. Alle Transkript-Events sind
+   * beim Aufloesen des Promises bereits beim Transkript-Listener angekommen.
+   */
+  async stopDictationAndFlush(): Promise<void> {
+    if (this.captureWindow !== null && !this.captureWindow.isDestroyed()) {
+      this.captureWindow.webContents.send(IpcChannel.CaptureStop);
+    }
+    this.dictationActive = false;
+    await this.broadcastStatus();
+    await this.engine?.flushAndWait(FLUSH_TIMEOUT_MS);
+    this.ringBuffer.clear();
+  }
+
+  /**
+   * Aufnahme abbrechen, ohne zu transkribieren (Sperrbildschirm/Suspend):
+   * Capture stoppen, akkumuliertes Audio in Engine und Ringpuffer verwerfen.
+   */
+  async abortDictation(): Promise<void> {
+    if (this.captureWindow !== null && !this.captureWindow.isDestroyed()) {
+      this.captureWindow.webContents.send(IpcChannel.CaptureStop);
+    }
+    this.engine?.reset();
+    this.ringBuffer.clear();
+    this.dictationActive = false;
+    await this.broadcastStatus();
   }
 
   private handlePcmChunk(pcm: ArrayBuffer): void {

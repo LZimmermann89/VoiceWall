@@ -28,6 +28,21 @@ export const modelStatusSchema = z.object({
 });
 export type ModelStatusView = z.infer<typeof modelStatusSchema>;
 
+/** Zustand des systemweiten Diktat-Flows (siehe shared/dictation-flow.ts). */
+export const dictationFlowStateSchema = z.enum(['idle', 'recording', 'transcribing', 'delivering']);
+export type DictationFlowStateView = z.infer<typeof dictationFlowStateSchema>;
+
+/** macOS-Bedienungshilfen-Status (Windows/Linux: not-applicable). */
+export const accessibilityStateSchema = z.enum(['granted', 'missing', 'not-applicable']);
+export type AccessibilityState = z.infer<typeof accessibilityStateSchema>;
+
+/** Registrierungszustand des globalen Hotkeys. */
+export const hotkeyStatusSchema = z.object({
+  accelerator: z.string(),
+  registered: z.boolean(),
+});
+export type HotkeyStatus = z.infer<typeof hotkeyStatusSchema>;
+
 /** Gesamtzustand der App, Grundlage der Status-UI. */
 export const appStatusSchema = z.object({
   consentGranted: z.boolean(),
@@ -37,8 +52,31 @@ export const appStatusSchema = z.object({
   engineReady: z.boolean(),
   dictationActive: z.boolean(),
   lastError: z.string().nullable(),
+  /** Systemweites Diktat (M3). */
+  flowState: dictationFlowStateSchema,
+  hotkey: hotkeyStatusSchema,
+  accessibility: accessibilityStateSchema,
+  /** Letztes Transkript (RAM-only, fuer den Kopieren-Knopf). */
+  lastTranscript: z.string().nullable(),
+  /** Zwischenablage nach dem Einfuegen wiederherstellen (Konfig-Schalter). */
+  clipboardRestoreEnabled: z.boolean(),
 });
 export type AppStatus = z.infer<typeof appStatusSchema>;
+
+/**
+ * Ergebnis einer Text-Zustellung (Clipboard-Sequenz + Auto-Paste). `message`
+ * traegt bei nicht erfolgtem Paste die deutsche Erklaerung samt naechstem
+ * Schritt; der Text selbst ist dann trotzdem in der Zwischenablage.
+ */
+export const deliveryResultSchema = z.object({
+  /** Text wurde in die Zwischenablage geschrieben. */
+  delivered: z.boolean(),
+  /** Auto-Paste wurde erfolgreich ausgeloest. */
+  pasted: z.boolean(),
+  /** Deutsche Meldung (Hinweis oder Fehler), sonst null. */
+  message: z.string().nullable(),
+});
+export type DeliveryResult = z.infer<typeof deliveryResultSchema>;
 
 /** Ein neues Transkript-Segment. */
 export const transcriptPayloadSchema = z.object({

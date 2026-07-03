@@ -11,6 +11,7 @@ import {
   actionResultSchema,
   appStatusSchema,
   audioLevelSchema,
+  deliveryResultSchema,
   modelProgressSchema,
   pingResponseSchema,
   transcriptPayloadSchema,
@@ -60,6 +61,14 @@ const bridge: VoiceWallBridge = {
       },
       listener,
     ),
+  setHotkey: async (accelerator) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetHotkey, accelerator)),
+  setClipboardRestore: async (enabled) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetClipboardRestore, enabled)),
+  copyLastTranscript: async () =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.CopyLastTranscript)),
+  openAccessibilitySettings: async () =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.OpenAccessibilitySettings)),
   devInjectPcm: async (pcm) => {
     try {
       return actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevInjectPcm, pcm));
@@ -70,6 +79,33 @@ const bridge: VoiceWallBridge = {
       };
     }
   },
+  devMockPaste: async (enabled) => {
+    try {
+      return actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevMockPaste, enabled));
+    } catch (error) {
+      return { ok: false, message: toDevErrorMessage(error) };
+    }
+  },
+  devGetPasteCalls: async () => {
+    const raw: unknown = await ipcRenderer.invoke(IpcChannel.DevGetPasteCalls);
+    return typeof raw === 'number' ? raw : -1;
+  },
+  devSetAccessibility: async (trusted) => {
+    try {
+      return actionResultSchema.parse(
+        await ipcRenderer.invoke(IpcChannel.DevSetAccessibility, trusted),
+      );
+    } catch (error) {
+      return { ok: false, message: toDevErrorMessage(error) };
+    }
+  },
+  devRunDictationResult: async (text) =>
+    deliveryResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevRunDictationResult, text)),
 };
+
+/** Deutsche Fehlermeldung fuer nicht verfuegbare Dev-/Test-Kanaele. */
+function toDevErrorMessage(error: unknown): string {
+  return `Dev-/Test-Kanal nicht verfuegbar: ${error instanceof Error ? error.message : String(error)}`;
+}
 
 contextBridge.exposeInMainWorld('voicewall', bridge);
