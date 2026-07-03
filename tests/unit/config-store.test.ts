@@ -58,8 +58,12 @@ describe('config-store', () => {
     await writeGlobalConfig(dir, config);
 
     const info = await stat(join(dir, 'config.json'));
-    // Nur Owner darf lesen/schreiben (0600).
-    expect(info.mode & 0o777).toBe(0o600);
+    // Nur Owner darf lesen/schreiben (0600). POSIX-only: Windows kennt keine
+    // POSIX-Modi (fs liefert dort 0666), der Schutz kommt vom nutzerprivaten
+    // Profilordner (siehe docs/ENTSCHEIDUNGEN.md).
+    if (process.platform !== 'win32') {
+      expect(info.mode & 0o777).toBe(0o600);
+    }
 
     const loaded = await readGlobalConfig(dir, silentLogger);
     expect(loaded.hotkey.accelerator).toBe('CommandOrControl+Alt+D');
