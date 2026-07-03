@@ -176,6 +176,32 @@ export type SyncCheckView = z.infer<typeof syncCheckViewSchema>;
 export const companyStorageStrategySchema = z.enum(['desktop', 'lokal-mit-verknuepfung']);
 export type CompanyStorageStrategy = z.infer<typeof companyStorageStrategySchema>;
 
+/**
+ * E-Mail-Pruefung, RFC-lax (ABARBEITUNG 4.2.1): genau ein @, kein
+ * Leerraum, mindestens ein Punkt in der Domain. Bewusst tolerant, die
+ * Adresse dient nur der lokalen Anzeige (kein Versand, kein Netzwerk).
+ */
+export const EMAIL_LAX_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Optionale Firmendaten des Wizard-Schritts 2 (ABARBEITUNG 4.2.1). Alle
+ * Felder werden im Main-Prozess zusaetzlich NFC-normalisiert und von
+ * Steuerzeichen befreit, bevor sie in die firmenbezogene Konfig wandern.
+ */
+export const companyDetailsSchema = z.object({
+  ansprechpartner: z.string().max(120).default(''),
+  email: z
+    .string()
+    .max(200)
+    .default('')
+    .refine((value) => value.length === 0 || EMAIL_LAX_PATTERN.test(value), {
+      message: 'Bitte eine gueltige E-Mail-Adresse eingeben (z. B. name@firma.de).',
+    }),
+  standort: z.string().max(120).default(''),
+  hinweis: z.string().max(2000).default(''),
+});
+export type CompanyDetails = z.infer<typeof companyDetailsSchema>;
+
 /** Ergebnis der Firmen-Anlage. */
 export const createCompanyResultSchema = z.discriminatedUnion('ok', [
   z.object({

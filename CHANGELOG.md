@@ -8,6 +8,48 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- M6: Installer, Packaging und First-Run-Wizard. Packaging als reiner
+  `--dir`-Build via electron-builder (`electron-builder.yml`: Bundle-ID
+  `de.der-ki-auditor.voicewall`, deutscher NSMicrophoneUsageDescription-Text,
+  `electronDist` aus node_modules ohne Netz-Nachladen, `identity: null`;
+  Signierung macht das Setup-Skript, Entscheidung E17); programmatisch
+  erzeugtes App-Icon ohne Binaerdatei im Repo (`scripts/generate-icon.mjs`,
+  E18). Bootstrap-Skripte `install/voicewall-setup.sh|.command|.ps1|.cmd`
+  mit den acht idempotenten Schritten aus ABARBEITUNG 4.1 (Preflight,
+  portable Node aus Vendor, .npmrc-Haertung, `npm ci --offline` gegen
+  Vendor-Cache, Packaging plus Ad-hoc-Codesign mit Bundle-ID-Verifikation
+  und TCC-Re-Grant-Hinweis, npm audit/SBOM, App-Start mit
+  Ready-Marker-Poll statt Port/Sleep (E19), First-Run-Erkennung), Log nach
+  `~/.voicewall/logs/install-<ISO>.log`; Deinstallation entfernt nur
+  VoiceWall-Eigenes und laesst Firmendaten IMMER stehen.
+  `scripts/prepare-vendor.mjs` bereitet den Offline-Vendor-Stand je
+  Zielplattform vor (Node-Tarball gegen offizielle SHASUMS256.txt,
+  npm-Cache inkl. Cross-Plattform-Whisper-Subpaket, Modelle verifiziert);
+  Ablauf dokumentiert in docs/ON-SITE-PROTOKOLL.md.
+  First-Run-Wizard als echte App-Shell (ersetzt die M2-Test-UI):
+  Willkommen mit informierter Einwilligung und AI-Act-Transparenzhinweis,
+  Firmendaten mit Live-Ordnernamen-Vorschau (editierbar) und
+  RFC-lax-E-Mail-Validierung, Speicherort mit Sync-Erkennung und
+  Empfehlung "lokal mit Desktop-Verknuepfung", Sprache (Deutsch fest),
+  Modellwahl mit Hardware-Empfehlung (Q5_0 Standard, fp16 ab 16 GB/6
+  Kernen, E21) und einmaligem, pruefsummen-verifiziertem Download samt
+  Fortschritt, Hotkey mit Livetest ohne Persistenz (E20) und
+  Tastatur-Recorder, macOS-Bedienungshilfen-Schritt (nicht blockierend),
+  Zusammenfassung mit atomarer Anlage, Erfolgsseite mit Kurzanleitung und
+  eingebettetem Netzwerk-Selbsttest. Uebergangs-Hauptansicht (Diktat-Status,
+  Firmen, letzte Diktate, Funktionsbeleg); Wizard aus der Verwaltung erneut
+  aufrufbar ("Neue Firma einrichten", nur Firmen-Schritte).
+  Design-System "Pruefdokument" (Papier-/Elfenbein-Grund, fast-schwarze
+  Tinte, Siegel-Gruen als einziger Akzent, lokale Serifen-Systemfonts,
+  Formular-Linien, Pruefstempel-Footer mit Version/Modell-Pruefsumme;
+  Kontrast-Nachweis AA in styles.css, A11y-Bilanz E22).
+  Neue IPCs: `system:info` (Hardware/Version), `wizard:test-hotkey`,
+  `config:set-model-choice`; Firmen-Anlage traegt jetzt optionale
+  Firmendaten (Ansprechpartner, E-Mail, Standort, Hinweis), editierten
+  Ordnernamen und Modellwahl. fp16-Modell im Katalog/Manifest ergaenzt.
+  CI: Skript-Syntax-Gate (bash -n, PowerShell-Parser) und macOS-Packaging-
+  Job mit Bundle-Asserts (Info.plist-Keys, Ad-hoc-Signatur, App-Start).
+
 - M5: Ordner-als-Datenbank. Firmenordner-Anlage atomar (Temp-Ordner plus
   Rename) und idempotent mit Struktur nach 4.4.1 (`.voicewall/` mit
   manifest.json/config.json/tags.json/.schema-version, `Diktate/YYYY/MM/`,

@@ -23,8 +23,10 @@ import { ipcMain } from 'electron';
 import { z } from 'zod';
 import {
   companyConfigSchema,
+  companyDetailsSchema,
   companyStorageStrategySchema,
   dictateSearchFilterSchema,
+  type CompanyDetails,
   type CompanyInfo,
   type CompanyListView,
   type CompanyNamePreview,
@@ -86,6 +88,16 @@ export interface SaveDictateInput {
   readonly modell: string;
   readonly sprache?: string;
   readonly zielApp?: string;
+}
+
+/**
+ * Bereinigt ein Wizard-Textfeld: Unicode-NFC-Normalisierung und Entfernen
+ * aller Steuerzeichen (konsistent zur clean()-Baseline, ABARBEITUNG 4.2.1).
+ */
+export function cleanWizardText(value: string): string {
+  // eslint-disable-next-line no-control-regex -- Steuerzeichen sind hier genau das Ziel.
+  const controlChars = /[\u0000-\u001F\u007F]/g;
+  return value.normalize('NFC').replace(controlChars, '').trim();
 }
 
 /** Leitet einen Titel aus den ersten Worten des Textes ab (max. 60 Zeichen). */
@@ -249,6 +261,9 @@ export class CompanyManager {
   async createCompany(
     rawName: string,
     strategie: CompanyStorageStrategy,
+    details?: CompanyDetails,
+    modell?: 'q5_0' | 'fp16',
+    ordnername?: string,
   ): Promise<CreateCompanyResult> {
     let baseDir: string;
     let syncWarnung: string | null = null;
@@ -283,6 +298,18 @@ export class CompanyManager {
 
     const created = await createCompanyFolder(baseDir, rawName, {
       erstelltMit: this.deps.appVersion,
+      ...(ordnername === undefined || ordnername.trim().length === 0 ? {} : { ordnername }),
+      ...(modell === undefined ? {} : { modell }),
+      ...(details === undefined
+        ? {}
+        : {
+            details: {
+              ansprechpartner: cleanWizardText(details.ansprechpartner),
+              email: cleanWizardText(details.email),
+              standort: cleanWizardText(details.standort),
+              hinweis: cleanWizardText(details.hinweis),
+            },
+          }),
       ...(this.deps.now === undefined ? {} : { now: this.deps.now }),
     });
     if (!created.ok) {
@@ -474,12 +501,15 @@ export class CompanyManager {
         .object({
           name: z.string().min(1).max(300),
           strategie: companyStorageStrategySchema,
+          details: companyDetailsSchema.optional(),
+          modell: z.enum(['q5_0', 'fp16']).optional(),
+          ordnername: z.string().max(300).optional(),
         })
         .safeParse(raw);
       if (!parsed.success) {
         return Promise.resolve<CreateCompanyResult>({
           ok: false,
-          message: 'Ungueltige Eingabe fuer die Firmen-Anlage.',
+          message: parsed.error.issues[0]?.message ?? 'Ungueltige Eingabe fuer die Firmen-Anlage.',
           vorschlag: null,
         });
       }
@@ -489,7 +519,14 @@ export class CompanyManager {
           message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
           vorschlag: null,
         },
-        () => this.createCompany(parsed.data.name, parsed.data.strategie),
+        () =>
+          this.createCompany(
+            parsed.data.name,
+            parsed.data.strategie,
+            parsed.data.details,
+            parsed.data.modell,
+            parsed.data.ordnername,
+          ),
       );
     });
 

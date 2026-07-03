@@ -167,11 +167,18 @@ export async function ensureModel(
   return ok(filePath);
 }
 
-/** Praesenz-/Integritaetsstatus aller Katalogmodelle (ohne Download). */
-export async function getModelStatuses(userDataPath: string): Promise<ModelStatus[]> {
+/**
+ * Praesenz-/Integritaetsstatus der uebergebenen Modelle (ohne Download).
+ * Default sind die Pflichtmodelle des Standardbetriebs (Q5_0 plus VAD);
+ * der Wizard fragt zusaetzlich das optionale fp16-Modell ab.
+ */
+export async function getModelStatuses(
+  userDataPath: string,
+  descriptors: readonly ModelDescriptor[] = MODEL_DESCRIPTORS,
+): Promise<ModelStatus[]> {
   const dir = getModelsDirectory(userDataPath);
   const statuses: ModelStatus[] = [];
-  for (const descriptor of MODEL_DESCRIPTORS) {
+  for (const descriptor of descriptors) {
     const verified = await verifyFile(userDataPath, descriptor);
     statuses.push({
       descriptor,

@@ -3,6 +3,7 @@
  * Dieses Modul darf weder Node- noch DOM-APIs verwenden.
  */
 import type {
+  CompanyDetails,
   CompanyListView,
   CompanyNamePreview,
   CompanyStorageStrategy,
@@ -17,8 +18,10 @@ import type {
   AppStatus,
   AudioLevel,
   DeliveryResult,
+  ModelChoiceView,
   ModelProgress,
   PingResponse,
+  SystemInfo,
   TranscriptPayload,
 } from './schema';
 
@@ -61,6 +64,14 @@ export interface VoiceWallBridge {
   /** macOS: Systemeinstellungen, Bedienungshilfen-Bereich oeffnen. */
   readonly openAccessibilitySettings: () => Promise<ActionResult>;
 
+  // First-Run-Wizard (M6).
+  /** System- und App-Informationen (Hardware-Empfehlung, Beleg-Footer). */
+  readonly systemInfo: () => Promise<SystemInfo>;
+  /** Hotkey-Livetest: registriert kurz und gibt sofort wieder frei. */
+  readonly testHotkey: (accelerator: string) => Promise<ActionResult>;
+  /** Whisper-Modellwahl persistieren (Q5_0 Standard, fp16 optional). */
+  readonly setModelChoice: (choice: ModelChoiceView) => Promise<ActionResult>;
+
   // Firmenverwaltung und Diktat-Speicher (M5, Ordner-als-Datenbank).
   /** Liste aller validierten Firmen plus aktive Firma und Auto-Speichern. */
   readonly listCompanies: () => Promise<CompanyListView>;
@@ -70,6 +81,9 @@ export interface VoiceWallBridge {
   readonly createCompany: (
     name: string,
     strategie: CompanyStorageStrategy,
+    details?: CompanyDetails,
+    modell?: ModelChoiceView,
+    ordnername?: string,
   ) => Promise<CreateCompanyResult>;
   /** Aktive Firma wechseln. */
   readonly setActiveCompany: (pfad: string) => Promise<ActionResult>;

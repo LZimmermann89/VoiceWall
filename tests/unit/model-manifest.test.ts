@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { MODEL_DESCRIPTORS, isValidSha256Hex } from '../../src/main/model/model-catalog';
+import { ALL_MODEL_DESCRIPTORS, isValidSha256Hex } from '../../src/main/model/model-catalog';
 
 const manifestPath = join(import.meta.dirname, '../../resources/model-manifest.json');
 
@@ -33,8 +33,8 @@ describe('resources/model-manifest.json', () => {
   const manifest = manifestSchema.parse(JSON.parse(readFileSync(manifestPath, 'utf8')));
 
   it('enthaelt exakt die Modelle des Katalogs (id, Datei, URL, Groesse, SHA-256, Label)', () => {
-    expect(manifest.models.length).toBe(MODEL_DESCRIPTORS.length);
-    for (const descriptor of MODEL_DESCRIPTORS) {
+    expect(manifest.models.length).toBe(ALL_MODEL_DESCRIPTORS.length);
+    for (const descriptor of ALL_MODEL_DESCRIPTORS) {
       const entry = manifest.models.find((model) => model.id === descriptor.id);
       expect(entry, `Manifest-Eintrag fuer ${descriptor.id} fehlt`).toBeDefined();
       expect(entry?.fileName).toBe(descriptor.fileName);

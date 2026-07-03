@@ -50,6 +50,19 @@ export interface CreateCompanyFolderOptions {
   readonly erstelltMit: string;
   readonly sprache?: string;
   readonly modell?: string;
+  /**
+   * Optionaler, vom Nutzer im Wizard editierter Ordnername. Er durchlaeuft
+   * exakt dieselbe Sanitisierungs- und Containment-Pipeline wie der
+   * Anzeigename (buildCompanyDirPath); der Anzeigename bleibt unveraendert.
+   */
+  readonly ordnername?: string;
+  /** Optionale Firmendaten aus dem Wizard (bereits bereinigt/validiert). */
+  readonly details?: {
+    readonly ansprechpartner: string;
+    readonly email: string;
+    readonly standort: string;
+    readonly hinweis: string;
+  };
   /** Injektionspunkt fuer Tests (deterministische Zeit). */
   readonly now?: () => Date;
 }
@@ -109,10 +122,10 @@ function initialConfig(
     firma: {
       anzeigename,
       ordnername,
-      ansprechpartner: '',
-      email: '',
-      standort: '',
-      hinweis: '',
+      ansprechpartner: options.details?.ansprechpartner ?? '',
+      email: options.details?.email ?? '',
+      standort: options.details?.standort ?? '',
+      hinweis: options.details?.hinweis ?? '',
     },
     sprache: options.sprache ?? 'de',
     modell: options.modell ?? 'q5_0',
@@ -191,7 +204,8 @@ export async function createCompanyFolder(
   options: CreateCompanyFolderOptions,
 ): Promise<Result<CreateCompanyFolderSuccess, CompanyFolderError>> {
   // Schritt 1: Sanitisierung + Containment (M4-Pipeline, unveraendert).
-  const built = buildCompanyDirPath(baseDir, anzeigename);
+  // Basis ist der ggf. im Wizard editierte Ordnername, sonst der Anzeigename.
+  const built = buildCompanyDirPath(baseDir, options.ordnername ?? anzeigename);
   if (!built.ok) {
     return err({ kind: 'sanitize', message: built.error.message });
   }

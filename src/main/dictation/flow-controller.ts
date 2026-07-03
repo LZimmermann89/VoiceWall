@@ -30,7 +30,7 @@ import {
   type DictationFlowEvent,
   type DictationFlowState,
 } from '../../shared/dictation-flow';
-import type { ActionResult, DeliveryResult } from '../../shared/schema';
+import { modelChoiceSchema, type ActionResult, type DeliveryResult } from '../../shared/schema';
 import type { OverlayStatePayload } from '../../shared/types';
 import type { Result } from '../../shared/result';
 import type { SaveDictateResult } from '../../shared/company';
@@ -38,7 +38,7 @@ import { runClipboardSequence, realDelay } from '../clipboard/transcript-clipboa
 import { readGlobalConfig, writeGlobalConfig } from '../config/config-store';
 import { IpcChannel } from '../ipc/channels';
 import type { Logger } from '../log/logger';
-import { TRANSCRIPT_MODEL_NAME } from '../model/model-catalog';
+import { transcriptModelName } from '../model/model-catalog';
 import type { CompanyManager } from '../storage/companies';
 import { createOverlayWindow, showOverlayInactive } from '../overlay/overlay-window';
 import { createPasteAdapter, type PasteAdapter } from '../paste/index';
@@ -326,7 +326,7 @@ export class DictationFlowController {
         text,
         dauerSekunden: Math.round(audioMs / 1000),
         quelle: 'diktat',
-        modell: TRANSCRIPT_MODEL_NAME,
+        modell: transcriptModelName(this.config.modell),
       });
       if (!saved.ok) {
         this.deps.logger.warn(`Diktat konnte nicht gespeichert werden: ${saved.message}`);
@@ -353,7 +353,7 @@ export class DictationFlowController {
       text: this.lastTranscript,
       dauerSekunden: Math.round(this.lastAudioMs / 1000),
       quelle: 'diktat',
-      modell: TRANSCRIPT_MODEL_NAME,
+      modell: transcriptModelName(this.config.modell),
     });
   }
 
@@ -446,6 +446,58 @@ export class DictationFlowController {
       hotkey: { ...this.config.hotkey, accelerator: parsed.data },
     };
     await writeGlobalConfig(this.deps.userDataPath, this.config);
+    this.deps.orchestrator.notifyStatusChanged();
+    return { ok: true };
+  }
+
+  /**
+   * Hotkey-Livetest fuer den Wizard (M6, ABARBEITUNG 4.2.4): registriert die
+   * Kandidaten-Kombination kurz systemweit und gibt sie sofort wieder frei.
+   * Persistiert NICHTS (der Wizard schreibt erst bei "Einrichten" ueber
+   * setHotkey). Ist der Kandidat der bereits aktive eigene Hotkey, gilt der
+   * Test als bestanden, ohne die aktive Registrierung anzufassen.
+   */
+  private testHotkey(accelerator: string): ActionResult {
+    const parsed = hotkeyAcceleratorSchema.safeParse(accelerator);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        message: parsed.error.issues[0]?.message ?? 'Ungueltige Tastenkombination.',
+      };
+    }
+    if (this.hotkeyRegistered && parsed.data === this.config.hotkey.accelerator) {
+      return { ok: true };
+    }
+    let registered = false;
+    try {
+      registered = globalShortcut.register(parsed.data, () => {
+        // Nur Testregistrierung: ein Druck waehrend des Tests tut nichts.
+      });
+    } catch (error) {
+      this.deps.logger.warn(
+        `Hotkey-Testregistrierung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (!registered) {
+      return {
+        ok: false,
+        message: `Die Tastenkombination ${parsed.data} ist bereits von einer anderen App oder vom System belegt. Bitte eine andere Kombination waehlen.`,
+      };
+    }
+    globalShortcut.unregister(parsed.data);
+    return { ok: true };
+  }
+
+  /**
+   * Whisper-Modellwahl setzen (Wizard Schritt Modell): persistiert die Wahl
+   * in der globalen Konfig und meldet sie dem Orchestrator (der eine ggf.
+   * laufende Engine beendet, damit der naechste Start das gewaehlte Modell
+   * laedt).
+   */
+  private async setModelChoice(choice: GlobalConfig['modell']): Promise<ActionResult> {
+    this.config = { ...this.config, modell: choice };
+    await writeGlobalConfig(this.deps.userDataPath, this.config);
+    await this.deps.orchestrator.setModelChoice(choice);
     this.deps.orchestrator.notifyStatusChanged();
     return { ok: true };
   }
@@ -554,6 +606,27 @@ export class DictationFlowController {
     );
 
     ipcMain.handle(IpcChannel.CopyLastTranscript, (): ActionResult => this.copyLastTranscript());
+
+    // Wizard (M6): Hotkey-Livetest ohne Persistenz.
+    ipcMain.handle(IpcChannel.WizardTestHotkey, (_event, raw: unknown): ActionResult => {
+      const parsed = z.string().min(1).max(100).safeParse(raw);
+      if (!parsed.success) {
+        return { ok: false, message: 'Ungueltige Eingabe fuer die Tastenkombination.' };
+      }
+      return this.testHotkey(parsed.data);
+    });
+
+    // Wizard (M6): Whisper-Modellwahl persistieren.
+    ipcMain.handle(
+      IpcChannel.SetModelChoice,
+      async (_event, raw: unknown): Promise<ActionResult> => {
+        const parsed = modelChoiceSchema.safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, message: 'Ungueltige Modellwahl.' };
+        }
+        return this.setModelChoice(parsed.data);
+      },
+    );
 
     // M5: letztes Transkript manuell in der aktiven Firma speichern. Der
     // Handler lebt hier (nicht im CompanyManager), weil nur der Flow das

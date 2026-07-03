@@ -25,6 +25,11 @@ export const IpcChannel = {
   CopyLastTranscript: 'dictation:copy-last',
   OpenAccessibilitySettings: 'system:open-accessibility',
 
+  // First-Run-Wizard (M6): Systeminfo, Hotkey-Livetest, Modellwahl.
+  SystemInfo: 'system:info',
+  WizardTestHotkey: 'wizard:test-hotkey',
+  SetModelChoice: 'config:set-model-choice',
+
   // Capture-Fenster <-> Main.
   CaptureStart: 'capture:start',
   CaptureStop: 'capture:stop',

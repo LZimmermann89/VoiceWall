@@ -4,7 +4,7 @@
  * Es gibt keinen HTTP-Server und keinen offenen Netzwerk-Port: die gesamte
  * Kommunikation läuft über Electron-IPC.
  */
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, globalShortcut, session } from 'electron';
 import { DictationFlowController } from './dictation/flow-controller';
@@ -255,7 +255,31 @@ if (!hasSingleInstanceLock) {
     await flowController.init();
     // Frisch registrierte M3-Statusanteile (Hotkey, Accessibility) anzeigen.
     orchestrator.notifyStatusChanged();
+
+    // Ready-Marker fuer das Bootstrap-Skript (M6, ABARBEITUNG 4.1 Schritt 7):
+    // das Setup-Skript pollt auf diese Datei statt blind zu schlafen oder
+    // einen HTTP-Port zu oeffnen (es gibt keinen Netzwerk-Port). Rein lokal,
+    // enthaelt nur PID, Version und Startzeit.
+    writeReadyMarker();
   });
+}
+
+/** Schreibt den Start-Marker (userData/app-ready.json, Modus 0600). */
+function writeReadyMarker(): void {
+  try {
+    writeFileSync(
+      join(app.getPath('userData'), 'app-ready.json'),
+      JSON.stringify(
+        { pid: process.pid, version: app.getVersion(), startedAtIso: new Date().toISOString() },
+        null,
+        2,
+      ),
+      { mode: 0o600 },
+    );
+  } catch {
+    // Nicht startkritisch: ohne Marker funktioniert die App vollstaendig,
+    // nur der Setup-Skript-Poll faellt dann auf den Prozess-Check zurueck.
+  }
 }
 
 /** Oeffnet das Hauptfenster bzw. holt es in den Vordergrund (Tray/Dock). */

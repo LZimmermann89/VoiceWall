@@ -1,0 +1,65 @@
+# electron-builder-Konfiguration (M6, ABARBEITUNG 4.1 Schritt 5).
+#
+# Grundsaetze:
+# - Reiner --dir-Build: kein Installer-Artefakt, kein Auto-Update, kein
+#   Publish. Der On-Site-Vertriebsweg ist das Repo plus Bootstrap-Skript.
+# - Signiert wird NICHT durch electron-builder (mac.identity: null), sondern
+#   ad-hoc durch install/voicewall-setup.sh (Schritt 5, codesign -s -), damit
+#   die TCC-Signatur-Identitaet kontrolliert und dokumentiert entsteht
+#   (M1-Spike F4: der cdhash ist die Designated Requirement).
+# - Kein Netzwerkzugriff beim Packaging: `electronDist` zeigt auf
+#   node_modules/electron/dist (liegt seit `npm ci` lokal), electron-builder
+#   26.x ist reines JavaScript (kein app-builder-bin-Downloader mehr), und
+#   fuer das dir-Target werden keine Zusatzwerkzeuge (NSIS, winCodeSign)
+#   geladen. Belegt im Trockenlauf: Packaging funktioniert offline.
+# - npmRebuild/nodeGypRebuild aus: es wird NIE kompiliert (compilerfreie
+#   Kette, prebuilt @fugood-Binaries; ABARBEITUNG 2.2/3.8).
+# - Windows ist deklariert (dir-Target), wird aber nur auf einer
+#   Windows-Maschine gebaut; lokal und in der CI wird macOS gebaut.
+#
+# Icon: resources/build/icon.icns wird VOR dem Packaging offline und
+# deterministisch von scripts/generate-icon.mjs erzeugt (npm run package).
+
+appId: de.der-ki-auditor.voicewall
+productName: VoiceWall
+
+directories:
+  output: dist
+  buildResources: resources/build
+
+# In die App wandert nur der gebaute out/-Baum; dazu packt electron-builder
+# package.json und die produktiven node_modules (inkl. der prebuilt
+# optionalDependencies des Whisper-Addons) in das asar-Archiv.
+files:
+  - out/**
+
+asar: true
+# Native .node-Binaries muessen ausserhalb des asar liegen (der Loader kann
+# sie nicht aus dem Archiv laden); electron-builder verweist automatisch auf
+# app.asar.unpacked.
+asarUnpack:
+  - '**/*.node'
+
+npmRebuild: false
+nodeGypRebuild: false
+electronDist: node_modules/electron/dist
+publish: null
+
+mac:
+  target:
+    - target: dir
+  # Bewusst null: Ad-hoc-Signierung macht das Setup-Skript (Schritt 5).
+  identity: null
+  icon: resources/build/icon.icns
+  extendInfo:
+    # Deutscher TCC-Text (resources/Info.plist.additions): ohne diesen Key
+    # schlaegt getUserMedia auf macOS still fehl.
+    NSMicrophoneUsageDescription: >-
+      VoiceWall nutzt das Mikrofon ausschliesslich lokal auf diesem Rechner
+      fuer die Umwandlung Ihrer Sprache in Text. Es werden keine Audiodaten
+      gespeichert oder an einen Server uebertragen.
+
+win:
+  target:
+    - target: dir
+  icon: resources/build/icon.png

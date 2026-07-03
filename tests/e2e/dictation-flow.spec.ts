@@ -17,18 +17,8 @@
  * 4. Overlay stiehlt keinen Fokus: focusable=false, alwaysOnTop=true.
  */
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
-import {
-  expect,
-  test,
-  _electron as electron,
-  type ElectronApplication,
-  type Page,
-} from '@playwright/test';
-import { getMainUiWindow } from './main-window';
-
-const projectRoot = join(import.meta.dirname, '../..');
-const builtMainEntry = join(projectRoot, 'out/main/index.js');
+import { expect, test, type ElectronApplication, type Page } from '@playwright/test';
+import { builtMainEntry, launchApp } from './launch';
 
 interface DevBridge {
   voicewall: {
@@ -90,14 +80,9 @@ test.beforeAll(() => {
 });
 
 test('Diktat-Flow: Hotkey registriert, Clipboard-Zustellung, Paste-Mock, Wiederherstellung, Accessibility-Pfad, Overlay-Fokus', async () => {
-  const app = await electron.launch({
-    args: [builtMainEntry],
-    cwd: projectRoot,
-    env: { ...process.env, VOICEWALL_ENABLE_TEST_IPC: '1' },
-  });
+  const { app, window } = await launchApp({ withCompany: true });
   try {
-    const window = await getMainUiWindow(app);
-    await expect(window.locator('h1')).toHaveText('VoiceWall');
+    await expect(window.locator('h1')).toContainText('VoiceWall');
     const bridge = bridgeOf(window);
 
     // 1. Der globale Hotkey (Default) ist systemweit registriert.
@@ -170,7 +155,7 @@ test('Diktat-Flow: Hotkey registriert, Clipboard-Zustellung, Paste-Mock, Wiederh
 
     // Die UI zeigt den Accessibility-Hinweis mit Deep-Link-Knopf.
     await expect(window.getByTestId('accessibility-hint')).toBeVisible();
-    await expect(window.getByRole('button', { name: 'Systemeinstellungen oeffnen' })).toBeVisible();
+    await expect(window.getByRole('button', { name: 'Systemeinstellungen öffnen' })).toBeVisible();
 
     // Kopieren-Knopf: letztes Transkript landet erneut in der Zwischenablage.
     await window.getByTestId('copy-last-transcript').click();
