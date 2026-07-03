@@ -25,7 +25,7 @@ const ACCESSIBILITY_SETTINGS_URL =
 
 /** Deutsche Anleitung, wenn die Freigabe fehlt (Schritt fuer Schritt). */
 export const ACCESSIBILITY_MISSING_MESSAGE =
-  'Automatisches Einfuegen ist noch nicht moeglich: VoiceWall hat keine Bedienungshilfen-Freigabe. Der Text liegt in der Zwischenablage, bitte mit Cmd+V manuell einfuegen. So erteilen Sie die Freigabe: 1. Knopf "Systemeinstellungen oeffnen" druecken (oder Systemeinstellungen, Datenschutz und Sicherheit, Bedienungshilfen). 2. VoiceWall in der Liste aktivieren (ggf. ueber das Plus-Symbol hinzufuegen). 3. Diktat erneut ausfuehren.';
+  'Automatisches Einfügen ist noch nicht möglich: VoiceWall hat keine Bedienungshilfen-Freigabe. Der Text liegt in der Zwischenablage, bitte mit Cmd+V manuell einfügen. So erteilen Sie die Freigabe: 1. Knopf "Systemeinstellungen öffnen" drücken (oder Systemeinstellungen, Datenschutz und Sicherheit, Bedienungshilfen). 2. VoiceWall in der Liste aktivieren (ggf. über das Plus-Symbol hinzufügen). 3. Diktat erneut ausführen.';
 
 /** Aktueller Bedienungshilfen-Status (Windows/Linux: not-applicable). */
 export function getAccessibilityState(): AccessibilityState {
@@ -46,7 +46,7 @@ export async function openAccessibilitySettings(): Promise<Result<void, string>>
     return ok(undefined);
   } catch (error) {
     return err(
-      `Die Systemeinstellungen konnten nicht geoeffnet werden (${error instanceof Error ? error.message : String(error)}). Bitte manuell oeffnen: Systemeinstellungen, Datenschutz und Sicherheit, Bedienungshilfen.`,
+      `Die Systemeinstellungen konnten nicht geöffnet werden (${error instanceof Error ? error.message : String(error)}). Bitte manuell öffnen: Systemeinstellungen, Datenschutz und Sicherheit, Bedienungshilfen.`,
     );
   }
 }

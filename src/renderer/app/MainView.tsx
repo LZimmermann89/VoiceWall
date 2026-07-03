@@ -250,8 +250,8 @@ export function MainView(props: MainViewProps): ReactElement {
               Für das automatische Einfügen braucht VoiceWall die macOS-Freigabe
               &quot;Bedienungshilfen&quot;. Ohne Freigabe bleibt der Text in der Zwischenablage
               (Cmd+V zum Einfügen). So geht es: Knopf drücken, dann VoiceWall in der Liste
-              aktivieren und das Diktat erneut ausfuehren. Was VoiceWall mit der Freigabe tut und
-              was nicht, steht in docs/ACCESSIBILITY.md.
+              aktivieren und das Diktat erneut ausführen. Was VoiceWall mit der Freigabe tut und was
+              nicht, steht in docs/ACCESSIBILITY.md.
             </p>
             <button
               type="button"

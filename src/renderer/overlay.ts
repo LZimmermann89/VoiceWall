@@ -14,11 +14,11 @@ if (overlay === null || message === null || !(copyButton instanceof HTMLButtonEl
 }
 
 const DEFAULT_TEXTS: Record<string, string> = {
-  recording: 'Ich hoere zu ...',
+  recording: 'Ich höre zu ...',
   transcribing: 'Transkribiere ...',
-  done: 'Text eingefuegt.',
+  done: 'Text eingefügt.',
   'no-speech': 'Keine Sprache erkannt.',
-  error: 'Fehler beim Einfuegen.',
+  error: 'Fehler beim Einfügen.',
 };
 
 window.voicewallOverlay.onState((state) => {

@@ -247,7 +247,7 @@ export class DictationFlowController {
     const result = await this.deliverText(text, audioMs);
     if (result.pasted) {
       this.showOverlay(
-        { kind: 'done', message: 'Text eingefuegt (und in der Zwischenablage).' },
+        { kind: 'done', message: 'Text eingefügt (und in der Zwischenablage).' },
         OVERLAY_DONE_VISIBLE_MS,
       );
     } else {
@@ -341,7 +341,7 @@ export class DictationFlowController {
   /** Letztes Transkript manuell als Diktat speichern (IPC/Test-UI). */
   private async saveLastDictate(): Promise<SaveDictateResult> {
     if (this.deps.companies === null) {
-      return { ok: false, message: 'Die Firmenverwaltung ist nicht verfuegbar.' };
+      return { ok: false, message: 'Die Firmenverwaltung ist nicht verfügbar.' };
     }
     if (this.lastTranscript === null) {
       return {
@@ -412,7 +412,7 @@ export class DictationFlowController {
       this.deps.logger.info(`Globaler Diktat-Hotkey registriert: ${accelerator}`);
     } else {
       this.deps.orchestrator.reportFlowError(
-        `Die Tastenkombination ${accelerator} ist bereits von einer anderen App oder vom System belegt. Bitte im VoiceWall-Fenster unter "Systemweites Diktat" eine andere Kombination waehlen, z. B. CommandOrControl+Alt+D.`,
+        `Die Tastenkombination ${accelerator} ist bereits von einer anderen App oder vom System belegt. Bitte im VoiceWall-Fenster unter "Systemweites Diktat" eine andere Kombination wählen, z. B. CommandOrControl+Alt+D.`,
       );
     }
     return registered;
@@ -423,7 +423,7 @@ export class DictationFlowController {
     if (!parsed.success) {
       return {
         ok: false,
-        message: parsed.error.issues[0]?.message ?? 'Ungueltige Tastenkombination.',
+        message: parsed.error.issues[0]?.message ?? 'Ungültige Tastenkombination.',
       };
     }
     const previous = this.config.hotkey.accelerator;
@@ -462,7 +462,7 @@ export class DictationFlowController {
     if (!parsed.success) {
       return {
         ok: false,
-        message: parsed.error.issues[0]?.message ?? 'Ungueltige Tastenkombination.',
+        message: parsed.error.issues[0]?.message ?? 'Ungültige Tastenkombination.',
       };
     }
     if (this.hotkeyRegistered && parsed.data === this.config.hotkey.accelerator) {
@@ -481,7 +481,7 @@ export class DictationFlowController {
     if (!registered) {
       return {
         ok: false,
-        message: `Die Tastenkombination ${parsed.data} ist bereits von einer anderen App oder vom System belegt. Bitte eine andere Kombination waehlen.`,
+        message: `Die Tastenkombination ${parsed.data} ist bereits von einer anderen App oder vom System belegt. Bitte eine andere Kombination wählen.`,
       };
     }
     globalShortcut.unregister(parsed.data);
@@ -589,7 +589,7 @@ export class DictationFlowController {
     ipcMain.handle(IpcChannel.SetHotkey, async (_event, raw: unknown): Promise<ActionResult> => {
       const parsed = z.string().min(1).safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungueltige Eingabe fuer die Tastenkombination.' };
+        return { ok: false, message: 'Ungültige Eingabe für die Tastenkombination.' };
       }
       return this.setHotkey(parsed.data);
     });
@@ -599,7 +599,7 @@ export class DictationFlowController {
       async (_event, raw: unknown): Promise<ActionResult> => {
         const parsed = z.boolean().safeParse(raw);
         if (!parsed.success) {
-          return { ok: false, message: 'Ungueltige Eingabe fuer den Zwischenablage-Schalter.' };
+          return { ok: false, message: 'Ungültige Eingabe für den Zwischenablage-Schalter.' };
         }
         return this.setClipboardRestore(parsed.data);
       },
@@ -611,7 +611,7 @@ export class DictationFlowController {
     ipcMain.handle(IpcChannel.WizardTestHotkey, (_event, raw: unknown): ActionResult => {
       const parsed = z.string().min(1).max(100).safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungueltige Eingabe fuer die Tastenkombination.' };
+        return { ok: false, message: 'Ungültige Eingabe für die Tastenkombination.' };
       }
       return this.testHotkey(parsed.data);
     });
@@ -622,7 +622,7 @@ export class DictationFlowController {
       async (_event, raw: unknown): Promise<ActionResult> => {
         const parsed = modelChoiceSchema.safeParse(raw);
         if (!parsed.success) {
-          return { ok: false, message: 'Ungueltige Modellwahl.' };
+          return { ok: false, message: 'Ungültige Modellwahl.' };
         }
         return this.setModelChoice(parsed.data);
       },
@@ -666,7 +666,7 @@ export class DictationFlowController {
     ipcMain.handle(IpcChannel.DevMockPaste, (_event, raw: unknown): ActionResult => {
       const parsed = z.boolean().safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungueltige Eingabe fuer den Paste-Mock.' };
+        return { ok: false, message: 'Ungültige Eingabe für den Paste-Mock.' };
       }
       this.mockPasteEnabled = parsed.data;
       return { ok: true };
@@ -677,7 +677,7 @@ export class DictationFlowController {
     ipcMain.handle(IpcChannel.DevSetAccessibility, (_event, raw: unknown): ActionResult => {
       const parsed = z.boolean().nullable().safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungueltige Eingabe fuer den Accessibility-Override.' };
+        return { ok: false, message: 'Ungültige Eingabe für den Accessibility-Override.' };
       }
       this.accessibilityOverride = parsed.data;
       return { ok: true };
@@ -688,7 +688,7 @@ export class DictationFlowController {
       async (_event, raw: unknown): Promise<DeliveryResult> => {
         const parsed = z.string().min(1).safeParse(raw);
         if (!parsed.success) {
-          return { delivered: false, pasted: false, message: 'Ungueltiger Text.' };
+          return { delivered: false, pasted: false, message: 'Ungültiger Text.' };
         }
         return this.deliverText(parsed.data);
       },

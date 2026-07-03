@@ -176,7 +176,7 @@ export class DictationOrchestrator {
       ipcMain.handle(IpcChannel.DevInjectPcm, async (_event, pcm: unknown) => {
         const buffer = toArrayBuffer(pcm);
         if (buffer === null) {
-          return { ok: false as const, message: 'Kein gueltiger PCM-Puffer.' };
+          return { ok: false as const, message: 'Kein gültiger PCM-Puffer.' };
         }
         return this.guarded(() => this.injectSegment(buffer));
       });
@@ -363,7 +363,7 @@ export class DictationOrchestrator {
     const silero = statuses.find((status) => status.descriptor.id === 'silero-vad');
     if (whisper === undefined || silero === undefined || !whisper.present || !silero.present) {
       const message =
-        'Die Modelle fehlen. Bitte zuerst den einmaligen Modell-Download im Einrichtungs-Assistenten ausfuehren.';
+        'Die Modelle fehlen. Bitte zuerst den einmaligen Modell-Download im Einrichtungs-Assistenten ausführen.';
       this.setError(message);
       return { ok: false, message };
     }
@@ -514,7 +514,7 @@ export class DictationOrchestrator {
       return engineOk;
     }
     if (this.engine === null) {
-      return { ok: false, message: 'Engine nicht verfuegbar.' };
+      return { ok: false, message: 'Engine nicht verfügbar.' };
     }
     const result = await this.engine.transcribeSegment(pcm);
     if (!result.ok) {

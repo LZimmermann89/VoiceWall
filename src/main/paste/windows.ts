@@ -48,7 +48,7 @@ export function createWindowsPasteAdapter(): PasteAdapter {
             const detail = stderr.trim().length > 0 ? ` (${stderr.trim()})` : '';
             resolve(
               err(
-                `Automatisches Einfuegen fehlgeschlagen${detail}. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfuegen. Hinweis: Laeuft die Ziel-App als Administrator, blockiert Windows simulierte Eingaben (UIPI); dann bitte immer den Kopieren-Knopf verwenden.`,
+                `Automatisches Einfügen fehlgeschlagen${detail}. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfügen. Hinweis: Läuft die Ziel-App als Administrator, blockiert Windows simulierte Eingaben (UIPI); dann bitte immer den Kopieren-Knopf verwenden.`,
               ),
             );
           },

@@ -161,7 +161,7 @@ describe('migrateCompanyFolder', () => {
     if (result.ok) {
       return;
     }
-    expect(result.error).toContain('unveraendert');
+    expect(result.error).toContain('unverändert');
 
     const after = await snapshotDir(companyDir);
     expect(after).toEqual(before);

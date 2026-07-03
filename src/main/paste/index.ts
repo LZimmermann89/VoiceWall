@@ -44,7 +44,7 @@ export function createPasteAdapter(platform: NodeJS.Platform): Result<PasteAdapt
       return ok(createWindowsPasteAdapter());
     default:
       return err(
-        'Automatisches Einfuegen wird auf diesem Betriebssystem nicht unterstuetzt. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfuegen.',
+        'Automatisches Einfügen wird auf diesem Betriebssystem nicht unterstützt. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfügen.',
       );
   }
 }

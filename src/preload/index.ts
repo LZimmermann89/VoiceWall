@@ -113,7 +113,7 @@ const bridge: VoiceWallBridge = {
     } catch (error) {
       return {
         ok: false,
-        message: `PCM-Injektion nicht verfuegbar: ${error instanceof Error ? error.message : String(error)}`,
+        message: `PCM-Injektion nicht verfügbar: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   },
@@ -143,7 +143,7 @@ const bridge: VoiceWallBridge = {
 
 /** Deutsche Fehlermeldung fuer nicht verfuegbare Dev-/Test-Kanaele. */
 function toDevErrorMessage(error: unknown): string {
-  return `Dev-/Test-Kanal nicht verfuegbar: ${error instanceof Error ? error.message : String(error)}`;
+  return `Dev-/Test-Kanal nicht verfügbar: ${error instanceof Error ? error.message : String(error)}`;
 }
 
 contextBridge.exposeInMainWorld('voicewall', bridge);

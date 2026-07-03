@@ -60,6 +60,6 @@ export async function ensureMicrophoneAccess(
   return err({
     state: 'restricted',
     message:
-      'Der Mikrofonzugriff ist auf diesem Rechner eingeschraenkt (z. B. durch eine Geraeteverwaltung). Bitte die Systemadministration kontaktieren.',
+      'Der Mikrofonzugriff ist auf diesem Rechner eingeschränkt (z. B. durch eine Geräteverwaltung). Bitte die Systemadministration kontaktieren.',
   });
 }

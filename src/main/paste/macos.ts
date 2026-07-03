@@ -37,7 +37,7 @@ export function createMacosPasteAdapter(): PasteAdapter {
             const detail = stderr.trim().length > 0 ? ` (${stderr.trim()})` : '';
             resolve(
               err(
-                `Automatisches Einfuegen fehlgeschlagen${detail}. Der Text liegt in der Zwischenablage, bitte mit Cmd+V manuell einfuegen. Bleibt der Fehler, in den Systemeinstellungen unter Datenschutz und Sicherheit, Bedienungshilfen die Freigabe fuer VoiceWall pruefen.`,
+                `Automatisches Einfügen fehlgeschlagen${detail}. Der Text liegt in der Zwischenablage, bitte mit Cmd+V manuell einfügen. Bleibt der Fehler, in den Systemeinstellungen unter Datenschutz und Sicherheit, Bedienungshilfen die Freigabe für VoiceWall prüfen.`,
               ),
             );
           },

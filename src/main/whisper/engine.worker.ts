@@ -268,7 +268,7 @@ parentPort.on('message', (messageEvent) => {
   if (!parsed.success) {
     send({
       type: 'transcribe-error',
-      message: `Ungueltige Worker-Nachricht: ${parsed.error.message}`,
+      message: `Ungültige Worker-Nachricht: ${parsed.error.message}`,
     });
     return;
   }

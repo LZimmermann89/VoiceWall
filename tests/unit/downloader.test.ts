@@ -112,7 +112,7 @@ describe('downloadModel', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.kind).toBe('checksum-mismatch');
-      expect(result.error.message).toContain('Pruefsumme');
+      expect(result.error.message).toContain('Prüfsumme');
     }
     // Weder Zieldatei noch .part duerfen existieren.
     expect(existsSync(dest)).toBe(false);

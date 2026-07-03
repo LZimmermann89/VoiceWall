@@ -1091,7 +1091,7 @@ function StepModell(
         {ready && (
           <p className="note" data-testid="wizard-model-ready">
             Alle benötigten Modelldateien sind vorhanden und gegen die fest hinterlegten Prüfsummen
-            verifiziert. Es ist kein Download noetig.
+            verifiziert. Es ist kein Download nötig.
           </p>
         )}
       </div>
@@ -1138,7 +1138,7 @@ function StepBedienungshilfen(
         Für das automatische Einfügen simuliert VoiceWall genau einen Tastendruck (Cmd+V). Dafür
         verlangt macOS die Freigabe &quot;Bedienungshilfen&quot;. VoiceWall liest damit keine
         Tastatur mit, liest keine Fenster anderer Programme und steuert nichts weiter (die
-        vollständige, auditierbare Begruendung liegt in docs/ACCESSIBILITY.md bei).
+        vollständige, auditierbare Begründung liegt in docs/ACCESSIBILITY.md bei).
       </p>
       <table className="proto-table">
         <tbody>
@@ -1156,7 +1156,7 @@ function StepBedienungshilfen(
       {!granted && (
         <div className="note warn">
           <p>
-            Ohne die Freigabe funktioniert alles ausser dem automatischen Einfügen: der Text liegt
+            Ohne die Freigabe funktioniert alles außer dem automatischen Einfügen: der Text liegt
             dann in der Zwischenablage und wird mit Cmd+V eingefügt. Sie können die Freigabe auch
             später jederzeit erteilen.
           </p>

@@ -197,7 +197,7 @@ describe('CompanyManager', () => {
     expect(created.pfad.startsWith(localBase)).toBe(true);
     if (process.platform !== 'win32') {
       // Verknuepfung liegt auf dem Desktop und zeigt auf den lokalen Ordner.
-      expect(created.verknuepfungHinweis).toContain('Verknuepfung');
+      expect(created.verknuepfungHinweis).toContain('Verknüpfung');
       const desktopEntries = await readdir(desktop);
       expect(desktopEntries).toContain('Lokal GmbH');
     }

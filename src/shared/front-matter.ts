@@ -131,7 +131,7 @@ function stripComment(value: string): string {
 function parseSingleQuoted(raw: string): Result<{ value: string; rest: string }, string> {
   const match = SINGLE_QUOTED_PREFIX.exec(raw);
   if (match === null || match[1] === undefined) {
-    return err('Ungueltiger einfach quotierter String.');
+    return err('Ungültiger einfach quotierter String.');
   }
   return ok({ value: match[1].replaceAll("''", "'"), rest: raw.slice(match[0].length) });
 }
@@ -139,16 +139,16 @@ function parseSingleQuoted(raw: string): Result<{ value: string; rest: string },
 function parseJsonQuoted(raw: string): Result<{ value: string; rest: string }, string> {
   const match = JSON_STRING_PREFIX.exec(raw);
   if (match === null) {
-    return err('Ungueltiger doppelt quotierter String.');
+    return err('Ungültiger doppelt quotierter String.');
   }
   try {
     const parsed: unknown = JSON.parse(match[0]);
     if (typeof parsed !== 'string') {
-      return err('Ungueltiger doppelt quotierter String.');
+      return err('Ungültiger doppelt quotierter String.');
     }
     return ok({ value: parsed, rest: raw.slice(match[0].length) });
   } catch {
-    return err('Ungueltiger doppelt quotierter String.');
+    return err('Ungültiger doppelt quotierter String.');
   }
 }
 
@@ -193,7 +193,7 @@ function parseScalar(raw: string): Result<string | number, string> {
 function parseFlowArray(raw: string): Result<readonly string[], string> {
   const closing = raw.lastIndexOf(']');
   if (closing === -1 || !isCleanRest(raw.slice(closing + 1))) {
-    return err('Ungueltige Liste im Front-Matter (fehlende schliessende Klammer).');
+    return err('Ungültige Liste im Front-Matter (fehlende schließende Klammer).');
   }
   const inner = raw.slice(1, closing).trim();
   if (inner.length === 0) {
@@ -232,7 +232,7 @@ function parseFlowArray(raw: string): Result<readonly string[], string> {
       break;
     }
     if (!rest.startsWith(',')) {
-      return err('Ungueltige Liste im Front-Matter (Komma erwartet).');
+      return err('Ungültige Liste im Front-Matter (Komma erwartet).');
     }
     rest = rest.slice(1);
     if (rest.trim().length === 0) {
@@ -263,7 +263,7 @@ export function parseFrontMatter(content: string): Result<ParsedFrontMatter, str
     }
   }
   if (endIndex === -1) {
-    return err('Front-Matter ist nicht abgeschlossen (schliessendes --- fehlt).');
+    return err('Front-Matter ist nicht abgeschlossen (schließendes --- fehlt).');
   }
 
   const meta: Record<string, string | number | readonly string[]> = {};
@@ -277,25 +277,25 @@ export function parseFrontMatter(content: string): Result<ParsedFrontMatter, str
     const key = match?.[1];
     const rawValue = match?.[2];
     if (match === null || key === undefined || rawValue === undefined) {
-      return err(`Ungueltige Front-Matter-Zeile ${String(index + 1)}.`);
+      return err(`Ungültige Front-Matter-Zeile ${String(index + 1)}.`);
     }
     if (Object.hasOwn(meta, key)) {
-      return err(`Doppelter Front-Matter-Schluessel "${key}".`);
+      return err(`Doppelter Front-Matter-Schlüssel "${key}".`);
     }
     const value = rawValue.trim();
     if (value.length === 0) {
-      return err(`Front-Matter-Schluessel "${key}" hat keinen Wert.`);
+      return err(`Front-Matter-Schlüssel "${key}" hat keinen Wert.`);
     }
     if (value.startsWith('[')) {
       const parsed = parseFlowArray(value);
       if (!parsed.ok) {
-        return err(`Schluessel "${key}": ${parsed.error}`);
+        return err(`Schlüssel "${key}": ${parsed.error}`);
       }
       meta[key] = parsed.value;
     } else {
       const parsed = parseScalar(value);
       if (!parsed.ok) {
-        return err(`Schluessel "${key}": ${parsed.error}`);
+        return err(`Schlüssel "${key}": ${parsed.error}`);
       }
       meta[key] = parsed.value;
     }
