@@ -177,18 +177,16 @@ describe('resolveContainedChildPath: Containment nach path.resolve', () => {
     }
   });
 
-  it.each(['..', '../x', 'a/../..', '/etc', 'a/b', 'a\\..\\b' /* win-sep nur auf win */])(
+  it.each(['..', '../x', 'a/../..', '/etc', 'a/b', 'a\\..\\b', 'a\\b', '.', '...'])(
     'lehnt Bypass-Versuch %s ab (Segment haette nie durchgelassen werden duerfen)',
     (segment) => {
       // Bewusst OHNE sanitizeCompanyName: das Containment ist die letzte,
       // eigenstaendige Verteidigungslinie und muss allein standhalten.
+      // Backslash-Segmente werden auf ALLEN Plattformen abgelehnt: unter
+      // Windows kollabiert path.resolve "a\..\b" sonst zu einem gueltigen
+      // Kind, und ein POSIX-Ordner mit Backslash im Namen waere beim Kopieren
+      // auf Windows eine Traversal (Portabilitaet des Firmenordners).
       const result = resolveContainedChildPath(BASE, segment);
-      if (process.platform !== 'win32' && segment === 'a\\..\\b') {
-        // Auf POSIX ist "a\..\b" ein gueltiger (skurriler) Dateiname mit
-        // Backslashes, also ein echtes Kind. Auf Windows wird er abgelehnt.
-        expect(result.ok).toBe(true);
-        return;
-      }
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error.kind).toBe('containment');

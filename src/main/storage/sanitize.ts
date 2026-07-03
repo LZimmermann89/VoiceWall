@@ -125,6 +125,19 @@ export function resolveContainedChildPath(
   baseDir: string,
   segment: string,
 ): Result<string, SanitizeError> {
+  // Roh-Segment-Pruefung VOR der Aufloesung: ein Segment mit Verzeichnistrennern
+  // oder ".." darf nie akzeptiert werden, auf keiner Plattform. Grund 1: unter
+  // Windows kollabiert path.resolve einen Bypass wie "a\..\b" zu einem gueltigen
+  // Kind ("b"), die nachgelagerte Pruefung griffe nicht mehr am Angriffsmuster.
+  // Grund 2 (Portabilitaet): ein unter POSIX technisch gueltiger Dateiname wie
+  // "a\..\b" wuerde beim Kopieren des Firmenordners auf Windows zur Traversal.
+  if (segment.includes('/') || segment.includes('\\') || segment.split('.').join('') === '') {
+    return err({
+      kind: 'containment',
+      message:
+        'Ungueltiger Ordnername: der Pfad liegt ausserhalb des Zielordners. Bitte einen anderen Namen waehlen.',
+    });
+  }
   const basis = path.resolve(baseDir);
   const ziel = path.resolve(basis, segment);
   const rel = path.relative(basis, ziel);
