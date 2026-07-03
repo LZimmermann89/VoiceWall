@@ -6,14 +6,20 @@
  * den Renderer erreicht.
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { z } from 'zod';
 import { IpcChannel } from '../main/ipc/channels';
 import {
+  belegInfoResultSchema,
   companyListViewSchema,
   companyNamePreviewSchema,
   createCompanyResultSchema,
+  dictateDetailResultSchema,
   dictateListResultSchema,
+  dictateMutationResultSchema,
+  exportResultSchema,
   saveDictateResultSchema,
   syncCheckViewSchema,
+  trashListResultSchema,
 } from '../shared/company';
 import {
   actionResultSchema,
@@ -107,6 +113,32 @@ const bridge: VoiceWallBridge = {
     dictateListResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateList, filter)),
   setDictateAutoSave: async (enabled) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetDictateAutoSave, enabled)),
+  getDictate: async (pfad) =>
+    dictateDetailResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateGet, pfad)),
+  updateDictate: async (input) =>
+    dictateMutationResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateUpdate, input)),
+  createManualNote: async (input) =>
+    saveDictateResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateCreateManual, input)),
+  softDeleteDictate: async (pfad) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateSoftDelete, pfad)),
+  restoreDictate: async (papierkorbPfad) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateRestore, papierkorbPfad)),
+  hardDeleteDictate: async (papierkorbPfad) =>
+    actionResultSchema.parse(
+      await ipcRenderer.invoke(IpcChannel.DictateHardDelete, papierkorbPfad),
+    ),
+  listTrash: async () =>
+    trashListResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateTrashList)),
+  exportDictate: async (input) =>
+    exportResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateExport, input)),
+  revealExport: async (relPfad) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateRevealExport, relPfad)),
+  listTags: async () => {
+    const raw: unknown = await ipcRenderer.invoke(IpcChannel.DictateTagsList);
+    return z.array(z.string()).parse(raw);
+  },
+  belegInfo: async () =>
+    belegInfoResultSchema.parse(await ipcRenderer.invoke(IpcChannel.BelegInfo)),
   devInjectPcm: async (pcm) => {
     try {
       return actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevInjectPcm, pcm));

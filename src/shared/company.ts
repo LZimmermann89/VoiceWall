@@ -251,3 +251,129 @@ export const saveDictateResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(false), message: z.string() }),
 ]);
 export type SaveDictateResult = z.infer<typeof saveDictateResultSchema>;
+
+// ---------------------------------------------------------------------------
+// Verwaltungs-UI (M7, ABARBEITUNG 4.8): Detailansicht, Bearbeiten, Tags,
+// manuelle Notiz, Export, Papierkorb, Beleg-Ansicht.
+// ---------------------------------------------------------------------------
+
+/**
+ * Vollstaendige Detailansicht eines Diktats: Metadaten plus Body. Der Body
+ * wird im Renderer ausschliesslich als Textknoten gerendert (nie als HTML,
+ * Stored-XSS-Regel ABARBEITUNG 3.5); kein Markdown-Rendering in v1.
+ */
+export const dictateDetailSchema = z.object({
+  meta: transcriptMetaSchema,
+  body: z.string(),
+  pfad: safeRelativePathSchema,
+});
+export type DictateDetail = z.infer<typeof dictateDetailSchema>;
+
+/** Ergebnis des Detail-Abrufs (get). */
+export const dictateDetailResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), detail: dictateDetailSchema }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type DictateDetailResult = z.infer<typeof dictateDetailResultSchema>;
+
+/**
+ * Aenderungen beim Bearbeiten: Titel, Body und Tags. Alle optional; ein
+ * fehlendes Feld bleibt unveraendert. Der Pfad kommt NIE roh vom Renderer,
+ * nur die id/der sichere relative Pfad; die Aufloesung macht der Main-Prozess.
+ */
+export const dictateUpdateInputSchema = z.object({
+  pfad: safeRelativePathSchema,
+  titel: z.string().min(1).max(500).optional(),
+  body: z.string().max(2_000_000).optional(),
+  tags: z.array(tagSchema).max(100).optional(),
+});
+export type DictateUpdateInput = z.infer<typeof dictateUpdateInputSchema>;
+
+/** Ergebnis einer Diktat-Mutation (Bearbeiten): aktualisierter Eintrag. */
+export const dictateMutationResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), eintrag: manifestEntrySchema, version: z.number().int() }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type DictateMutationResult = z.infer<typeof dictateMutationResultSchema>;
+
+/** Eingabe einer manuellen Notiz (Quelle `manuell`, ohne Diktat). */
+export const manualNoteInputSchema = z.object({
+  titel: z.string().min(1).max(500),
+  body: z.string().max(2_000_000),
+});
+export type ManualNoteInput = z.infer<typeof manualNoteInputSchema>;
+
+/** Ein einzelner Papierkorb-Eintrag (gleiche Sicht wie ein Manifest-Eintrag). */
+export const trashEntrySchema = manifestEntrySchema;
+export type TrashEntry = z.infer<typeof trashEntrySchema>;
+
+/** Ergebnis der Papierkorb-Liste. */
+export const trashListResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), eintraege: z.array(trashEntrySchema) }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type TrashListResult = z.infer<typeof trashListResultSchema>;
+
+/** Exportformat pro Eintrag (v1: Markdown und reiner Text; PDF ist v1.1/M8). */
+export const exportFormatSchema = z.enum(['md', 'txt']);
+export type ExportFormat = z.infer<typeof exportFormatSchema>;
+
+/** Eingabe eines Exports: Quelle (sicherer relativer Pfad), Format, Optionen. */
+export const exportInputSchema = z.object({
+  pfad: safeRelativePathSchema,
+  format: exportFormatSchema,
+  /** Nur fuer Markdown relevant: mit oder ohne YAML-Front-Matter. */
+  mitFrontMatter: z.boolean().default(true),
+});
+export type ExportInput = z.infer<typeof exportInputSchema>;
+
+/**
+ * Ergebnis eines Exports. `anzeigePfad` ist der absolute Pfad NUR zur Anzeige;
+ * `relPfad` ist der sichere relative Pfad unter `Exporte/`, den der
+ * "Im Finder zeigen"-Aufruf erneut im Main-Prozess aufloest und prueft
+ * (Pfade kommen nie roh vom Renderer).
+ */
+export const exportResultSchema = z.discriminatedUnion('ok', [
+  z.object({
+    ok: z.literal(true),
+    anzeigePfad: z.string(),
+    relPfad: safeRelativePathSchema,
+  }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type ExportResult = z.infer<typeof exportResultSchema>;
+
+/** Ein einzelnes Modell im Beleg (Version, Pruefsumme, Pfad, Vorhandensein). */
+export const belegModellSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  sha256: z.string(),
+  pfad: z.string(),
+  vorhanden: z.boolean(),
+  aktiv: z.boolean(),
+});
+export type BelegModell = z.infer<typeof belegModellSchema>;
+
+/**
+ * Beleg-Ansicht ("Status/Beleg", ABARBEITUNG 4.8): die UI-Seite von "Beleg
+ * statt Behauptung". Belegt den lokalen Charakter mit pruefbaren Fakten.
+ */
+export const belegInfoSchema = z.object({
+  appVersion: z.string(),
+  plattform: z.string(),
+  modelle: z.array(belegModellSchema),
+  /** Zeitstempel der Mikrofon-Einwilligung (ISO) oder null. */
+  konsentZeitstempel: z.string().nullable(),
+  /** Absoluter Pfad des Betriebslogs (nur Anzeige). */
+  logPfad: z.string(),
+  /** Absoluter Pfad des Modellordners (nur Anzeige). */
+  modellOrdner: z.string(),
+});
+export type BelegInfo = z.infer<typeof belegInfoSchema>;
+
+/** Ergebnis des Beleg-Abrufs. */
+export const belegInfoResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), beleg: belegInfoSchema }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type BelegInfoResult = z.infer<typeof belegInfoResultSchema>;

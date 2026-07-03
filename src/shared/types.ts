@@ -3,15 +3,23 @@
  * Dieses Modul darf weder Node- noch DOM-APIs verwenden.
  */
 import type {
+  BelegInfoResult,
   CompanyDetails,
   CompanyListView,
   CompanyNamePreview,
   CompanyStorageStrategy,
   CreateCompanyResult,
+  DictateDetailResult,
   DictateListResult,
+  DictateMutationResult,
   DictateSearchFilter,
+  DictateUpdateInput,
+  ExportInput,
+  ExportResult,
+  ManualNoteInput,
   SaveDictateResult,
   SyncCheckView,
+  TrashListResult,
 } from './company';
 import type {
   ActionResult,
@@ -95,6 +103,30 @@ export interface VoiceWallBridge {
   readonly listDictates: (filter: DictateSearchFilter) => Promise<DictateListResult>;
   /** Diktate automatisch in der aktiven Firma speichern (an/aus). */
   readonly setDictateAutoSave: (enabled: boolean) => Promise<ActionResult>;
+
+  // Verwaltungs-UI (M7): Detail, Bearbeiten, Notiz, Tags, Export, Papierkorb, Beleg.
+  /** Vollstaendige Detailansicht eines Diktats (Metadaten plus Body). */
+  readonly getDictate: (pfad: string) => Promise<DictateDetailResult>;
+  /** Diktat bearbeiten (Titel/Body/Tags; version wird nachgefuehrt). */
+  readonly updateDictate: (input: DictateUpdateInput) => Promise<DictateMutationResult>;
+  /** Manuelle Notiz anlegen (Quelle `manuell`, ohne Diktat). */
+  readonly createManualNote: (input: ManualNoteInput) => Promise<SaveDictateResult>;
+  /** Diktat in den Papierkorb verschieben (Soft-Delete). */
+  readonly softDeleteDictate: (pfad: string) => Promise<ActionResult>;
+  /** Diktat aus dem Papierkorb wiederherstellen. */
+  readonly restoreDictate: (papierkorbPfad: string) => Promise<ActionResult>;
+  /** Diktat endgueltig aus dem Papierkorb loeschen (unwiderruflich). */
+  readonly hardDeleteDictate: (papierkorbPfad: string) => Promise<ActionResult>;
+  /** Papierkorb der aktiven Firma auflisten. */
+  readonly listTrash: () => Promise<TrashListResult>;
+  /** Diktat als Markdown/TXT nach `Exporte/` exportieren. */
+  readonly exportDictate: (input: ExportInput) => Promise<ExportResult>;
+  /** Eine Exportdatei im Datei-Manager anzeigen (Im Finder zeigen). */
+  readonly revealExport: (relPfad: string) => Promise<ActionResult>;
+  /** Bekannte Tags der aktiven Firma (Autocomplete/Filter). */
+  readonly listTags: () => Promise<readonly string[]>;
+  /** Beleg-Informationen (Modelle, Pruefsummen, Konsent, Log-Pfad). */
+  readonly belegInfo: () => Promise<BelegInfoResult>;
   /**
    * Nur Dev/Test: injiziert ein vollstaendiges PCM-Segment direkt in die
    * Engine (deterministischer Beweis ohne echtes Mikrofon). Ohne aktiven
