@@ -135,3 +135,44 @@ progress {
   padding: 0.75rem 1rem;
   background: rgba(198, 40, 40, 0.08);
 }
+
+.warn-text {
+  color: #c62828;
+  font-size: 0.85rem;
+}
+
+.actions label {
+  align-self: center;
+  font-size: 0.9rem;
+}
+
+.actions input[type='text'] {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  min-width: 16rem;
+}
+
+.actions + .actions {
+  margin-top: 0.6rem;
+}
+
+.accessibility-hint {
+  margin-top: 0.75rem;
+  border: 1px solid #e8a13a;
+  border-radius: 0.4rem;
+  padding: 0.75rem 1rem;
+  background: rgba(232, 161, 58, 0.08);
+}
+
+.last-transcript {
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  border-radius: 0.4rem;
+  padding: 0.75rem 1rem;
+}
+
+.notice {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}

@@ -32,6 +32,7 @@ export default defineConfig({
         input: {
           index: 'src/preload/index.ts',
           capture: 'src/preload/capture.ts',
+          overlay: 'src/preload/overlay.ts',
         },
         output: {
           // Sandboxed Preload-Skripte unterstuetzen kein ESM, deshalb CommonJS.
@@ -46,11 +47,12 @@ export default defineConfig({
     plugins: [react()],
     build: {
       rollupOptions: {
-        // Zwei Renderer-HTML-Entries: die Verwaltungs-/Test-UI und das
-        // versteckte Audio-Capture-Fenster.
+        // Drei Renderer-HTML-Entries: die Verwaltungs-/Test-UI, das
+        // versteckte Audio-Capture-Fenster und das Diktat-Overlay.
         input: {
           index: 'src/renderer/index.html',
           capture: 'src/renderer/capture.html',
+          overlay: 'src/renderer/overlay.html',
         },
       },
     },

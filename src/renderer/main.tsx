@@ -22,6 +22,14 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** Deutsche Anzeige des Diktat-Flow-Zustands. */
+const FLOW_STATE_LABELS: Record<string, string> = {
+  idle: 'bereit',
+  recording: 'Aufnahme laeuft',
+  transcribing: 'transkribiert',
+  delivering: 'fuegt Text ein',
+};
+
 function App(): ReactElement {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [progress, setProgress] = useState<ModelProgress | null>(null);
@@ -29,6 +37,8 @@ function App(): ReactElement {
   const [level, setLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [hotkeyInput, setHotkeyInput] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
   const levelDecay = useRef<number | null>(null);
 
   const refreshStatus = useCallback(async () => {
@@ -90,6 +100,11 @@ function App(): ReactElement {
   const modelsReady = status?.modelsReady ?? false;
   const engineReady = status?.engineReady ?? false;
   const dictationActive = status?.dictationActive ?? false;
+  const hotkey = status?.hotkey ?? null;
+  const accessibility = status?.accessibility ?? 'not-applicable';
+  const lastTranscript = status?.lastTranscript ?? null;
+  const clipboardRestoreEnabled = status?.clipboardRestoreEnabled ?? true;
+  const flowState = status?.flowState ?? 'idle';
 
   return (
     <main>
@@ -168,6 +183,108 @@ function App(): ReactElement {
           Ihre Sprache wird ausschliesslich lokal auf diesem Rechner verarbeitet. Es werden keine
           Audiodaten gespeichert oder an einen Server gesendet.
         </p>
+      </section>
+
+      <section aria-label="Systemweites Diktat">
+        <h2>Systemweites Diktat</h2>
+        <ul className="status-list">
+          <li>
+            Hotkey (Toggle):{' '}
+            <strong data-testid="hotkey-current">{hotkey?.accelerator ?? 'unbekannt'}</strong>{' '}
+            {hotkey !== null && !hotkey.registered && (
+              <span className="warn-text" data-testid="hotkey-conflict">
+                (nicht aktiv: Kombination ist bereits belegt, bitte unten eine andere waehlen)
+              </span>
+            )}
+          </li>
+          <li>
+            Zustand:{' '}
+            <strong data-testid="flow-state">{FLOW_STATE_LABELS[flowState] ?? flowState}</strong>
+          </li>
+        </ul>
+        <div className="actions">
+          <label htmlFor="hotkey-input">Neue Tastenkombination:</label>
+          <input
+            id="hotkey-input"
+            type="text"
+            value={hotkeyInput}
+            placeholder="z. B. CommandOrControl+Shift+D"
+            onChange={(event) => {
+              setHotkeyInput(event.target.value);
+            }}
+          />
+          <button
+            type="button"
+            disabled={busy || hotkeyInput.trim().length === 0}
+            onClick={() => void runAction(() => window.voicewall.setHotkey(hotkeyInput.trim()))}
+          >
+            Hotkey uebernehmen
+          </button>
+        </div>
+        <div className="actions">
+          <label>
+            <input
+              type="checkbox"
+              checked={clipboardRestoreEnabled}
+              disabled={busy}
+              onChange={(event) =>
+                void runAction(() => window.voicewall.setClipboardRestore(event.target.checked))
+              }
+            />{' '}
+            Zwischenablage nach dem Einfuegen wiederherstellen (Datenschutz, empfohlen)
+          </label>
+        </div>
+        {accessibility === 'missing' && (
+          <div className="accessibility-hint" data-testid="accessibility-hint">
+            <p>
+              Fuer das automatische Einfuegen braucht VoiceWall die macOS-Freigabe
+              &quot;Bedienungshilfen&quot;. Ohne Freigabe bleibt der Text in der Zwischenablage
+              (Cmd+V zum Einfuegen). So geht es: Knopf druecken, dann VoiceWall in der Liste
+              aktivieren und das Diktat erneut ausfuehren. Was VoiceWall mit der Freigabe tut und
+              was nicht, steht in docs/ACCESSIBILITY.md.
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void runAction(() => window.voicewall.openAccessibilitySettings())}
+            >
+              Systemeinstellungen oeffnen
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section aria-label="Letztes Diktat">
+        <h2>Letztes Diktat</h2>
+        {lastTranscript === null ? (
+          <p className="placeholder" data-testid="last-transcript-empty">
+            Noch kein Diktat. Der Text des letzten Diktats bleibt hier abrufbar und geht nie
+            verloren, auch wenn das automatische Einfuegen scheitert.
+          </p>
+        ) : (
+          <div className="last-transcript" data-testid="last-transcript">
+            <p className="transcript-text">{lastTranscript}</p>
+            <button
+              type="button"
+              disabled={busy}
+              data-testid="copy-last-transcript"
+              onClick={() =>
+                void runAction(async () => {
+                  const result = await window.voicewall.copyLastTranscript();
+                  if (result.ok) {
+                    setNotice(
+                      'Text wurde in die Zwischenablage kopiert (Cmd/Strg+V zum Einfuegen).',
+                    );
+                  }
+                  return result;
+                })
+              }
+            >
+              Kopieren
+            </button>
+          </div>
+        )}
+        {notice !== null && <p className="notice">{notice}</p>}
       </section>
 
       <section aria-label="Pegel">

@@ -27,8 +27,13 @@ export const workerCommandSchema = z.discriminatedUnion('type', [
   }),
   /** Kontinuierlicher Aufnahmemodus: PCM-Chunk anhaengen. */
   z.object({ type: z.literal('audio-chunk'), pcm: arrayBufferSchema }),
-  /** Laufendes, akkumuliertes Segment jetzt verarbeiten (z. B. bei Stop). */
-  z.object({ type: z.literal('flush') }),
+  /**
+   * Laufendes, akkumuliertes Segment jetzt verarbeiten (z. B. bei Stop).
+   * Mit requestId antwortet der Worker nach Abschluss zusaetzlich mit
+   * `flush-done` (auch wenn nichts zu verarbeiten war), damit der Aufrufer
+   * deterministisch auf das letzte Segment warten kann (Hotkey-Stop, M3).
+   */
+  z.object({ type: z.literal('flush'), requestId: z.string().optional() }),
   /** Akkumuliertes Segment ohne Transkription verwerfen. */
   z.object({ type: z.literal('reset') }),
   /**
@@ -57,6 +62,8 @@ export const workerEventSchema = z.discriminatedUnion('type', [
   }),
   /** VAD hat keine Sprache gefunden: bewusst kein Text (Anti-Halluzination). */
   z.object({ type: z.literal('silence'), requestId: z.string().optional() }),
+  /** Antwort auf `flush` mit requestId: letztes Segment ist verarbeitet. */
+  z.object({ type: z.literal('flush-done'), requestId: z.string() }),
   z.object({
     type: z.literal('transcribe-error'),
     message: z.string(),

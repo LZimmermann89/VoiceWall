@@ -207,16 +207,26 @@ function handleCommand(command: WorkerCommand): void {
     }
     case 'flush': {
       const active = state;
+      const requestId = command.requestId;
       if (active === null) {
+        // Auch ohne Engine deterministisch antworten, damit ein wartender
+        // Aufrufer (Hotkey-Stop) nie haengt.
+        if (requestId !== undefined) {
+          send({ type: 'flush-done', requestId });
+        }
         return;
       }
       enqueue(async () => {
-        if (pendingSamples === 0) {
-          return;
+        if (pendingSamples > 0) {
+          const pcm = collectPendingArrayBuffer();
+          clearPending();
+          await processSegment(active, pcm);
         }
-        const pcm = collectPendingArrayBuffer();
-        clearPending();
-        await processSegment(active, pcm);
+        // Nach der Segmentverarbeitung melden: alle Transkript-/Silence-
+        // Events des Flushs sind zu diesem Zeitpunkt bereits gesendet.
+        if (requestId !== undefined) {
+          send({ type: 'flush-done', requestId });
+        }
       });
       return;
     }
