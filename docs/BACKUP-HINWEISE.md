@@ -1,9 +1,11 @@
 # Backup und Verschlüsselung (VoiceWall)
 
-Dieses Dokument gehört zum Beleg-Blatt (M9) und ist inhaltlich deckungsgleich
-mit dem Abschnitt „Backup und Verschlüsselung“ in der Beleg-Ansicht der App
-(`src/shared/backup-hinweise.ts`). Es adressiert Risiko R16 aus dem
-Risikoregister: unverschlüsseltes Klartext-Backup hochsensibler Diktate.
+Dieses Dokument gehört zum DSGVO-Beleg-Blatt
+(`rechtstexte/DSGVO-BELEG-BLATT.md`, Abschnitt 5) und ist inhaltlich
+deckungsgleich mit dem Abschnitt „Backup und Verschlüsselung“ in der
+Beleg-Ansicht der App (`src/shared/backup-hinweise.ts`). Es adressiert
+Risiko R16 aus dem Risikoregister: unverschlüsseltes Klartext-Backup
+hochsensibler Diktate.
 
 ## Die zentrale Warnung zuerst
 

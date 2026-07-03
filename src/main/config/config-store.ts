@@ -3,7 +3,8 @@
  * (userData/config.json). Zod-validiert an der Vertrauensgrenze, Datei-Rechte
  * 0600, rein lokal. Unbekannte Felder bleiben beim Lesen-Aendern-Schreiben
  * erhalten (passthrough), damit das Format kompatibel erweiterbar ist; die
- * volle Konfig-Architektur folgt in M5.
+ * volle Konfig-Architektur (firmen[]/aktiveFirma/diktatAutoSpeichern/modell)
+ * steht seit M5/M6 in shared/config.ts.
  */
 import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';

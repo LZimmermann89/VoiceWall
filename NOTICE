@@ -1,11 +1,80 @@
 VoiceWall
 Copyright (c) 2026 Lars Zimmermann
+Veröffentlicht als Angebot der FERNAU Präzisionstechnik GmbH, Darmstadt.
 
-Dieses Produkt enthält beziehungsweise nutzt Software von Drittanbietern.
-Die vollständige Liste mit Lizenztexten steht in THIRD_PARTY_LICENSES.md.
+Dieses Produkt enthält beziehungsweise nutzt Software und Modelle von
+Drittanbietern. Die vollständige Liste mit Lizenztexten steht in
+THIRD_PARTY_LICENSES.md; maschinenlesbar in der je Release beiliegenden
+CycloneDX-SBOM (release/, Erzeugung mit `npm run sbom`).
 
-Grundgerüst-Hinweis: Die Attribution für whisper.cpp, das GGML-Modell
-(primeline/whisper-large-v3-turbo-german, GGML/Q5_0-Konvertierung durch
-cstr/whisper-large-v3-turbo-german-ggml, Apache-2.0) und Silero VAD wird in
-Meilenstein M2 ergänzt, sobald diese Komponenten tatsächlich eingebunden
-sind. In M0 enthält das Projekt noch keine Whisper- oder Modellbausteine.
+Attributionen (Pflicht-Hinweise):
+
+1. whisper.cpp
+   Copyright (c) 2023-2024 The ggml authors (Georgi Gerganov und
+   Mitwirkende). Lizenz: MIT.
+   https://github.com/ggml-org/whisper.cpp
+   Eingebunden als vorkompiliertes N-API-Addon über @fugood/whisper.node
+   (siehe Nr. 2), es wird kein eigener whisper.cpp-Quellbaum ausgeliefert.
+
+2. @fugood/whisper.node 1.0.22 einschließlich der sechs
+   Plattform-Subpakete @fugood/node-whisper-{darwin-arm64, darwin-x64,
+   win32-x64, win32-arm64, linux-x64, linux-arm64}
+   Copyright (c) 2025 ggml / whisper.cpp contributors,
+   Copyright (c) 2025 Jhen-Jie Hong, Copyright (c) 2025 Hans Chen.
+   Lizenz: MIT (LICENSE im Paket).
+   https://github.com/whisper-node/whisper.node
+   Das Paket bündelt whisper.cpp (Nr. 1) als vorkompilierte
+   index.node je Plattform; jede ausgelieferte index.node ist per
+   SHA-256 gepinnt (scripts/verify-checksums.mjs).
+
+3. OpenAI Whisper (Modellarchitektur und Ursprungsgewichte large-v3-turbo)
+   Copyright (c) 2022 OpenAI. Lizenz: MIT.
+   https://github.com/openai/whisper
+
+4. Whisper-Modell "whisper-large-v3-turbo-german"
+   Urheber: primeLine Solutions GmbH (primeline/whisper-large-v3-turbo-german,
+   Feintuning des OpenAI-Whisper-large-v3-turbo auf Deutsch).
+   Lizenz: Apache License 2.0 (Volltext in THIRD_PARTY_LICENSES.md).
+   https://huggingface.co/primeline/whisper-large-v3-turbo-german
+   ÄNDERUNGSHINWEIS gemäß Apache-2.0 Ziffer 4(b): Die von VoiceWall
+   geladenen Dateien sind NICHT die Originalgewichte, sondern die von
+   "cstr" erstellten GGML-Konvertierungen (fp16) beziehungsweise
+   Q5_0-Quantisierungen für whisper.cpp:
+   https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml
+   Dateien und SHA-256-Prüfsummen: resources/model-manifest.json.
+
+5. Silero VAD, Version v5.1.2 (gepinnt)
+   Copyright (c) 2020-present Silero Team (snakers4/silero-vad).
+   Lizenz: MIT (gilt für die v5-Serie; ältere Distributionen hatten
+   abweichende Lizenzlagen, deshalb ist die Version fest gepinnt und die
+   Datei per SHA-256 verifiziert).
+   https://github.com/snakers4/silero-vad
+   Verwendet als GGML-Konvertierung ggml-silero-v5.1.2.bin aus
+   https://huggingface.co/ggml-org/whisper-vad (Konvertierung: ggml-org).
+
+6. React und react-dom 18.3.1
+   Copyright (c) Meta Platforms, Inc. and affiliates. Lizenz: MIT.
+   https://github.com/facebook/react
+
+7. zod 3.25.76
+   Copyright (c) 2020 Colin McDonnell. Lizenz: MIT.
+   https://github.com/colinhacks/zod
+   (In package.json unter devDependencies, wird aber in Preload/Main
+   gebündelt und ist funktional Laufzeitbestandteil, siehe
+   THIRD_PARTY_LICENSES.md.)
+
+8. Electron 43.0.0 (Laufzeitplattform der ausgelieferten App)
+   Copyright (c) Electron contributors, Copyright (c) 2013-2020
+   GitHub Inc. Lizenz: MIT.
+   https://github.com/electron/electron
+   Electron bündelt Chromium und Node.js; deren Lizenz- und
+   Attributions-Hinweise (BSD-artige Lizenzen und weitere) liegen dem
+   Electron-Paket bei (node_modules/electron/dist, Dateien LICENSE und
+   LICENSES.chromium.html) und gelten für die ausgelieferte App mit.
+
+Die Whisper-Modelle und die Silero-VAD-Datei werden nicht im Repo
+ausgeliefert, sondern bei der Einrichtung prüfsummen-verifiziert von
+huggingface.co geladen oder vor Ort offline eingespielt
+(vendor/models/). Herkunft, URL, Größe und SHA-256 jeder Datei:
+resources/model-manifest.json (testgesichert synchron zum Katalog
+src/main/model/model-catalog.ts).

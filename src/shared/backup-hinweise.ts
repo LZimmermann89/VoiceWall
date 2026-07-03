@@ -3,8 +3,8 @@
  * Beleg-Ansicht (M8, Risiko R16, Kritik D10).
  *
  * Inhaltlich deckungsgleich mit docs/BACKUP-HINWEISE.md (dort ausfuehrlich
- * fuer den Ausdruck bzw. das Beleg-Blatt in M9; hier als eingebettete
- * UI-Ansicht). Bewusst als TypeScript-Konstante statt Datei-Import: die CSP
+ * fuer den Ausdruck; Teil des DSGVO-Beleg-Blatts
+ * rechtstexte/DSGVO-BELEG-BLATT.md; hier als eingebettete UI-Ansicht). Bewusst als TypeScript-Konstante statt Datei-Import: die CSP
  * der Oberflaeche verbietet externe Ressourcen und der Renderer hat keinen
  * Dateizugriff. So ist der Hinweis auch offline und im paketierten Build
  * garantiert vorhanden.
@@ -49,5 +49,5 @@ export const BACKUP_HINWEISE: readonly BackupHinweisAbschnitt[] = [
   },
 ];
 
-/** Pfad des ausfuehrlichen Dokuments (Teil des Beleg-Blatts in M9). */
+/** Pfad des ausfuehrlichen Dokuments (Teil des DSGVO-Beleg-Blatts). */
 export const BACKUP_HINWEISE_DOKUMENT = 'docs/BACKUP-HINWEISE.md';

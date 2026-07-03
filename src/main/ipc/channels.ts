@@ -25,6 +25,11 @@ export const IpcChannel = {
   CopyLastTranscript: 'dictation:copy-last',
   OpenAccessibilitySettings: 'system:open-accessibility',
 
+  // Rechtstexte (M9): Impressums-Quelle im Browser oeffnen. Der Handler
+  // uebergibt AUSSCHLIESSLICH die statische URL aus shared/impressum.ts;
+  // dokumentierte openExternal-Ausnahme, siehe ENTSCHEIDUNGEN E31.
+  OpenImpressumSource: 'system:open-impressum-quelle',
+
   // First-Run-Wizard (M6): Systeminfo, Hotkey-Livetest, Modellwahl.
   SystemInfo: 'system:info',
   WizardTestHotkey: 'wizard:test-hotkey',

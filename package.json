@@ -1,6 +1,6 @@
 {
   "name": "voicewall",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "description": "VoiceWall: 100 Prozent lokales, DSGVO-konformes Sprachdiktiergeraet fuer Mac und Windows.",
   "license": "SEE LICENSE IN LICENSE",

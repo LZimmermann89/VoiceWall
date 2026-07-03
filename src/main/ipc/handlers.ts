@@ -5,8 +5,9 @@
  * Werte an den Renderer zurück, nie rohe Fehler oder Stacktraces.
  */
 import { cpus, totalmem } from 'node:os';
-import { app, ipcMain } from 'electron';
-import type { PingResponse, SystemInfo } from '../../shared/schema';
+import { app, ipcMain, shell } from 'electron';
+import { IMPRESSUM_QUELLE_URL } from '../../shared/impressum';
+import type { ActionResult, PingResponse, SystemInfo } from '../../shared/schema';
 import { MODEL_CATALOG } from '../model/model-catalog';
 import { IpcChannel } from './channels';
 
@@ -39,4 +40,21 @@ export function collectSystemInfo(): SystemInfo {
 export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannel.Ping, (): PingResponse => 'pong');
   ipcMain.handle(IpcChannel.SystemInfo, (): SystemInfo => collectSystemInfo());
+
+  // Rechtstexte (M9): oeffnet die Impressums-Quelle im Standard-Browser.
+  // Bewusste, dokumentierte openExternal-Ausnahme (ENTSCHEIDUNGEN E31):
+  // ausschliesslich das statische Literal IMPRESSUM_QUELLE_URL, nie
+  // dynamischer Input. Der Nutzer stoesst den Aufruf explizit per Knopf an;
+  // die App selbst laedt dabei nichts (der Browser ist ein fremder Prozess).
+  ipcMain.handle(IpcChannel.OpenImpressumSource, async (): Promise<ActionResult> => {
+    try {
+      await shell.openExternal(IMPRESSUM_QUELLE_URL);
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        message: `Der Browser konnte nicht geöffnet werden (${error instanceof Error ? error.message : String(error)}). Die Quelle ist ${IMPRESSUM_QUELLE_URL}; alle Angaben stehen auch direkt hier in der App.`,
+      };
+    }
+  });
 }

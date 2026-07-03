@@ -192,3 +192,30 @@ test('M7: XSS-Probe: HTML-artiger Body wird als Text angezeigt (kein img, kein S
     await app.close();
   }
 });
+
+test('M9: Beleg-Ansicht zeigt die Anbieterkennzeichnung (Impressum, § 5 DDG) lokal an', async () => {
+  const { app, window } = await launchApp({ withCompany: true });
+  try {
+    await expect(window.locator('h1')).toContainText('VoiceWall');
+    await window.getByTestId('nav-beleg').click();
+
+    // Anbieterkennzeichnung wird vollstaendig LOKAL gerendert (kein Web-Zugriff).
+    const impressum = window.getByTestId('beleg-impressum');
+    await expect(impressum).toBeVisible();
+    await expect(impressum).toContainText('FERNAU Präzisionstechnik GmbH');
+    await expect(impressum).toContainText('Merianstraße 5a, 64291 Darmstadt');
+    await expect(impressum).toContainText('kontakt@der-ki-auditor.de');
+    await expect(impressum).toContainText('Amtsgericht Darmstadt, HRB 7378');
+    await expect(impressum).toContainText('DE812710783');
+    await expect(impressum).toContainText('§ 18 Abs. 2 MStV');
+    await expect(impressum).toContainText('§ 5 DDG');
+
+    // Der Quelle-Knopf existiert und traegt die statische URL (openExternal-
+    // Ausnahme E31); er wird hier bewusst NICHT geklickt (kein Browser im Test).
+    await expect(window.getByTestId('beleg-impressum-quelle')).toContainText(
+      'der-ki-auditor.de/impressum',
+    );
+  } finally {
+    await app.close();
+  }
+});

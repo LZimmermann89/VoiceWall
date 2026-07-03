@@ -10,3 +10,6 @@ package-lock.json
 # Der Bauplan bleibt unangetastet (eigene Formatierungsregeln)
 ABARBEITUNG.md
 .claude/
+
+# Release-Artefakte (generiert: SBOM und Checksummen, nie umformatieren)
+release/

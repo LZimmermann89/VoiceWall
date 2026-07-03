@@ -1,8 +1,9 @@
 /**
- * Globale Konfiguration (M3-Umfang): Hotkey und Zwischenablage-Verhalten.
+ * Globale Konfiguration: Hotkey und Zwischenablage-Verhalten (seit M3),
+ * Firmenverwaltung, Auto-Speichern und Modellwahl (seit M5/M6).
  *
- * Das Format ist bewusst kompatibel erweiterbar (die volle Konfig-Architektur
- * folgt in M5): `schemaVersion` steuert spaetere Migrationen, und alle Objekte
+ * Das Format ist bewusst kompatibel erweiterbar:
+ * `schemaVersion` steuert spaetere Migrationen, und alle Objekte
  * parsen mit `passthrough`, sodass unbekannte (neuere) Felder beim
  * Lesen-Aendern-Schreiben erhalten bleiben statt verloren zu gehen.
  *

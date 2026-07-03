@@ -6,7 +6,55 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+- Für 1.0.0 vorgesehen: bestandene manuelle Abnahme nach
+  `docs/ABNAHME-CHECKLISTE.md` (Auto-Paste auf macOS und Windows,
+  TCC-Rebuild-Test, Windows-Setup-Trockenlauf, Schwachhardware-Latenz,
+  echter Download-Pfad, SmartScreen/AV-Verhalten, On-Site-Trockenlauf).
+  Begründung des Release-Kandidaten: Entscheidung E33.
+
+## [1.0.0-rc.1] - 2026-07-03
+
+Erster Release-Kandidat: alle Funktionsmeilensteine M0 bis M9 umgesetzt,
+alle automatisierten Gates grün (Typprüfung, Lint, Format, Unit-Tests,
+Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
+
 ### Added
+
+- M9: Vertriebsreife, Rechtstexte und Release-Vorbereitung. Neues
+  Verzeichnis `rechtstexte/` mit Impressum (§ 5 DDG, § 7 DDG in
+  Verbindung mit der VO (EU) 2022/2065, E-Mail von der Live-Quelle
+  der-ki-auditor.de/impressum übernommen), kurzer und beweisbar wahrer
+  Datenschutzerklärung (keine Übermittlung mangels Server, § 25 TDDDG
+  nicht einschlägig, Hugging-Face-Download transparent inklusive
+  IP-Empfänger-Hinweis), Widerrufsbelehrung für den
+  49-Euro-Vor-Ort-Dienst mit ehrlicher Differenzierung (Fernabsatz
+  § 312c, außerhalb von Geschäftsräumen § 312b, Widerrufsbutton § 356a
+  BGB nur bei Vertragsschluss über eine Online-Benutzeroberfläche,
+  vorzeitiges Erlöschen § 356 Abs. 5 Nr. 2 BGB, Wertersatz § 357a
+  Abs. 2 BGB; alle Fundstellen am 03.07.2026 gegen
+  gesetze-im-internet.de geprüft), Muster-Widerrufsformular (Anlage 2
+  EGBGB), kundenfertigem DSGVO-Beleg-Blatt (kein AVV, kein
+  Drittlandtransfer, sechs nachprüfbare Nachweise, ehrliche
+  Restdimensionen) und AI-Act-Einordnung mit dem wörtlichen
+  Art.-50-Abs.-2-Carveout der VO (EU) 2024/1689 in Deutsch und
+  Englisch (EUR-Lex/Amt für Veröffentlichungen, CELEX 32024R1689).
+  In der App: Abschnitt „Über VoiceWall (Anbieterkennzeichnung)“ in
+  der Beleg-Ansicht, vollständig lokal gerendert
+  (`src/shared/impressum.ts`), plus Knopf zur statischen
+  Impressums-Quelle (zweite dokumentierte openExternal-Ausnahme, E31);
+  E2E-Beleg in `tests/e2e/manage.spec.ts`. Das CI-Rechtsverweis-Gate
+  deckt `rechtstexte/` mit ab (Verstoß-Beweis geführt).
+  Signing-Kostenentscheidung aufbereitet
+  (`docs/SIGNING-ENTSCHEIDUNG.md`, E32), Abnahme-Checkliste zu einer
+  konsolidierten 1.0.0-Checkliste erweitert, README auf den Ist-Stand
+  neu geschrieben, NOTICE und THIRD_PARTY_LICENSES.md vervollständigt
+  (whisper.cpp, @fugood/whisper.node samt sechs Plattform-Binaries,
+  OpenAI-Whisper-Architektur, primeline-Modell mit
+  cstr-Änderungshinweis und vollem Apache-2.0-Text, Silero VAD v5.1.2
+  gepinnt, React, zod, Electron/Chromium-Hinweis), SECURITY.md-Kontakt
+  auf das Impressum abgestimmt. Release-Artefakte unter `release/`
+  (CycloneDX-SBOM und Checksummen-Datei mit Modell-Hashes,
+  Plattform-Binary-Hashes und Commit-Bezug).
 
 - M8: Export-, Such- und Backup-Ausbau (v1.1-Posten aus E25). PDF-Export
   über `webContents.printToPDF()` in einem versteckten, sandboxed
@@ -31,6 +79,23 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   ausschließlich Node-Bordmittel, Passwort mindestens 12 Zeichen mit
   Wiederholung, wird nie gespeichert) plus „Datei entschlüsseln“ in der App
   (E30).
+
+- M7: Verwaltungs-UI (v1-Scope). Ansichts-Container ohne Router-Paket
+  (E23) mit vier Ansichten (Diktat, Register, Papierkorb, Beleg) und
+  prominentem Firmen-Umschalter. Register als sortierbares
+  Aktenverzeichnis (Datum/Titel/Wortzahl) mit Manifest-Schnellsuche und
+  Filtern (Zeitraum, Tags-Mehrfachauswahl, Quelle), Tags mit
+  Autocomplete aus `tags.json`, Detailansicht mit Volltext strikt als
+  Textknoten (Stored-XSS-Beweis per E2E), Bearbeiten mit atomarem
+  Schreiben und `geaendert`/`version`-Nachführung, manuelle Notiz
+  (Quelle `manuell`), MD/TXT-Export nach `Exporte/` mit „Im Finder
+  zeigen“ (Containment auch für Reveal, E24), Soft-Delete/Papierkorb
+  mit Wiederherstellen und endgültigem Löschen, Beleg-Ansicht („0
+  externe Verbindungen“, Modellversionen mit SHA-256 und Pfad,
+  eingebetteter Netzwerk-Selbsttest, Konsent-Zeitstempel, App-Version,
+  Log-Pfad). Genau eine sichtbare H1 je Ansicht, Fokus wandert beim
+  Ansichtswechsel auf die H2. PDF/Volltext/Tag-Batch-Rename bewusst auf
+  M8 verschoben (E25).
 
 - M6: Installer, Packaging und First-Run-Wizard. Packaging als reiner
   `--dir`-Build via electron-builder (`electron-builder.yml`: Bundle-ID
@@ -133,6 +198,26 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   Onboarding ohne Fenster im Tray weiter, Aufnahme-Abbruch bei
   Sperrbildschirm/Suspend. Push-to-talk fuer v1 gestrichen (technisch
   unmoeglich mit globalShortcut, siehe docs/ENTSCHEIDUNGEN.md).
+
+- M2: STT-Kern. Audio-Aufnahme in einem eigenen, unsichtbaren
+  Capture-Fenster (getUserMedia, 16 kHz mono, RAM-only, kein
+  Datei-Artefakt), informierte Mikrofon-Einwilligung mit Zeitstempel
+  und AI-Act-Transparenzhinweis, Whisper-Engine als utilityProcess mit
+  dem deutschen Modell whisper-large-v3-turbo-german (Q5_0),
+  VAD-gestuetzte Segmentierung (Silero v5.1.2) mit Sliding-Window,
+  pruefsummen-verifizierter Modell-Download (SHA-256 aus dem Katalog,
+  Quercheck gegen den Hugging-Face-LFS-OID, Risiko R14) und
+  Test-Oberflaeche fuer den Diktat-Flow.
+
+- M1: Architektur-Spike (Projektbrecher empirisch geklaert, Ergebnisse
+  in docs/M1-SPIKE-ERGEBNIS.md): `@fugood/whisper.node` ist ein echtes
+  N-API-Addon (ABI-stabil, kein nan), laedt und transkribiert im
+  `utilityProcess` (R1/R2 entschaerft); der Binary-Bezug funktioniert
+  unter npm-Skript-Restriktionen ueber optionale Plattform-Subpakete,
+  Offline-Vendoring je Zielplattform als Pflichtweg festgelegt (R3);
+  TCC-Befund F4: Ad-hoc-Signatur bindet Freigaben an den cdhash, jeder
+  Rebuild bricht erteilte Grants (Grundlage der
+  Developer-ID-Empfehlung, R4).
 
 - M0: Vollständig gehärtetes, compilerfreies Electron-Projektgerüst
   (Electron, electron-vite, TypeScript strict, ESLint-Modulgrenzen, Vitest,

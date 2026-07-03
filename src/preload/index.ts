@@ -88,6 +88,8 @@ const bridge: VoiceWallBridge = {
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.CopyLastTranscript)),
   openAccessibilitySettings: async () =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.OpenAccessibilitySettings)),
+  openImpressumSource: async () =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.OpenImpressumSource)),
   systemInfo: async () => systemInfoSchema.parse(await ipcRenderer.invoke(IpcChannel.SystemInfo)),
   testHotkey: async (accelerator) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.WizardTestHotkey, accelerator)),

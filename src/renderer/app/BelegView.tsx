@@ -8,6 +8,11 @@
  * Seit M8 (Risiko R16): Abschnitt "Backup und Verschlüsselung" mit der
  * Klartext-Warnung (Art.-9-Potenzial), FileVault-/BitLocker-Anleitung und
  * dem Entschlüsseln von .vwenc-Dateien direkt in der App.
+ *
+ * Seit M9: Abschnitt "Über VoiceWall" mit der vollständigen, lokal
+ * angezeigten Anbieterkennzeichnung (§ 5 DDG, shared/impressum.ts,
+ * deckungsgleich mit rechtstexte/IMPRESSUM.md) plus Knopf zur statischen
+ * Impressums-Quelle (openExternal-Ausnahme E31).
  */
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import type { BelegInfo } from '../../shared/company';
@@ -16,6 +21,7 @@ import {
   BACKUP_HINWEISE_DOKUMENT,
   BACKUP_KLARTEXT_WARNUNG,
 } from '../../shared/backup-hinweise';
+import { IMPRESSUM_ANGABEN, IMPRESSUM_HINWEIS, IMPRESSUM_QUELLE_URL } from '../../shared/impressum';
 import { NETZWERK_SELBSTTEST_DOKUMENT, NETZWERK_SELBSTTEST_PROBEN } from '../../shared/selbsttest';
 import { formatGermanDateTime } from './format';
 import { PasswordDialog } from './PasswordDialog';
@@ -27,6 +33,7 @@ export function BelegView(): ReactElement {
   const [decryptBusy, setDecryptBusy] = useState(false);
   const [decryptNotice, setDecryptNotice] = useState<string | null>(null);
   const [decryptError, setDecryptError] = useState<string | null>(null);
+  const [impressumError, setImpressumError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -199,6 +206,41 @@ export function BelegView(): ReactElement {
           {decryptError !== null && (
             <p className="note error" role="alert" data-testid="decrypt-error">
               {decryptError}
+            </p>
+          )}
+
+          <h3>Über VoiceWall (Anbieterkennzeichnung)</h3>
+          <table className="proto-table" data-testid="beleg-impressum">
+            <tbody>
+              {IMPRESSUM_ANGABEN.map((zeile) => (
+                <tr key={zeile.label}>
+                  <th scope="row">{zeile.label}</th>
+                  <td>{zeile.wert}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="notice">{IMPRESSUM_HINWEIS}</p>
+          <div className="actions">
+            <button
+              type="button"
+              data-testid="beleg-impressum-quelle"
+              onClick={() => {
+                setImpressumError(null);
+                void (async () => {
+                  const result = await window.voicewall.openImpressumSource();
+                  if (!result.ok) {
+                    setImpressumError(result.message);
+                  }
+                })();
+              }}
+            >
+              Quelle im Browser öffnen ({IMPRESSUM_QUELLE_URL})
+            </button>
+          </div>
+          {impressumError !== null && (
+            <p className="note error" role="alert">
+              {impressumError}
             </p>
           )}
         </>

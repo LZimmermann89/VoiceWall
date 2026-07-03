@@ -79,6 +79,10 @@ export interface VoiceWallBridge {
   /** macOS: Systemeinstellungen, Bedienungshilfen-Bereich oeffnen. */
   readonly openAccessibilitySettings: () => Promise<ActionResult>;
 
+  // Rechtstexte (M9).
+  /** Impressums-Quelle (statische URL) im Standard-Browser oeffnen. */
+  readonly openImpressumSource: () => Promise<ActionResult>;
+
   // First-Run-Wizard (M6).
   /** System- und App-Informationen (Hardware-Empfehlung, Beleg-Footer). */
   readonly systemInfo: () => Promise<SystemInfo>;

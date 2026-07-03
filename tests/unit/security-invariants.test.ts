@@ -1,7 +1,10 @@
 /**
  * Grep-basierte Sicherheits-Invarianten ueber den Quellbaum (M4):
- * 1. `shell.openExternal` existiert genau EINMAL, nur mit dem statischen
- *    Accessibility-Deep-Link in permission/accessibility.ts.
+ * 1. `shell.openExternal` existiert genau ZWEIMAL, ausschliesslich mit
+ *    statischen Konstanten: Accessibility-Deep-Link in
+ *    permission/accessibility.ts (M3) und Impressums-Quelle in
+ *    ipc/handlers.ts (M9). Jede weitere Stelle braucht einen Eintrag in
+ *    docs/ENTSCHEIDUNGEN.md (E31) UND eine Erweiterung dieses Tests.
  * 2. Kein `innerHTML`/`dangerouslySetInnerHTML`/`document.write` fuer
  *    Nutzerinhalte im Renderer (Output-Encoding, ABARBEITUNG 3.5).
  * 3. Kein `exec(`/`execSync(` mit Shell-String; ausschliesslich `execFile`
@@ -39,13 +42,30 @@ function filesMatching(pattern: RegExp): string[] {
 }
 
 describe('Sicherheits-Invarianten im Quellbaum', () => {
-  it('shell.openExternal existiert genau einmal (statischer Accessibility-Link)', () => {
-    const hits = filesMatching(/openExternal\s*\(/);
-    expect(hits.length).toBe(1);
-    expect(hits[0]).toContain(join('permission', 'accessibility.ts'));
-    // Der Aufruf verwendet die statische Konstante, nie dynamischen Input.
-    const file = sources.find((source) => source.path === hits[0]);
-    expect(file?.content).toContain('shell.openExternal(ACCESSIBILITY_SETTINGS_URL)');
+  it('shell.openExternal existiert genau zweimal (statische Ausnahmen E31)', () => {
+    const hits = filesMatching(/openExternal\s*\(/).sort();
+    expect(hits.length).toBe(2);
+
+    const accessibilityPath = hits.find((hit) =>
+      hit.includes(join('permission', 'accessibility.ts')),
+    );
+    const impressumPath = hits.find((hit) => hit.includes(join('ipc', 'handlers.ts')));
+    expect(accessibilityPath).toBeDefined();
+    expect(impressumPath).toBeDefined();
+
+    // Beide Aufrufe verwenden statische Konstanten, nie dynamischen Input.
+    const accessibilityFile = sources.find((source) => source.path === accessibilityPath);
+    expect(accessibilityFile?.content).toContain('shell.openExternal(ACCESSIBILITY_SETTINGS_URL)');
+    const impressumFile = sources.find((source) => source.path === impressumPath);
+    expect(impressumFile?.content).toContain('shell.openExternal(IMPRESSUM_QUELLE_URL)');
+
+    // Die Impressums-URL ist ein Literal in shared/impressum.ts.
+    const impressumConst = sources.find((source) =>
+      source.path.endsWith(join('shared', 'impressum.ts')),
+    );
+    expect(impressumConst?.content).toContain(
+      "export const IMPRESSUM_QUELLE_URL = 'https://der-ki-auditor.de/impressum';",
+    );
   });
 
   it('kein innerHTML/dangerouslySetInnerHTML/document.write im Quellbaum', () => {

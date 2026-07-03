@@ -3,10 +3,13 @@
 ## Schwachstellen melden
 
 Wenn Sie eine Schwachstelle in VoiceWall finden, melden Sie diese bitte
-vertraulich an den Inhaber:
+vertraulich an den Anbieter (FERNAU Präzisionstechnik GmbH, siehe
+`rechtstexte/IMPRESSUM.md`):
 
-- E-Mail: lars.zimmermann89@gmail.com
+- E-Mail: kontakt@der-ki-auditor.de
 - Betreff: `[SECURITY] VoiceWall: <Kurzbeschreibung>`
+- Direkter Kontakt zum Projektverantwortlichen (Ausweichweg):
+  lars.zimmermann89@gmail.com
 
 Bitte nennen Sie: betroffene Version beziehungsweise Commit, Schritte zur
 Reproduktion, erwartetes und tatsächliches Verhalten sowie eine Einschätzung
@@ -34,5 +37,8 @@ Stand: Typprüfung, Lint mit Modulgrenzen, Tests, Build, E2E,
 
 ## Unterstützte Versionen
 
-Bis zur Version 1.0.0 wird ausschließlich der jeweils aktuelle Stand des
-`main`-Branches unterstützt.
+Bis zum finalen Release 1.0.0 wird ausschließlich der jeweils aktuelle
+Stand des `main`-Branches unterstützt (aktuell: 1.0.0-rc.1). Updates
+erfolgen kontrolliert als neues, inspizierbares Repo-Release, das vor
+Ort eingespielt wird (review-then-run); es gibt bewusst keinen
+automatischen Update-Kanal und kein Phone-Home.
