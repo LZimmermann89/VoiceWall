@@ -2,6 +2,18 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Aktive CSP des HAUPTFENSTERS (Verwaltungs-/Status-UI), ABARBEITUNG 3.3:
+      - connect-src 'self': kein fetch/XHR/WebSocket/sendBeacon zu fremden
+        Origins moeglich (der technische Nicht-Exfiltrations-Beweis).
+      - Kein 'unsafe-inline', kein 'unsafe-eval': Skripte/Styles nur aus
+        lokalen Dateien.
+      - BEWUSST kein worker-src und kein media-src: dieses Fenster nutzt
+        weder Worker noch Medienquellen; beide fallen damit auf
+        default-src 'self' zurueck (blob: ist nur im Capture-Fenster noetig).
+      - img-src data: nur fuer eingebettete Icons, nie externe Hosts
+        (kein Tracking-Pixel-Kanal).
+    -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'self'"

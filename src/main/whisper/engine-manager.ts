@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { utilityProcess, type UtilityProcess } from 'electron';
 import { err, ok, type Result } from '../../shared/result';
 import type { Logger } from '../log/logger';
+import { NativeLogRingBuffer, routeNativeOutput } from './native-log';
 import { workerEventSchema, type WorkerCommand, type WorkerEvent } from './protocol';
 
 export interface EngineConfig {
@@ -65,6 +66,12 @@ export class WhisperEngineManager {
   /** Wartende flushAndWait-Aufrufer (Hotkey-Stop), aufgeloest bei flush-done. */
   private readonly pendingFlushes = new Map<string, () => void>();
   private readonly workerPath = join(import.meta.dirname, 'engine.worker.js');
+  /**
+   * RAM-only-Puffer fuer native whisper.cpp-Zeilen, die die Allowlist nicht
+   * passieren (M4-Befund: solche Zeilen koennen Transkripttext enthalten und
+   * werden deshalb NIE persistiert, siehe native-log.ts).
+   */
+  private readonly nativeLogBuffer = new NativeLogRingBuffer();
 
   constructor(
     private readonly config: EngineConfig,
@@ -94,11 +101,14 @@ export class WhisperEngineManager {
         }
       };
 
+      // Native Ausgaben laufen durch die Allowlist-Schleuse: nur bekannt
+      // unkritische Zeilen erreichen die Logdatei, alles andere bleibt im
+      // RAM-Puffer (M4-Befund: Randfall-Zeilen koennen Transkripttext tragen).
       child.stdout?.on('data', (data: Buffer) => {
-        this.logger.debug(`[whisper stdout] ${data.toString().trimEnd()}`);
+        routeNativeOutput(this.logger, this.nativeLogBuffer, 'stdout', data.toString());
       });
       child.stderr?.on('data', (data: Buffer) => {
-        this.logger.debug(`[whisper stderr] ${data.toString().trimEnd()}`);
+        routeNativeOutput(this.logger, this.nativeLogBuffer, 'stderr', data.toString());
       });
 
       child.on('message', (raw: unknown) => {
@@ -177,7 +187,8 @@ export class WhisperEngineManager {
         }
         return;
       case 'log':
-        this.logger.debug(`[whisper ${event.level}] ${event.text}`);
+        // Auch Log-Callbacks der nativen Bibliothek passieren die Schleuse.
+        routeNativeOutput(this.logger, this.nativeLogBuffer, `native-${event.level}`, event.text);
         return;
     }
   }
@@ -199,7 +210,11 @@ export class WhisperEngineManager {
       return;
     }
 
-    this.logger.warn(`Whisper-Engine unerwartet beendet (Code ${String(code)}).`);
+    // Nur METADATEN der zurueckgehaltenen nativen Zeilen loggen, nie Inhalt.
+    this.logger.warn(`Whisper-Engine unerwartet beendet (Code ${String(code)}).`, {
+      code,
+      suppressedLines: this.nativeLogBuffer.size,
+    });
     if (this.restarts >= MAX_RESTARTS) {
       const message =
         'Die Spracherkennung ist mehrfach abgestuerzt und konnte nicht neu gestartet werden. Bitte VoiceWall neu starten; bleibt der Fehler, das Log unter userData pruefen.';

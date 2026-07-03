@@ -148,3 +148,73 @@ zusammengefügten, getrimmten Gesamttext. Segmentweises Pasten während des
 Sprechens wäre fehleranfällig (Fokuswechsel des Nutzers mitten im Diktat,
 mehrfache Paste-Simulationen, zerrissene Sätze) und würde das
 Wiederherstellungs-Fenster der Zwischenablage vervielfachen.
+
+## E9: sanitize-filename wird selbst implementiert, nicht als npm-Paket bezogen (M4)
+
+**Kontext:** ABARBEITUNG 3.4 verlangt einen sanitize-filename-Schritt
+(reservierte Zeichen `<>:"/\|?*`, trailing Dots/Spaces). Zur Wahl standen das
+npm-Paket `sanitize-filename` oder eine eigene, geprüfte Funktion.
+
+**Prüfung des Pakets:** Funktional identisch zu wenigen Regex-Schritten,
+bringt aber zwei transitive Dependencies mit (`truncate-utf8-bytes` →
+`utf8-byte-length`), liefert keine eigenen TypeScript-Typen (separates
+`@types`-Paket nötig) und hat seit 2020 kein Release gesehen.
+
+**Entscheidung:** Eigene Implementierung in `src/main/storage/sanitize.ts`.
+Sie ist ohnehin nur ein Schritt der verbindlichen 7-Stufen-Pipeline
+(NFC → Segment-Reduktion → Zeichenfilter → Windows-Reserved → Länge →
+Leer-Fehler → Containment nach `path.resolve`) und mit 50 Unit-Tests über
+alle Angriffsklassen abgedeckt. Null neue Dependencies, kleinere
+Supply-Chain-Fläche.
+
+## E10: Windows-Desktop-Auflösung per `reg.exe query`, nicht per PowerShell (M4)
+
+**Kontext:** Der Windows-Desktop kann umgeleitet sein (OneDrive Known Folder
+Move, GPO). `%USERPROFILE%\Desktop` wäre dann falsch.
+
+**Entscheidung:** `src/main/storage/paths.ts` liest den Known-Folder-Pfad aus
+`HKCU\...\Explorer\User Shell Folders` per `execFile('reg.exe', [...])` mit
+statischem Argument-Array. Gründe gegen den PowerShell-Einzeiler
+(`[Environment]::GetFolderPath('Desktop')`): PowerShell-Kaltstart kostet 1
+bis 2 Sekunden, berührt die ExecutionPolicy und ist ein größerer
+Interpreter; `reg.exe` ist auf jedem unterstützten Windows vorhanden und
+startet in Millisekunden. `%USERPROFILE%\Desktop` bleibt Fallback mit
+Existenz-Check; existiert kein Desktop, liefert die Funktion ein
+Fehler-Result, damit der Wizard nachfragt (nie ein stiller falscher Pfad).
+
+## E11: Modell-Manifest, Single Source of Truth ist der TypeScript-Katalog (M4)
+
+**Kontext:** ABARBEITUNG 3.8 verlangt ein auditierbares Artefakt mit
+Modell-URLs und SHA-256. Zur Wahl standen: der Katalog liest das Manifest
+(JSON als Quelle) oder das Manifest spiegelt den Katalog.
+
+**Entscheidung:** `src/main/model/model-catalog.ts` bleibt die einzige
+Quelle: er ist typgeprüft (Compilezeit-Fehler statt Laufzeit-Parsing im
+App-Start) und wird von Downloader und Store direkt importiert.
+`resources/model-manifest.json` ist das mitgelieferte, maschinenlesbare
+Audit-Artefakt (inkl. Lizenz und Quelle je Modell für die Attribution). Der
+Unit-Test `tests/unit/model-manifest.test.ts` erzwingt exakte Synchronität;
+Drift bricht die CI.
+
+## E12: Native Whisper-Logs, Allowlist plus RAM-only-Puffer (M4-Pflicht-Befund)
+
+**Kontext:** Der Whisper-utilityProcess leitet native
+whisper.cpp-/ggml-Zeilen weiter; bis M3 wanderten sie ungefiltert per
+`logger.debug` in die persistente Logdatei. whisper.cpp kann in Randfällen
+Segment-/Token-TEXT in Logzeilen ausgeben; die Messlatte aus ABARBEITUNG 3.6
+ist aber: auch debug protokolliert NIEMALS Transkriptinhalte.
+
+**Entscheidung (kombinierter Ansatz, `src/main/whisper/native-log.ts`):**
+
+1. Persistiert wird eine native Zeile nur bei Treffer auf einer engen
+   Allowlist bekannt unkritischer Präfixe (`whisper_`, `ggml_`,
+   `system_info`, Timing-/VAD-Zeilen). Zusätzliche Negativsperre: Zeilen mit
+   Segment-Timestamp-Syntax (`-->`, `[hh:mm`) werden nie persistiert, selbst
+   mit passendem Präfix.
+2. Alle übrigen Zeilen bleiben in einem begrenzten RAM-Ringpuffer (200
+   Zeilen) für die Vor-Ort-Fehlersuche und verlassen den RAM nie; bei einem
+   Engine-Absturz wird nur ihre Anzahl geloggt.
+   Der Beweis steht in `tests/unit/native-log.test.ts`: eine präparierte Zeile
+   mit Diktattext erreicht die Logdatei nicht, eine Modell-Load-Zeile schon.
+   Damit bleibt die Diagnosefähigkeit (Modell-Load, Backend, Timings) erhalten,
+   ohne die Datenschutz-Garantie zu verletzen.

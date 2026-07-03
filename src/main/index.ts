@@ -6,10 +6,10 @@
  */
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { app, BrowserWindow, globalShortcut } from 'electron';
+import { app, BrowserWindow, globalShortcut, session } from 'electron';
 import { DictationFlowController } from './dictation/flow-controller';
 import { registerIpcHandlers } from './ipc/handlers';
-import { createLogger } from './log/logger';
+import { createLogger, type Logger } from './log/logger';
 import { DictationOrchestrator } from './stt/orchestrator';
 
 // App-Namen fruehzeitig und deterministisch setzen. Ohne dies liefe die App
@@ -47,6 +47,49 @@ function hardenCrashDumps(): void {
   rmSync(crashDumpDir, { recursive: true, force: true });
   mkdirSync(crashDumpDir, { recursive: true });
   app.setPath('crashDumps', crashDumpDir);
+}
+
+/**
+ * True nur fuer die eigene, lokale Origin: die gebauten file://-Seiten bzw.
+ * im Dev-Modus die von electron-vite ausgelieferte lokale Renderer-URL.
+ */
+function isOwnOrigin(url: string): boolean {
+  if (url.startsWith('file://')) {
+    return true;
+  }
+  const devUrl = process.env['ELECTRON_RENDERER_URL'];
+  return devUrl !== undefined && !app.isPackaged && url.startsWith(devUrl);
+}
+
+/**
+ * Berechtigungs-Haertung (ABARBEITUNG 3.1/3.13, sichere Defaults):
+ * Chromium-Berechtigungsanfragen werden zentral beantwortet. Erlaubt wird
+ * AUSSCHLIESSLICH 'media' (Mikrofon fuer das Capture-Fenster) und auch das
+ * nur fuer die eigene lokale Origin und nur fuer Audio. Alles andere
+ * (Geolocation, Notifications, Kamera, MIDI, Bluetooth, ...) wird immer
+ * abgelehnt, ohne Nutzer-Prompt. Der E2E-Test network-isolation.spec.ts
+ * belegt die Ablehnung.
+ */
+function hardenPermissions(logger: Logger): void {
+  session.defaultSession.setPermissionRequestHandler(
+    (webContents, permission, callback, details) => {
+      const requestingUrl = webContents.getURL();
+      const mediaTypes = 'mediaTypes' in details ? details.mediaTypes : undefined;
+      const onlyAudio = mediaTypes === undefined || mediaTypes.every((type) => type === 'audio');
+      const allowed = permission === 'media' && onlyAudio && isOwnOrigin(requestingUrl);
+      if (!allowed) {
+        logger.info('Berechtigungsanfrage abgelehnt (sicherer Default).', {
+          reason: permission,
+        });
+      }
+      callback(allowed);
+    },
+  );
+  // Synchrone Checks (z. B. navigator.permissions.query) identisch streng.
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission, requestingOrigin) =>
+      permission === 'media' && isOwnOrigin(requestingOrigin),
+  );
 }
 
 function createMainWindow(): BrowserWindow {
@@ -140,6 +183,7 @@ if (!hasSingleInstanceLock) {
   void app.whenReady().then(async () => {
     registerIpcHandlers();
     const logger = createLogger(app.getPath('userData'));
+    hardenPermissions(logger);
     orchestrator = new DictationOrchestrator({
       userDataPath: app.getPath('userData'),
       logger,

@@ -26,6 +26,17 @@ jobs:
       - name: Abhaengigkeiten installieren
         run: npm ci
 
+      # Supply-Chain-Gate (ABARBEITUNG 3.8): SHA-256 der prebuilt nativen
+      # Binaries gegen die fest hinterlegten Konstanten, Versions-Drift,
+      # keine kompilierende binding.gyp im Baum.
+      - name: Native-Binary-Checksummen pruefen
+        run: node scripts/verify-checksums.mjs
+
+      # Rechtstexte-Gate (ABARBEITUNG 3.12): kein aktives TMG-/TTDSG-Zitat in
+      # src/, README.md, resources/ oder rechtstexte/ (TMG -> DDG, TTDSG -> TDDDG).
+      - name: Rechtsverweis-Gate (TMG/TTDSG verboten)
+        run: node scripts/check-legal-references.mjs
+
       - name: Typpruefung
         run: npm run typecheck
 

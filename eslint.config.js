@@ -153,9 +153,16 @@ export default tseslint.config(
     },
   },
   {
-    // JS-Konfigdateien (nur eslint.config.js) ohne typed-linting pruefen.
-    files: ['**/*.js'],
+    // JS-Konfigdateien und Build-/CI-Skripte (scripts/*.mjs) ohne
+    // typed-linting pruefen: sie gehoeren zu keinem tsconfig-Projekt.
+    files: ['**/*.js', 'scripts/**/*.mjs'],
     extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+      },
+    },
   },
   prettierConfig,
 );
