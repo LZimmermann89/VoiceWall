@@ -9,16 +9,20 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import { z } from 'zod';
 import { IpcChannel } from '../main/ipc/channels';
 import {
+  batchExportResultSchema,
   belegInfoResultSchema,
   companyListViewSchema,
   companyNamePreviewSchema,
   createCompanyResultSchema,
+  decryptFileResultSchema,
   dictateDetailResultSchema,
   dictateListResultSchema,
   dictateMutationResultSchema,
+  exportProgressSchema,
   exportResultSchema,
   saveDictateResultSchema,
   syncCheckViewSchema,
+  tagRenameResultSchema,
   trashListResultSchema,
 } from '../shared/company';
 import {
@@ -139,6 +143,18 @@ const bridge: VoiceWallBridge = {
   },
   belegInfo: async () =>
     belegInfoResultSchema.parse(await ipcRenderer.invoke(IpcChannel.BelegInfo)),
+  exportDictatesBatch: async (input) =>
+    batchExportResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateExportBatch, input)),
+  onExportProgress: (listener) =>
+    subscribe(IpcChannel.DictateExportProgress, (raw) => exportProgressSchema.parse(raw), listener),
+  renameTag: async (input) =>
+    tagRenameResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateRenameTag, input)),
+  exportDictateEncrypted: async (input) =>
+    exportResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateExportEncrypted, input)),
+  decryptVwencFile: async (passwort) =>
+    decryptFileResultSchema.parse(
+      await ipcRenderer.invoke(IpcChannel.DictateDecryptVwenc, { passwort }),
+    ),
   devInjectPcm: async (pcm) => {
     try {
       return actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevInjectPcm, pcm));

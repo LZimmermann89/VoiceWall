@@ -4,15 +4,29 @@
  * Modellversion samt SHA-256 und Pfad, "0 externe Verbindungen" mit dem
  * eingebetteten Netzwerk-Selbsttest, Konsent-Zeitstempel, App-Version und
  * Pfad zum Betriebslog. Dem Kunden direkt vorführbar.
+ *
+ * Seit M8 (Risiko R16): Abschnitt "Backup und Verschlüsselung" mit der
+ * Klartext-Warnung (Art.-9-Potenzial), FileVault-/BitLocker-Anleitung und
+ * dem Entschlüsseln von .vwenc-Dateien direkt in der App.
  */
-import { useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import type { BelegInfo } from '../../shared/company';
+import {
+  BACKUP_HINWEISE,
+  BACKUP_HINWEISE_DOKUMENT,
+  BACKUP_KLARTEXT_WARNUNG,
+} from '../../shared/backup-hinweise';
 import { NETZWERK_SELBSTTEST_DOKUMENT, NETZWERK_SELBSTTEST_PROBEN } from '../../shared/selbsttest';
 import { formatGermanDateTime } from './format';
+import { PasswordDialog } from './PasswordDialog';
 
 export function BelegView(): ReactElement {
   const [beleg, setBeleg] = useState<BelegInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showDecrypt, setShowDecrypt] = useState(false);
+  const [decryptBusy, setDecryptBusy] = useState(false);
+  const [decryptNotice, setDecryptNotice] = useState<string | null>(null);
+  const [decryptError, setDecryptError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -23,6 +37,23 @@ export function BelegView(): ReactElement {
         setError(result.message);
       }
     })();
+  }, []);
+
+  const runDecrypt = useCallback(async (passwort: string) => {
+    setDecryptBusy(true);
+    setDecryptNotice(null);
+    setDecryptError(null);
+    try {
+      const result = await window.voicewall.decryptVwencFile(passwort);
+      setShowDecrypt(false);
+      if (result.ok) {
+        setDecryptNotice(`Entschlüsselt nach: ${result.zielPfad}`);
+      } else {
+        setDecryptError(result.message);
+      }
+    } finally {
+      setDecryptBusy(false);
+    }
   }, []);
 
   return (
@@ -127,7 +158,65 @@ export function BelegView(): ReactElement {
               </li>
             ))}
           </ol>
+
+          <h3>Backup und Verschlüsselung</h3>
+          <p className="note warn" data-testid="backup-warnung">
+            {BACKUP_KLARTEXT_WARNUNG}
+          </p>
+          <div className="backup-hinweise" data-testid="backup-hinweise">
+            {BACKUP_HINWEISE.map((abschnitt) => (
+              <div key={abschnitt.titel} className="backup-abschnitt">
+                <h4>{abschnitt.titel}</h4>
+                {abschnitt.absaetze.map((absatz) => (
+                  <p key={absatz} className="notice">
+                    {absatz}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+          <p className="notice">
+            Diese Hinweise liegen ausführlich in {BACKUP_HINWEISE_DOKUMENT} bei (Teil des
+            Beleg-Blatts).
+          </p>
+          <div className="actions">
+            <button
+              type="button"
+              data-testid="beleg-decrypt"
+              disabled={decryptBusy}
+              onClick={() => {
+                setShowDecrypt(true);
+              }}
+            >
+              Datei entschlüsseln (.vwenc)
+            </button>
+          </div>
+          {decryptNotice !== null && (
+            <p className="note" data-testid="decrypt-notice">
+              {decryptNotice}
+            </p>
+          )}
+          {decryptError !== null && (
+            <p className="note error" role="alert" data-testid="decrypt-error">
+              {decryptError}
+            </p>
+          )}
         </>
+      )}
+
+      {showDecrypt && (
+        <PasswordDialog
+          titel="Datei entschlüsseln (.vwenc)"
+          beschreibung="Nach der Passwort-Eingabe öffnet sich die Dateiauswahl. Die entschlüsselte Datei wird neben der .vwenc-Datei abgelegt, nichts wird überschrieben."
+          bestaetigenText="Datei wählen und entschlüsseln"
+          minLength={1}
+          mitWiederholung={false}
+          busy={decryptBusy}
+          onSubmit={(passwort) => void runDecrypt(passwort)}
+          onCancel={() => {
+            setShowDecrypt(false);
+          }}
+        />
       )}
     </div>
   );

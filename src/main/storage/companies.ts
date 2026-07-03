@@ -17,19 +17,26 @@
  * - Alle IPC-Handler: zod-Eingabevalidierung, Result-Antworten, keine
  *   Stacktraces ueber die Prozessgrenze.
  */
-import { mkdir, readFile } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
-import { ipcMain, shell } from 'electron';
+import { randomBytes } from 'node:crypto';
+import { mkdir, readFile, stat } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join } from 'node:path';
+import { dialog, ipcMain, shell } from 'electron';
 import { z } from 'zod';
 import {
+  batchExportInputSchema,
   companyConfigSchema,
   companyDetailsSchema,
   companyStorageStrategySchema,
+  decryptFileInputSchema,
   dictateSearchFilterSchema,
   dictateUpdateInputSchema,
+  encryptedExportInputSchema,
   exportInputSchema,
   manualNoteInputSchema,
   safeRelativePathSchema,
+  tagRenameInputSchema,
+  type BatchExportInput,
+  type BatchExportResult,
   type BelegInfoResult,
   type CompanyDetails,
   type CompanyInfo,
@@ -37,16 +44,21 @@ import {
   type CompanyNamePreview,
   type CompanyStorageStrategy,
   type CreateCompanyResult,
+  type DecryptFileResult,
   type DictateDetailResult,
   type DictateListResult,
   type DictateMutationResult,
   type DictateSearchFilter,
   type DictateUpdateInput,
+  type EncryptedExportInput,
   type ExportInput,
+  type ExportProgress,
   type ExportResult,
   type ManualNoteInput,
   type SaveDictateResult,
   type SyncCheckView,
+  type TagRenameInput,
+  type TagRenameResult,
   type TranscriptQuelle,
   type TrashListResult,
 } from '../../shared/company';
@@ -74,7 +86,14 @@ import {
   searchManifest,
   upsertManifestEntry,
 } from './manifest';
-import { exportTranscript } from './export';
+import { exportTranscriptsBatch, type BatchExportDeps } from './batch-export';
+import { decryptFromVwenc, encryptToVwenc, VWENC_EXTENSION } from './encrypted-export';
+import { buildExportContent, exportBaseName, exportTranscript, writeExportFile } from './export';
+import { searchTranscriptBodies } from './fulltext';
+import { exportTranscriptPdf, PdfRenderer } from './pdf-export';
+import { buildPrintHtml } from './pdf-template';
+import { renameTagEverywhere } from './tag-rename';
+import { writeFileAtomic } from './atomic-write';
 import { sanitizeCompanyName } from './sanitize';
 import {
   checkSyncExposure,
@@ -496,7 +515,13 @@ export class CompanyManager {
     return { ok: true, pfad: created.value.relPfad, id: created.value.meta.id };
   }
 
-  /** Liste/Schnellsuche der Diktate der aktiven Firma (Manifest-basiert). */
+  /**
+   * Liste/Schnellsuche der Diktate der aktiven Firma (Manifest-basiert).
+   * Mit `volltext: true` (M8, ABARBEITUNG 4.4.5) werden zusaetzlich die
+   * Markdown-Bodies durchsucht (Streaming-Scan, Suchbegriff strikt als
+   * Literal): ein Eintrag trifft, wenn Manifest ODER Body den Begriff
+   * enthaelt; Body-Treffer liefern ein Kontext-Snippet.
+   */
   async listDictates(filter: DictateSearchFilter): Promise<DictateListResult> {
     const companyDir = await this.activeCompanyDir();
     if (companyDir === null) {
@@ -508,6 +533,24 @@ export class CompanyManager {
     const manifest = await readManifestWithHealing(companyDir, this.deps.logger);
     if (!manifest.ok) {
       return { ok: false, message: manifest.error };
+    }
+    const text = filter.text?.trim() ?? '';
+    if (filter.volltext === true && text.length > 0) {
+      // Alle uebrigen Filter (Zeitraum, Tags, Quelle) zuerst anwenden, dann
+      // Schnellsuche-Treffer und Body-Treffer vereinigen.
+      const ohneText = { ...filter };
+      delete ohneText.text;
+      delete ohneText.volltext;
+      const basis = searchManifest(manifest.value.eintraege, ohneText);
+      const schnellTreffer = new Set(searchManifest(basis, { text }).map((entry) => entry.id));
+      const bodyTreffer = await searchTranscriptBodies(companyDir, basis, text);
+      return {
+        ok: true,
+        eintraege: basis.filter(
+          (entry) => schnellTreffer.has(entry.id) || bodyTreffer.has(entry.id),
+        ),
+        volltextTreffer: [...bodyTreffer.entries()].map(([id, snippet]) => ({ id, snippet })),
+      };
     }
     return { ok: true, eintraege: searchManifest(manifest.value.eintraege, filter) };
   }
@@ -694,23 +737,190 @@ export class CompanyManager {
     return { ok: true };
   }
 
-  /** Exportiert ein Diktat als Markdown/TXT nach `Exporte/`. */
+  /** Exportiert ein Diktat als Markdown/TXT/PDF nach `Exporte/`. */
   async exportDictate(input: ExportInput): Promise<ExportResult> {
     const active = await this.requireActiveDir();
     if (!active.ok) {
       return active;
     }
-    const result = await exportTranscript(
-      active.dir,
-      input.pfad,
-      input.format,
-      input.mitFrontMatter,
-    );
+    const result =
+      input.format === 'pdf'
+        ? await exportTranscriptPdf(active.dir, input.pfad)
+        : await exportTranscript(active.dir, input.pfad, input.format, input.mitFrontMatter);
     if (!result.ok) {
       return { ok: false, message: result.error };
     }
     this.deps.logger.info('Diktat exportiert.', { format: input.format });
     return { ok: true, anzeigePfad: result.value.absPfad, relPfad: result.value.relPfad };
+  }
+
+  /**
+   * Stapel-Export (M8): mehrere Diktate als Markdown/TXT/PDF. Bei mehr als
+   * einer Datei entsteht ein Unterordner `Exporte/<datum>-stapel/` (atomar);
+   * ein einzelner PDF-Renderer wird fuer alle Dateien wiederverwendet.
+   */
+  async exportDictatesBatch(
+    input: BatchExportInput,
+    onProgress?: (fertig: number, gesamt: number) => void,
+  ): Promise<BatchExportResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    // Halter-Objekt statt let-Variable: die Zuweisung passiert in einer
+    // Closure, was die TS-Kontrollflussanalyse sonst als "bleibt null" liest.
+    const pdf: { renderer: PdfRenderer | null } = { renderer: null };
+    const renderPdf: NonNullable<BatchExportDeps['renderPdf']> = async (meta, body, tmpDir) => {
+      pdf.renderer ??= new PdfRenderer();
+      return pdf.renderer.render(buildPrintHtml(meta, body), tmpDir);
+    };
+    const deps: BatchExportDeps = {
+      ...(onProgress === undefined ? {} : { onProgress }),
+      ...(input.format === 'pdf' ? { renderPdf } : {}),
+    };
+    try {
+      const result = await exportTranscriptsBatch(
+        active.dir,
+        input.pfade,
+        input.format,
+        input.mitFrontMatter,
+        deps,
+      );
+      if (!result.ok) {
+        return { ok: false, message: result.error };
+      }
+      this.deps.logger.info('Stapel-Export ausgefuehrt.', {
+        format: input.format,
+        exportiert: result.value.exportiert,
+        fehler: result.value.fehler.length,
+      });
+      return {
+        ok: true,
+        anzeigePfad: result.value.absPfad,
+        relPfad: result.value.relPfad,
+        exportiert: result.value.exportiert,
+        fehler: [...result.value.fehler],
+      };
+    } finally {
+      pdf.renderer?.dispose();
+    }
+  }
+
+  /** Tag-Batch-Rename (M8): wirkt firmenweit inklusive Papierkorb. */
+  async renameTag(input: TagRenameInput): Promise<TagRenameResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const result = await renameTagEverywhere(active.dir, input.alt, input.neu, this.deps.logger);
+    if (!result.ok) {
+      return { ok: false, message: result.error };
+    }
+    return {
+      ok: true,
+      geaendert: result.value.geaendert,
+      papierkorbGeaendert: result.value.papierkorbGeaendert,
+      fehler: [...result.value.fehler],
+    };
+  }
+
+  /**
+   * Verschluesselter Einzel-Export (M8, R16): Markdown mit Front-Matter,
+   * AES-256-GCM als .vwenc nach `Exporte/`. Das Passwort wird weder
+   * gespeichert noch geloggt.
+   */
+  async exportDictateEncrypted(input: EncryptedExportInput): Promise<ExportResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const source = await readTranscript(active.dir, input.pfad);
+    if (!source.ok) {
+      return { ok: false, message: source.error };
+    }
+    const content = buildExportContent(source.value.meta, source.value.body, 'md', true);
+    const container = encryptToVwenc(Buffer.from(content, 'utf8'), input.passwort);
+    const written = await writeExportFile(
+      active.dir,
+      `${exportBaseName(input.pfad)}.md`,
+      VWENC_EXTENSION,
+      container,
+    );
+    if (!written.ok) {
+      return { ok: false, message: written.error };
+    }
+    this.deps.logger.info('Diktat verschluesselt exportiert (.vwenc).');
+    return { ok: true, anzeigePfad: written.value.absPfad, relPfad: written.value.relPfad };
+  }
+
+  /**
+   * Entschluesselt eine .vwenc-Datei (M8): die Datei waehlt der Nutzer im
+   * nativen Datei-Dialog des Main-Prozesses (nie ein roher Renderer-Pfad).
+   * Das Ergebnis wird atomar NEBEN die Quelldatei geschrieben, nie
+   * ueberschrieben.
+   */
+  async decryptVwencFile(passwort: string): Promise<DecryptFileResult> {
+    const chosen = await dialog.showOpenDialog({
+      title: 'VoiceWall-verschlüsselte Datei entschlüsseln',
+      buttonLabel: 'Entschlüsseln',
+      filters: [{ name: 'VoiceWall verschlüsselt (.vwenc)', extensions: ['vwenc'] }],
+      properties: ['openFile'],
+    });
+    const sourcePath = chosen.filePaths[0];
+    if (chosen.canceled || sourcePath === undefined) {
+      return { ok: false, message: 'Es wurde keine Datei ausgewählt.' };
+    }
+    try {
+      const info = await stat(sourcePath);
+      if (info.size > 64 * 1024 * 1024) {
+        return {
+          ok: false,
+          message: 'Die Datei ist zu groß für eine VoiceWall-.vwenc-Datei (Limit 64 MB).',
+        };
+      }
+    } catch {
+      return { ok: false, message: 'Die ausgewählte Datei ist nicht lesbar.' };
+    }
+    let container: Buffer;
+    try {
+      container = await readFile(sourcePath);
+    } catch {
+      return { ok: false, message: 'Die ausgewählte Datei ist nicht lesbar.' };
+    }
+    const plain = decryptFromVwenc(container, passwort);
+    if (!plain.ok) {
+      return { ok: false, message: plain.error };
+    }
+    // Zielname: `.vwenc` abschneiden; Kollisionen loest ein Zufalls-Suffix.
+    const dir = dirname(sourcePath);
+    const name = basename(sourcePath);
+    const stem = name.endsWith(VWENC_EXTENSION)
+      ? name.slice(0, -VWENC_EXTENSION.length)
+      : `${name}.entschluesselt`;
+    const candidates = [stem, `${stem}_${randomBytes(3).toString('hex')}`];
+    for (const candidate of candidates) {
+      const target = join(dir, candidate);
+      try {
+        await stat(target);
+        continue; // Ziel existiert: naechster Kandidat, nie ueberschreiben.
+      } catch {
+        // Ziel frei.
+      }
+      try {
+        await writeFileAtomic(target, plain.value);
+      } catch (error) {
+        return {
+          ok: false,
+          message: `Die entschlüsselte Datei konnte nicht geschrieben werden: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+      this.deps.logger.info('.vwenc-Datei entschluesselt.');
+      return { ok: true, zielPfad: target };
+    }
+    return {
+      ok: false,
+      message: 'Die entschlüsselte Datei konnte nicht angelegt werden (Namenskollision).',
+    };
   }
 
   /**
@@ -973,6 +1183,66 @@ export class CompanyManager {
       }
       return guard<ExportResult>({ ok: false, message: internalError }, () =>
         this.exportDictate(parsed.data),
+      );
+    });
+
+    ipcMain.handle(IpcChannel.DictateExportBatch, (event, raw: unknown) => {
+      const parsed = batchExportInputSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<BatchExportResult>({
+          ok: false,
+          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für den Stapel-Export.',
+        });
+      }
+      return guard<BatchExportResult>({ ok: false, message: internalError }, () =>
+        this.exportDictatesBatch(parsed.data, (fertig, gesamt) => {
+          // Fortschritt an den auslösenden Renderer (aria-live-Anzeige).
+          if (!event.sender.isDestroyed()) {
+            const progress: ExportProgress = { fertig, gesamt };
+            event.sender.send(IpcChannel.DictateExportProgress, progress);
+          }
+        }),
+      );
+    });
+
+    ipcMain.handle(IpcChannel.DictateRenameTag, (_event, raw: unknown) => {
+      const parsed = tagRenameInputSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<TagRenameResult>({
+          ok: false,
+          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für die Tag-Umbenennung.',
+        });
+      }
+      return guard<TagRenameResult>({ ok: false, message: internalError }, () =>
+        this.renameTag(parsed.data),
+      );
+    });
+
+    ipcMain.handle(IpcChannel.DictateExportEncrypted, (_event, raw: unknown) => {
+      const parsed = encryptedExportInputSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<ExportResult>({
+          ok: false,
+          message:
+            parsed.error.issues[0]?.message ??
+            'Ungültige Eingabe für den verschlüsselten Export (Passwort mindestens 12 Zeichen).',
+        });
+      }
+      return guard<ExportResult>({ ok: false, message: internalError }, () =>
+        this.exportDictateEncrypted(parsed.data),
+      );
+    });
+
+    ipcMain.handle(IpcChannel.DictateDecryptVwenc, (_event, raw: unknown) => {
+      const parsed = decryptFileInputSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<DecryptFileResult>({
+          ok: false,
+          message: 'Ungültige Eingabe für das Entschlüsseln.',
+        });
+      }
+      return guard<DecryptFileResult>({ ok: false, message: internalError }, () =>
+        this.decryptVwencFile(parsed.data.passwort),
       );
     });
 

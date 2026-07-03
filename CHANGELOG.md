@@ -8,6 +8,30 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- M8: Export-, Such- und Backup-Ausbau (v1.1-Posten aus E25). PDF-Export
+  über `webContents.printToPDF()` in einem versteckten, sandboxed
+  BrowserWindow: lokale Druckvorlage (CSP `default-src 'none'`, Body strikt
+  als Text, Prüfdokument-Layout DIN A4 mit Fußzeile „Erstellt mit VoiceWall,
+  100 % lokal“), echte Umlaute per Text-Extraktion im E2E-Test bewiesen
+  (pdf-parse nur als gepinnte Test-devDependency, E26). Stapel-Export im
+  Register (Mehrfachauswahl per Checkbox oder alle gefilterten, MD/TXT/PDF):
+  mehrere Dateien landen in einem atomar erzeugten Unterordner
+  `Exporte/<datum>-stapel/` statt ZIP (E27), Fortschritt als
+  IPC-Progress mit aria-live. Volltextsuche über die Markdown-Bodies
+  (Umschalter „Auch im Volltext suchen“): sequenzieller Streaming-Scan,
+  Suchbegriff strikt als Literal, Treffer mit Kontext-Snippet, kombiniert
+  mit allen Filtern; bewusst ohne Cache nach Messung mit 1000
+  Fixture-Diktaten (E28). Tag-Batch-Rename („Tags verwalten“): firmenweit
+  inklusive Papierkorb, atomare Datei-Updates, Abschluss per atomarem
+  Manifest-Rebuild aus dem Dateizustand, Fehlerstrategie „weiterlaufen und
+  sammeln“ (E29). Backup-Härtung (R16): Beleg-Ansicht-Abschnitt „Backup und
+  Verschlüsselung“ mit Klartext-/Art.-9-Warnung und
+  FileVault-/BitLocker-Anleitung (auch als docs/BACKUP-HINWEISE.md);
+  verschlüsselter Einzel-Export als `.vwenc` (AES-256-GCM, scrypt,
+  ausschließlich Node-Bordmittel, Passwort mindestens 12 Zeichen mit
+  Wiederholung, wird nie gespeichert) plus „Datei entschlüsseln“ in der App
+  (E30).
+
 - M6: Installer, Packaging und First-Run-Wizard. Packaging als reiner
   `--dir`-Build via electron-builder (`electron-builder.yml`: Bundle-ID
   `de.der-ki-auditor.voicewall`, deutscher NSMicrophoneUsageDescription-Text,

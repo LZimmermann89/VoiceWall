@@ -107,7 +107,12 @@ function toRelPfad(companyDir: string, absolutePath: string): string {
   return relative(companyDir, absolutePath).split(sep).join('/').normalize('NFC');
 }
 
-function metaToFrontMatter(meta: TranscriptMeta): FlatFrontMatter {
+/**
+ * Wandelt die flachen Metadaten fuer den Front-Matter-Serializer um.
+ * Exportiert, damit Export (M7) und Tag-Batch-Rename (M8) exakt dieselbe
+ * Feldreihenfolge schreiben wie der Transkript-Speicher.
+ */
+export function transcriptMetaToFrontMatter(meta: TranscriptMeta): FlatFrontMatter {
   const entries: Record<string, string | number | readonly string[]> = {
     id: meta.id,
     titel: meta.titel,
@@ -226,7 +231,7 @@ export async function createTranscript(
     try {
       await writeFileAtomic(
         filePath,
-        serializeFrontMatter(metaToFrontMatter(checked.data), input.body),
+        serializeFrontMatter(transcriptMetaToFrontMatter(checked.data), input.body),
       );
     } catch (error) {
       return err(
@@ -355,7 +360,7 @@ export async function updateTranscript(
   try {
     await writeFileAtomic(
       resolved.value,
-      serializeFrontMatter(metaToFrontMatter(checked.data), body),
+      serializeFrontMatter(transcriptMetaToFrontMatter(checked.data), body),
     );
   } catch (error) {
     return err(

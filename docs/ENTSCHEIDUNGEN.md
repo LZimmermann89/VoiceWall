@@ -473,3 +473,119 @@ im Firmenordner, Kollisionen lösen ein Zufalls-Suffix (nie überschreiben).
 
 Damit verschiebt sich das Kernprodukt nicht hinter UI-Ausbau; M8 zieht diese
 drei Posten sauber nach.
+
+## E26: PDF-Export via printToPDF, Umlaut-Beweis mit pdf-parse als Test-only-Dependency (M8)
+
+**Kontext:** Der PDF-Export (v1.1-Posten aus E25) muss echte Umlaute
+(Ä Ö Ü ä ö ü ß) beweisbar korrekt einbetten (DoD-Pflichtpunkt, Kritik C4).
+
+**Entscheidung:**
+
+- Rendering über Electrons eingebautes `webContents.printToPDF()` in einem
+  versteckten, sandboxed BrowserWindow (`src/main/storage/pdf-export.ts`):
+  compilerfrei, 100 Prozent lokal, keine neue Laufzeit-Dependency, kein
+  externes Tool. Die Druckvorlage (`pdf-template.ts`) ist lokales HTML mit
+  CSP `default-src 'none'`, ohne Skripte und ohne externe Ressourcen; Titel,
+  Metadaten und Body werden HTML-escaped und der Body strikt als
+  vorformatierter TEXT gerendert (Stored-XSS-Regel 3.5). Layout: schlichtes
+  Prüfdokument (Serifen, feine Linien, Wortmarke, Fußzeile „Erstellt mit
+  VoiceWall, 100 % lokal“ mit Datum und Seitenzahl), DIN A4. Die Vorlage
+  liegt während des Renderings als versteckte Tempdatei IM Exporte-Ordner
+  (kein Klartext außerhalb des Firmenordners) und wird sofort gelöscht;
+  das PDF selbst wird atomar mit Containment- und Kollisionsregeln des
+  Markdown-Exports geschrieben.
+- **Umlaut-Beweis:** Chromium schreibt Text in PDFs als komprimierte
+  Font-Subset-Glyphen; ein Grep auf den Roh-Inhalt kann Umlaute prinzipiell
+  nicht nachweisen. Deshalb extrahiert der E2E-Test
+  (`tests/e2e/export-m8.spec.ts`) den PDF-Text mit `pdf-parse` und prüft
+  Umlaute in Titel UND Body. `pdf-parse` ist AUSSCHLIESSLICH devDependency
+  (Test-only), exakt gepinnt (1.1.1), MIT-lizenziert, reines JavaScript
+  (keine binding.gyp, keine Install-Skripte, Supply-Chain-Gate
+  `scripts/verify-checksums.mjs` bleibt grün) und wird nie in die App
+  gebündelt.
+
+**Konsequenz:** Null neue Laufzeit-Dependencies; der Beweis läuft im Test
+gegen die echte, gebaute App.
+
+## E27: Stapel-Export als Unterordner statt ZIP (M8)
+
+**Kontext:** ABARBEITUNG 4.7 nennt für den Stapel-Export „ZIP oder
+zusammengeführtes PDF/MD“. Node bringt kein ZIP-Format mit; jede
+ZIP-Erzeugung hieße eine neue Dependency (JS-Implementierungen wie jszip
+oder native wie libzip-Bindings).
+
+**Entscheidung:** Kein ZIP. Mehrere ausgewählte bzw. alle gefilterten
+Einträge landen in einem Unterordner `Exporte/<datum>-stapel/`
+(`src/main/storage/batch-export.ts`). Der Ordner entsteht atomar wie der
+Firmenordner selbst (versteckter Temp-Ordner, dann Rename); genau eine
+Datei läuft über den normalen Einzel-Export. Fehlerstrategie: weiterlaufen
+und Fehler je Datei sammeln (jede Datei ist für sich abgeschlossen), bei
+null Erfolgen Fehler-Result und Aufräumen. Fortschritt geht als
+IPC-Progress-Event an den Renderer (aria-live). Ein Unterordner erfüllt
+denselben Zweck wie ZIP (ein Griff, alles beisammen), bleibt ohne
+Entpacken lesbar und kostet keine Dependency; wer ein Archiv braucht,
+komprimiert den Ordner mit Bordmitteln des OS.
+
+## E28: Volltextsuche ohne Cache; Messung 1000 Einträge weit unter der Schwelle (M8)
+
+**Kontext:** ABARBEITUNG 4.4.5 sieht für sehr große Bestände optional einen
+lokalen, wiederaufbaubaren Volltext-Cache in `.voicewall/` vor. Vorgabe M8:
+erst messen (1000 Fixture-Diktate), Cache nur bei mehr als 500 ms Suchzeit.
+
+**Entscheidung:** KEIN Cache. Die Volltextsuche
+(`src/main/storage/fulltext.ts`) scannt die Markdown-Bodies sequenziell
+(nie alle gleichzeitig im RAM), case-insensitiv (de-DE), der Suchbegriff
+wird IMMER als Literal behandelt (indexOf, nie Regex, nie Pfad;
+ReDoS-/Injektions-Regel 3.5). Die Messung in
+`tests/unit/fulltext.test.ts` (1000 generierte Diktate mit je ~120 Wörtern)
+liegt auf der Referenzmaschine (macOS arm64, 2026-07-03) bei rund 90 ms
+und damit weit unter der Schwelle (der Test gibt den Messwert aus und
+asserted die 500 ms). Ein Cache wäre
+Komplexität ohne Nutzen und ist bei Bedarf später als ableitbares,
+jederzeit löschbares Artefakt nachrüstbar. Treffer liefern ein
+Kontext-Snippet; die UI kombiniert Volltext mit allen bestehenden Filtern.
+
+## E29: Tag-Batch-Rename: weiterlaufen und Fehler sammeln, Papierkorb inklusive (M8)
+
+**Kontext:** Ein Tag-Rename wirkt über viele Dateien. Was passiert bei einem
+Fehler mitten im Batch, und gilt der Rename auch im Papierkorb?
+
+**Entscheidung** (`src/main/storage/tag-rename.ts`):
+
+- **Papierkorb wird mit umbenannt.** Sonst brächte ein wiederhergestelltes
+  Diktat den gerade abgeschafften Tag zurück; der Bestand wäre inkonsistent.
+- **Fehlerstrategie: weiterlaufen und Fehler sammeln**, kein Abbruch und
+  kein Rollback. Begründung: jede Datei wird für sich atomar geschrieben
+  (Temp plus Rename). Ein Abbruch mitten im Batch hinterließe exakt
+  denselben teilweise umbenannten Zustand wie das Weiterlaufen, nur mit
+  weniger erledigten Dateien; ein Rollback wäre ein zweiter Batch mit
+  denselben Fehlerrisiken. Konsistenz garantiert der Abschluss: das
+  Manifest wird per `rebuildManifest()` atomar aus dem TATSÄCHLICHEN
+  Dateizustand neu geschrieben (Dateien sind die Wahrheitsquelle, 4.4.4),
+  `tags.json` wird nachgeführt, gesammelte Fehler werden dem Nutzer als
+  deutsche Meldungen angezeigt. `version` und `geaendert` werden je Datei
+  nachgeführt. Beleg: `tests/unit/tag-rename.test.ts` (3 Diktate, eines im
+  Papierkorb, plus Fehlerfall mit beschädigter Datei).
+
+## E30: Verschlüsselter Export als eigenes .vwenc-Container-Format (AES-256-GCM), kein Passwort-ZIP (M8, R16)
+
+**Kontext:** R16 verlangt optional einen verschlüsselten Export. „ZIP mit
+Passwort“ wäre die vertraute Form, aber: Node kann kein ZIP, das klassische
+ZipCrypto ist kryptografisch gebrochen, und AES-ZIP hieße eine neue
+(teils native) Dependency.
+
+**Entscheidung:** Eigenes, schlichtes Container-Format `.vwenc`
+(`src/main/storage/encrypted-export.ts`), ausschließlich mit Node-crypto:
+Header `VWENC1` + Versions-Byte + KDF-Kennung + Salt (16 B) + Nonce (12 B) +
+GCM-Auth-Tag (16 B) + Ciphertext. Schlüsselableitung scrypt (memory-hard,
+N=16384/r=8/p=1, über die KDF-Kennung versionierbar), AES-256-GCM
+(authentifiziert: falsches Passwort ODER manipulierte Datei schlägt hart
+mit deutscher Meldung fehl, nie halb entschlüsselter Inhalt). Passwort:
+Mindestlänge 12 plus Wiederholung (UI und IPC-zod), wird nie gespeichert
+und nie geloggt; die UI warnt ausdrücklich, dass Passwortverlust
+unwiederbringlich ist. Entschlüsselt wird in der App (Beleg-Ansicht →
+„Datei entschlüsseln“, Dateiauswahl über den nativen Dialog des
+Main-Prozesses, Ergebnis atomar NEBEN die Quelldatei, nie überschreiben).
+Beleg: Roundtrip-Test `tests/unit/encrypted-export.test.ts` (byte-identisch,
+falsches Passwort, Manipulation). Die FileVault-/BitLocker-Empfehlung samt
+Art.-9-Hinweis steht in der Beleg-Ansicht und in docs/BACKUP-HINWEISE.md.

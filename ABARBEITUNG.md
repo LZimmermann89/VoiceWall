@@ -1301,12 +1301,12 @@ Die Roadmap ist streng sequenziell. Sie ist bewusst so geschnitten, dass die dre
 **Ziel:** Die zurueckgestellten Export- und Backup-Funktionen sauber nachziehen.
 
 **Aufgaben (Checkliste):**
-- [ ] PDF-Export via `webContents.printToPDF()`. **DoD-Pflichtpunkt: echte Umlaute ae oe ue ss im PDF korrekt eingebettet** (Kritik C4).
-- [ ] Stapel-Export (ZIP oder zusammengefuehrtes PDF/MD), Ziel `Exporte/`.
-- [ ] Volltext-Cache (ableitbar, loeschbar), Tag-Batch-Rename mit atomarem Manifest-Rewrite.
-- [ ] **Backup-Verschluesselung (Risiko R16, Kritik D10):** FileVault/BitLocker-Empfehlung im Beleg-Blatt, optionaler verschluesselter Export. Hinweis, dass Klartext-Markdown mit moeglichen Art.-9-Daten unverschluesselt kopiert wird.
+- [x] PDF-Export via `webContents.printToPDF()` (verstecktes, sandboxed BrowserWindow; lokale Druckvorlage mit CSP `default-src 'none'`, Body strikt als Text; DIN A4, Pruefdokument-Layout mit Fusszeile). **DoD-Pflichtpunkt erfuellt: echte Umlaute Ä Ö Ü ä ö ü ß im PDF korrekt eingebettet**, bewiesen durch Text-Extraktion im E2E-Test `tests/e2e/export-m8.spec.ts` (pdf-parse als exakt gepinnte Test-only-devDependency, Entscheidung E26).
+- [x] Stapel-Export: Mehrfachauswahl (Checkboxen) und "alle gefilterten" im Register, Formate MD/TXT/PDF, Ziel `Exporte/`; bei mehreren Dateien atomarer Unterordner `Exporte/<datum>-stapel/` STATT ZIP (bewusst, keine neue Dependency, Entscheidung E27); IPC-Fortschritt mit aria-live.
+- [x] Volltextsuche ueber die Bodies (Streaming-Scan, Literal-Suche, Snippets mit Kontext, kombiniert mit allen Filtern); Volltext-Cache bewusst NICHT gebaut: Messung mit 1000 Fixture-Diktaten liegt weit unter der 500-ms-Schwelle (tests/unit/fulltext.test.ts, Entscheidung E28). Tag-Batch-Rename mit atomarem Manifest-Rewrite (rebuildManifest aus dem Dateizustand), inkl. Papierkorb, Fehlerstrategie "weiterlaufen und sammeln" (Entscheidung E29).
+- [x] **Backup-Verschluesselung (Risiko R16, Kritik D10):** Beleg-Ansicht-Abschnitt "Backup und Verschluesselung" mit Klartext-/Art.-9-Warnung und FileVault-/BitLocker-Anleitung (auch als docs/BACKUP-HINWEISE.md fuer das Beleg-Blatt in M9); verschluesselter Einzel-Export als .vwenc (AES-256-GCM, scrypt, Node-Bordmittel, Passwort min. 12 Zeichen mit Wiederholung, nie gespeichert) plus "Datei entschluesseln" in der App (Entscheidung E30).
 
-**Definition of Done:** PDF mit korrekten Umlauten erzeugt; Stapel-Export funktioniert; Volltextsuche liefert Treffer aus Bodies; Backup-Verschluesselungs-Hinweis im Beleg-Blatt; verschluesselter Export optional verfuegbar.
+**Definition of Done:** ERFUELLT. PDF mit korrekten Umlauten erzeugt (E2E-Beweis per Text-Extraktion); Stapel-Export funktioniert (E2E: 2 von 3 ausgewaehlt, Datei-Asserts im Stapel-Ordner); Volltextsuche liefert Treffer aus Bodies (E2E: Begriff nur im Body wird gefunden, Snippet sichtbar); Backup-Verschluesselungs-Hinweis im Beleg-Blatt; verschluesselter Export verfuegbar (Roundtrip-Unit-Test: byte-identisch, falsches Passwort schlaegt mit deutscher Meldung fehl).
 
 **Aufwand:** 4 bis 5 PT.
 
