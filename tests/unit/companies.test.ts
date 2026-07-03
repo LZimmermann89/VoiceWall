@@ -164,6 +164,70 @@ describe('CompanyManager', () => {
     expect(await firmenverwaltung.isAutoSaveEnabled()).toBe(false);
   });
 
+  it('Kein Lost-Update: verspaetetes Konfig-Laden ueberschreibt eine frisch angelegte Firma nicht (M7-Race)', async () => {
+    // Deterministische Nachstellung des flakigen E2E-Fehlers "Keine aktive
+    // Firma": der ERSTE Konfig-Read (ausgeloest durch einen fruehen
+    // listCompanies-Aufruf beim Renderer-Start) haengt, waehrend
+    // createCompany parallel die Firma anlegt und als aktiv persistiert.
+    // Loest der veraltete Read DANACH auf, darf er den frischen Zustand
+    // nicht ueberschreiben (frueherer Fehler: `this.config ??= await ...`
+    // prueft VOR dem await und weist NACH dem await bedingungslos zu).
+    let releaseFirstRead: () => void = () => undefined;
+    const firstRead = new Promise<void>((resolve) => {
+      releaseFirstRead = resolve;
+    });
+    let readCalls = 0;
+    const firmenverwaltung = new CompanyManager({
+      userDataPath: userData,
+      logger: silentLogger,
+      appVersion: 'VoiceWall 0.1.0-test',
+      resolveDesktop: () => Promise.resolve(desktop),
+      localBase,
+      readConfig: async () => {
+        readCalls += 1;
+        if (readCalls === 1) {
+          // Simulierter langsamer Disk-Read unter Last: liefert erst nach
+          // der Freigabe den (leeren) Altstand.
+          await firstRead;
+        }
+        return defaultGlobalConfig();
+      },
+    });
+
+    // 1. Frueher Aufruf startet den (haengenden) Erst-Read.
+    const early = firmenverwaltung.listCompanies();
+
+    // 2. createCompany laeuft parallel. Mit der Promise-Memoisierung wartet
+    //    es korrekt auf denselben einen Read (settled === false); der alte
+    //    Code startete stattdessen einen ZWEITEN Read und persistierte im
+    //    offenen Fenster des ersten.
+    const create = firmenverwaltung.createCompany('Race GmbH', 'desktop');
+    const settledBeforeRelease = await Promise.race([
+      create.then(() => true),
+      new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          resolve(false);
+        }, 300);
+      }),
+    ]);
+    expect(settledBeforeRelease).toBe(false);
+    expect(readCalls).toBe(1);
+
+    // 3. Der veraltete Read loest JETZT auf (nach bzw. waehrend persist).
+    releaseFirstRead();
+    await early;
+    const created = await create;
+    expect(created.ok).toBe(true);
+
+    // 4. Die frisch angelegte Firma ist und bleibt die aktive Firma.
+    const after = await firmenverwaltung.listCompanies();
+    expect(after.firmen.length).toBe(1);
+    expect(after.aktiveFirma).not.toBeNull();
+    if (created.ok) {
+      expect(after.aktiveFirma).toBe(created.pfad);
+    }
+  });
+
   it('saveDictate ohne aktive Firma liefert ein Fehler-Result', async () => {
     const result = await manager().saveDictate({
       text: 'Text ohne Firma.',
