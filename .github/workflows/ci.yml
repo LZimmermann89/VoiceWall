@@ -66,7 +66,7 @@ jobs:
         run: npm run sbom
 
       - name: SBOM als Artefakt hochladen
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ matrix.os }}
           path: sbom.cdx.json
