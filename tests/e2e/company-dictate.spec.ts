@@ -168,7 +168,7 @@ test('M5: Firma anlegen, Diktat-Flow speichert wohlgeformte .md, Suche findet si
     const monthDir = join(yearDir, monthDirs[0] ?? '');
     const mdFiles = readdirSync(monthDir).filter((file) => file.endsWith('.md'));
     expect(mdFiles.length).toBe(1);
-    expect(mdFiles[0]).toMatch(/^\d{4}-\d{2}-\d{2}_\d{6}_[a-z0-9-]+\.md$/);
+    expect(mdFiles[0]).toMatch(/^\d{4}-\d{2}-\d{2}_\d{6}_[a-zäöüß0-9-]+\.md$/);
 
     const raw = readFileSync(join(monthDir, mdFiles[0] ?? ''), 'utf8');
     const parsed = parseFrontMatter(raw);

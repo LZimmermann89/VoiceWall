@@ -54,8 +54,8 @@ afterEach(async () => {
 
 describe('slugFromTitle', () => {
   it('bildet Umlaute auf Basisbuchstaben ab und begrenzt auf 40 Zeichen', () => {
-    expect(slugFromTitle('Angebot Müller')).toBe('angebot-mueller');
-    expect(slugFromTitle('Größe & Öl für Ärzte')).toBe('groesse-oel-fuer-aerzte');
+    expect(slugFromTitle('Angebot Müller')).toBe('angebot-müller');
+    expect(slugFromTitle('Größe & Öl für Ärzte')).toBe('größe-öl-für-ärzte');
     expect(slugFromTitle('Café à la carte')).toBe('cafe-a-la-carte');
     expect(slugFromTitle('X'.repeat(100)).length).toBeLessThanOrEqual(40);
     expect(slugFromTitle('🎙️🎙️')).toBe('diktat'); // Fallback statt leer
@@ -70,7 +70,7 @@ describe('createTranscript', () => {
     if (!result.ok) {
       return;
     }
-    expect(result.value.relPfad).toBe('Diktate/2026/07/2026-07-02_143210_angebot-mueller.md');
+    expect(result.value.relPfad).toBe('Diktate/2026/07/2026-07-02_143210_angebot-müller.md');
     expect(result.value.meta.id).toBe('2026-07-02_143210_a1b2c3');
     expect(result.value.meta.wortzahl).toBe(9);
     // ISO 8601 MIT Zeitzonen-Offset.
@@ -95,9 +95,7 @@ describe('createTranscript', () => {
     if (!first.ok || !second.ok) {
       return;
     }
-    expect(second.value.relPfad).toBe(
-      'Diktate/2026/07/2026-07-02_143210_angebot-mueller_d4e5f6.md',
-    );
+    expect(second.value.relPfad).toBe('Diktate/2026/07/2026-07-02_143210_angebot-müller_d4e5f6.md');
   });
 
   it('hinterlaesst keine Tempdateien (Atomaritaet)', async () => {

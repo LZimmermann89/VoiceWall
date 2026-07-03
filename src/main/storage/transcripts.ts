@@ -77,25 +77,30 @@ export interface TranscriptClockDeps {
 }
 
 /**
- * Slug aus dem Titel (nur fuer den Dateinamen; die Anzeige nutzt `titel` mit
- * echten Umlauten): Umlaute/ss zu Basis, Diakritika entfernen, alles
- * ausserhalb [a-z0-9] zu `-`, zusammenfassen, auf 40 Zeichen begrenzen.
+ * Slug aus dem Titel (nur fuer den Dateinamen; die Anzeige nutzt `titel`):
+ * echte Umlaute und ss-Ligatur BLEIBEN im Dateinamen erhalten
+ * (Inhaber-Entscheidung vom 03.07.2026: die Dateinamen sollen deutsch
+ * lesbar sein; der Firmenordner traegt ohnehin schon Umlaute, und alle
+ * Pfad-Vergleiche laufen NFC-normalisiert, siehe M5). Uebrige Diakritika
+ * werden zur Basis reduziert (é zu e), alles ausserhalb [a-zäöüß0-9] wird
+ * zu `-`, zusammengefasst und auf 40 Zeichen begrenzt.
  */
 export function slugFromTitle(titel: string): string {
-  const transliterated = titel
-    .normalize('NFC')
-    .replace(/ä/g, 'ae')
-    .replace(/ö/g, 'oe')
-    .replace(/ü/g, 'ue')
-    .replace(/Ä/g, 'Ae')
-    .replace(/Ö/g, 'Oe')
-    .replace(/Ü/g, 'Ue')
-    .replace(/ß/g, 'ss');
-  const base = transliterated
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
+  // Umlaute/ß vor der NFD-Diakritika-Entfernung schuetzen: Zeichenweise
+  // pruefen statt Steuerzeichen-Platzhalter (lint-freundlich und explizit).
+  const lowered = titel.normalize('NFC').toLowerCase();
+  const KEEP = new Set(['ä', 'ö', 'ü', 'ß']);
+  const restauriert = Array.from(lowered)
+    .map((zeichen) => {
+      if (KEEP.has(zeichen)) {
+        return zeichen;
+      }
+      // Diakritika einzelner Fremdzeichen zur Basis reduzieren (é zu e).
+      return zeichen.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    })
+    .join('');
+  const base = restauriert
+    .replace(/[^a-zäöüß0-9]+/g, '-')
     .replace(/-{2,}/g, '-')
     .replace(/^-+|-+$/g, '');
   const cut = base.slice(0, SLUG_MAX_LENGTH).replace(/-+$/, '');
