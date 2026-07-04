@@ -50,8 +50,21 @@ sha256_of() {
   shasum -a 256 "$1" | cut -d' ' -f1
 }
 
-# Liest einen Wert aus checksums.json (python3 ist auf macOS und ueblichen
-# Linux-Systemen vorhanden; Node existiert an dieser Stelle ggf. noch nicht).
+# Stellt sicher, dass python3 wirklich lauffaehig ist, bevor eine
+# Pruefsummen-Verifikation darauf aufbaut. Wichtig: auf macOS ohne Xcode
+# Command Line Tools ist /usr/bin/python3 nur ein Stub, der mit Exit != 0
+# endet; ein ungesicherter Aufruf wuerde das Skript unter `set -e` ohne
+# verstaendliche Meldung beenden.
+require_python3() {
+  if ! command -v python3 >/dev/null 2>&1 || ! python3 -c 'pass' >/dev/null 2>&1; then
+    fail "python3 ist auf dieser Maschine nicht lauffaehig, wird aber fuer die Pruefsummen-Verifikation des Vendor-Standes benoetigt. Auf macOS die Xcode Command Line Tools installieren ('xcode-select --install'), auf Linux das Paket python3; danach das Skript erneut ausfuehren."
+  fi
+}
+
+# Liest einen Wert aus checksums.json ueber python3 (Node existiert an
+# dieser Stelle ggf. noch nicht). Aufrufer sichern den Aufruf vorher mit
+# require_python3 ab; python3 ist NICHT ueberall garantiert lauffaehig
+# (macOS ohne Xcode CLT liefert nur einen Stub).
 checksum_lookup() {
   local section="$1" key="$2"
   python3 - "$CHECKSUMS_FILE" "$section" "$key" <<'PY'
@@ -97,6 +110,13 @@ log "  Speicherplatz: ${FREE_GB} GB frei (mindestens 3 GB): OK."
 
 [ -w "${HOME}" ] || fail "Kein Schreibrecht auf das Home-Verzeichnis ${HOME}. Rechte pruefen, dann Skript erneut ausfuehren."
 log "  Schreibrecht auf ${HOME}: OK."
+
+# shasum wird fuer ALLE SHA-256-Pruefungen benoetigt (Lockfile-Marker,
+# Build-Marker, Vendor-Artefakte); ohne Guard wuerde `set -e` das Skript
+# spaeter ohne verstaendliche Meldung beenden.
+command -v shasum >/dev/null 2>&1 ||
+  fail "Das Werkzeug 'shasum' fehlt (noetig fuer die SHA-256-Pruefungen; auf macOS immer vorhanden, auf Linux liefert es das Paket 'perl'). Bitte installieren, dann Skript erneut ausfuehren."
+log "  Benoetigtes Werkzeug shasum vorhanden: OK."
 if [ -d "${HOME}/Desktop" ] && [ -w "${HOME}/Desktop" ]; then
   log "  Schreibrecht auf den Desktop: OK."
 else
@@ -137,9 +157,10 @@ else
     [ -f "${candidate}" ] && NODE_TARBALL="${candidate}"
   done
   if [ -z "${NODE_TARBALL}" ]; then
-    fail "Keine passende Node-Version gefunden. Entweder Node >=26 <27 installieren ODER vorher auf einer Maschine mit Internet 'node scripts/prepare-vendor.mjs --platform ${OS_NAME}-${ARCH_NAME}' ausfuehren (legt das portable Node unter vendor/node-runtime/ ab, siehe docs/ON-SITE-PROTOKOLL.md)."
+    fail "Node >=26 <27 fehlt und es liegt kein Vendor-Stand unter vendor/node-runtime/. Fuer die Selbst-Installation bitte Node 26 installieren: https://nodejs.org/en/download aufrufen und dort ausdruecklich Version 26 ('Current') waehlen; der vorausgewaehlte Standard-Button liefert die aeltere LTS-Version, die dieser Preflight ablehnt. Auf macOS geht alternativ 'brew install node' (die Homebrew-Formel node liefert derzeit die 26er-Linie). Danach dieses Skript erneut ausfuehren. Der Vendor-Weg ueber scripts/prepare-vendor.mjs ist der Dienstleistungsweg fuer die Offline-Vor-Ort-Installation und setzt seinerseits eine Maschine mit Node 26 voraus (docs/ON-SITE-PROTOKOLL.md)."
   fi
   TARBALL_NAME="$(basename "${NODE_TARBALL}")"
+  require_python3
   EXPECTED_SHA="$(checksum_lookup nodeRuntime "${TARBALL_NAME}")"
   [ -n "${EXPECTED_SHA}" ] || fail "Fuer ${TARBALL_NAME} ist keine SHA-256 in install/lib/checksums.json hinterlegt. Vendor-Stand mit scripts/prepare-vendor.mjs neu erzeugen."
   ACTUAL_SHA="$(sha256_of "${NODE_TARBALL}")"
@@ -301,11 +322,17 @@ fi
 log ""
 log "Schritt 6/8: Verifikation (Audit, SBOM, Modelle)."
 
+AUDIT_WARNUNG=""
 if [ "${ONLINE}" = "ja" ]; then
   if npm audit --audit-level=high >>"${LOG_FILE}" 2>&1; then
     log "  npm audit: keine Findings ab Level high."
   else
-    fail "npm audit meldet Schwachstellen ab Level high (Details im Log). Bitte vor der Auslieferung klaeren."
+    # Bewusst KEIN Abbruch (Entscheidung E49): ein neues High-Advisory fuer
+    # gepinnte Dependencies erscheint ausserhalb der Kontrolle des
+    # Installierenden und darf eine fertig gebaute, funktionierende
+    # Installation nicht kippen. In der CI bleibt npm audit ein hartes Gate.
+    AUDIT_WARNUNG="Sicherheits-Hinweis: npm audit meldet bekannte Schwachstellen in Abhaengigkeiten (Details im Log). Die Installation wurde fortgesetzt. Bitte auf eine aktualisierte VoiceWall-Version pruefen."
+    log "  WARNUNG: ${AUDIT_WARNUNG}"
   fi
 else
   log "  Offline: npm audit uebersprungen (Vermerk; Audit ist zuletzt in der CI gelaufen)."
@@ -320,6 +347,7 @@ log "  SBOM (CycloneDX) geschrieben: ${SBOM_FILE}"
 # den App-Support-Ordner kopiert (idempotent). Sonst laedt der Wizard sie
 # einmalig aus dem Netz (mit denselben SHA-256-Konstanten).
 if [ -d "${REPO_DIR}/vendor/models" ]; then
+  require_python3
   mkdir -p "${APP_SUPPORT}/models"
   for model in "${REPO_DIR}/vendor/models/"*.bin; do
     [ -f "${model}" ] || continue
@@ -400,12 +428,16 @@ log "Schritt 8/8: First-Run-Erkennung."
 
 CONFIG_FILE="${APP_SUPPORT}/config.json"
 FIRST_RUN="ja"
-if [ -f "${CONFIG_FILE}" ]; then
+# python3 geguardet wie in uninstall.sh: auf Macs ohne Xcode CLT ist
+# /usr/bin/python3 nur ein Stub mit Exit != 0; ohne Guard und Fallback
+# wuerde `set -e` das Skript hier NACH dem erfolgreichen App-Start noch
+# abrupt beenden. Dieser Schritt loggt nur; im Zweifel gilt First-Run.
+if [ -f "${CONFIG_FILE}" ] && command -v python3 >/dev/null 2>&1; then
   FIRMEN_COUNT="$(python3 -c 'import json,sys
 try:
     print(len(json.load(open(sys.argv[1], encoding="utf8")).get("firmen", [])))
 except Exception:
-    print(0)' "${CONFIG_FILE}")"
+    print(0)' "${CONFIG_FILE}" 2>>"${LOG_FILE}" || echo 0)"
   if [ "${FIRMEN_COUNT}" -gt 0 ]; then
     FIRST_RUN="nein"
   fi
@@ -419,4 +451,8 @@ fi
 log ""
 log "Fertig. VoiceWall laeuft. Installationsprotokoll: ${LOG_FILE}"
 log "SBOM (Stueckliste aller Komponenten): ${SBOM_FILE}"
-log "Deinstallation (Firmendaten bleiben IMMER erhalten): install/uninstall.sh"
+log "Deinstallation (Firmendaten bleiben IMMER erhalten): install/uninstall.command (Doppelklick) oder install/uninstall.sh"
+if [ -n "${AUDIT_WARNUNG}" ]; then
+  log ""
+  log "WARNUNG: ${AUDIT_WARNUNG}"
+fi

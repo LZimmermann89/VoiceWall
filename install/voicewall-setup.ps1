@@ -106,7 +106,7 @@ if ($NodeOk) {
 } else {
     $NodeZip = Get-ChildItem -Path (Join-Path $RepoDir 'vendor\node-runtime') -Filter 'node-v*-win-x64.zip' -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -eq $NodeZip) {
-        Stop-WithError "Keine passende Node-Version gefunden. Entweder Node >=26 <27 installieren ODER vorher 'node scripts/prepare-vendor.mjs --platform win32-x64' ausfuehren (siehe docs/ON-SITE-PROTOKOLL.md)."
+        Stop-WithError "Node >=26 <27 fehlt und es liegt kein Vendor-Stand unter vendor\node-runtime\. Fuer die Selbst-Installation bitte Node 26 installieren: https://nodejs.org/en/download aufrufen und dort ausdruecklich Version 26 ('Current') als Windows-Installer (.msi) waehlen; der vorausgewaehlte Standard-Button liefert die aeltere LTS-Version, die dieser Preflight ablehnt. Danach dieses Skript erneut ausfuehren. Der Vendor-Weg ueber scripts/prepare-vendor.mjs ist der Dienstleistungsweg fuer die Offline-Vor-Ort-Installation und setzt seinerseits eine Maschine mit Node 26 voraus (docs/ON-SITE-PROTOKOLL.md)."
     }
     $Expected = $Checksums.nodeRuntime.($NodeZip.Name)
     if ([string]::IsNullOrEmpty($Expected)) {
@@ -219,7 +219,11 @@ $AppExe = Join-Path $AppDir "$BundleName.exe"
 $BuildMarker = Join-Path $StateDir 'package.ok'
 $SourceFiles = Get-ChildItem -Recurse -File -Path (Join-Path $RepoDir 'src'), (Join-Path $RepoDir 'resources') -ErrorAction SilentlyContinue
 $HashInput = ($SourceFiles | Sort-Object FullName | ForEach-Object { Get-Sha256 $_.FullName }) -join "`n"
-$HashInput += "`n" + (Get-Sha256 (Join-Path $RepoDir 'package.json')) + "`n" + $LockSha + "`n" + (Get-Sha256 (Join-Path $RepoDir 'electron-builder.yml'))
+# Gleiche Hash-Basis wie die macOS-/Linux-Variante (Schritt 5 in
+# voicewall-setup.sh): package.json, Lockfile, electron.vite.config.ts,
+# electron-builder.yml. Aendert sich die Vite-Konfiguration, muss auch
+# Windows neu bauen.
+$HashInput += "`n" + (Get-Sha256 (Join-Path $RepoDir 'package.json')) + "`n" + $LockSha + "`n" + (Get-Sha256 (Join-Path $RepoDir 'electron.vite.config.ts')) + "`n" + (Get-Sha256 (Join-Path $RepoDir 'electron-builder.yml'))
 $Sha256 = [System.Security.Cryptography.SHA256]::Create()
 $SrcSha = ([System.BitConverter]::ToString($Sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($HashInput)))).Replace('-', '').ToLowerInvariant()
 
@@ -246,12 +250,19 @@ Write-Log '  Beim ersten Start einmal die SmartScreen-Warnung bestaetigen (bewus
 Write-Log ''
 Write-Log 'Schritt 6/8: Verifikation (Audit, SBOM, Modelle).'
 
+$AuditWarnung = ''
 if ($Online) {
     & npm audit --audit-level=high *>> $LogFile
     if ($LASTEXITCODE -ne 0) {
-        Stop-WithError 'npm audit meldet Schwachstellen ab Level high (Details im Log).'
+        # Bewusst KEIN Abbruch (Entscheidung E49): ein neues High-Advisory fuer
+        # gepinnte Dependencies erscheint ausserhalb der Kontrolle des
+        # Installierenden und darf eine fertig gebaute, funktionierende
+        # Installation nicht kippen. In der CI bleibt npm audit ein hartes Gate.
+        $AuditWarnung = 'Sicherheits-Hinweis: npm audit meldet bekannte Schwachstellen in Abhaengigkeiten (Details im Log). Die Installation wurde fortgesetzt. Bitte auf eine aktualisierte VoiceWall-Version pruefen.'
+        Write-Log "  WARNUNG: $AuditWarnung"
+    } else {
+        Write-Log '  npm audit: keine Findings ab Level high.'
     }
-    Write-Log '  npm audit: keine Findings ab Level high.'
 } else {
     Write-Log '  Offline: npm audit uebersprungen (Vermerk; Audit ist zuletzt in der CI gelaufen).'
 }
@@ -348,4 +359,8 @@ if ($FirstRun) {
 
 Write-Log ''
 Write-Log "Fertig. VoiceWall laeuft. Installationsprotokoll: $LogFile"
-Write-Log 'Deinstallation (Firmendaten bleiben IMMER erhalten): install\uninstall.ps1'
+Write-Log 'Deinstallation (Firmendaten bleiben IMMER erhalten): install\uninstall.cmd (Doppelklick) oder install\uninstall.ps1'
+if ($AuditWarnung -ne '') {
+    Write-Log ''
+    Write-Log "WARNUNG: $AuditWarnung"
+}

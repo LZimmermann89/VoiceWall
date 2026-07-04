@@ -45,6 +45,7 @@ jobs:
           bash -n install/voicewall-setup.sh
           bash -n install/uninstall.sh
           bash -n install/voicewall-setup.command
+          bash -n install/uninstall.command
       - name: Installer-Skripte Syntax-Check (PowerShell)
         if: matrix.os == 'windows-latest'
         shell: pwsh

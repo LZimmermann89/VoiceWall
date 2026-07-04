@@ -114,7 +114,7 @@ Diktat-Durchlaufs.
 - **Logging ohne Inhalte:** strukturierte, rotierte Logdateien mit
   restriktiven Rechten; Diktat-Inhalte werden nie geloggt.
 
-Details: `docs/ENTSCHEIDUNGEN.md` (Entscheidungsprotokoll E1 bis E47),
+Details: `docs/ENTSCHEIDUNGEN.md` (Entscheidungsprotokoll E1 bis E49),
 `docs/M1-SPIKE-ERGEBNIS.md` (empirische Architektur-Belege),
 `SECURITY.md` (Meldeweg für Schwachstellen).
 
@@ -135,33 +135,67 @@ Zitate dienen der internen Nachvollziehbarkeit der Entscheidungen.
 - **Ressourcen:** rund 3 GB freier Plattenplatz (App, Node-Runtime,
   Modelle); Standardmodell Q5_0 läuft ab 8 GB RAM, fp16 wird ab 16 GB
   RAM und 6 Kernen angeboten.
-- **Entwicklung:** Node.js 26 (siehe `.nvmrc`, `engines` gepinnt),
-  npm 11.
+- **Selbst-Installation und Entwicklung:** Node.js 26 (siehe `.nvmrc`,
+  `engines` gepinnt), npm 11. Bezugsquelle siehe Installation. Nur die
+  Vor-Ort-Installation mit vorbereitetem Vendor-Stand kommt ohne
+  vorinstalliertes Node aus.
 
 ## Installation (review-then-run)
 
 VoiceWall wird als inspizierbares Quellcode-Repo ausgeliefert, nicht
 als anonymes Binary. Der Grundsatz: erst prüfen, dann ausführen. Vor
 jeder Installation kann und soll der gesamte Quellcode eingesehen
-werden.
+werden. Es gibt zwei Wege.
 
-1. Repo prüfen (Quellcode, `package-lock.json`, Skripte unter
-   `install/` und `scripts/`).
+### Selbst-Installation (aus dem Klon)
+
+Voraussetzung: **Node.js 26** und einmalig Internet (npm-Registry und
+Modell-Download). Node 26 ist die aktuelle "Current"-Linie von
+Node.js: auf <https://nodejs.org/en/download> ausdrücklich Version 26
+("Current") wählen; der vorausgewählte Standard-Button liefert die
+ältere LTS-Version, die das Setup ablehnt. Auf macOS geht alternativ
+`brew install node` (die Homebrew-Formel `node` liefert derzeit die
+26er-Linie).
+
+1. Repo per `git clone` beziehen und prüfen (Quellcode,
+   `package-lock.json`, Skripte unter `install/` und `scripts/`).
 2. `install/voicewall-setup.command` (macOS) beziehungsweise
    `install\voicewall-setup.cmd` (Windows) ausführen. Das Skript
-   arbeitet acht idempotente Schritte ab (Preflight, portable
-   Node-Runtime, npm-Härtung, `npm ci` offline gegen den Vendor-Cache,
-   Build und Packaging mit Ad-hoc-Signierung, Verifikation inklusive
-   SBOM, App-Start, First-Run-Erkennung) und protokolliert nach
-   `~/.voicewall/logs/`.
+   arbeitet acht idempotente Schritte ab (Preflight, Node-Prüfung,
+   npm-Härtung, `npm ci`, Build und Packaging mit Ad-hoc-Signierung,
+   Verifikation inklusive SBOM, App-Start, First-Run-Erkennung) und
+   protokolliert nach `~/.voicewall/logs/`. Auf diesem Weg läuft
+   `npm ci` online gegen die npm-Registry; das Modell lädt der Wizard
+   einmalig SHA-256-verifiziert nach.
 3. Der First-Run-Wizard führt durch Einwilligung, Firma, Speicherort,
    Modell und Hotkey.
 
-Der komplette Vor-Ort-Ablauf (Vendor-Stand vorbereiten, Termin unter
-10 Minuten, Funktionsbeleg, Datensauberkeit) steht in
-`docs/ON-SITE-PROTOKOLL.md`. Die Deinstallation
-(`install/uninstall.sh` beziehungsweise `install\uninstall.ps1`)
-entfernt nur VoiceWall-Eigenes; Firmendaten bleiben immer stehen.
+Ehrlicher Hinweis zum Weg "Code, Download ZIP" statt `git clone`:
+macOS versieht den Download mit dem Quarantäne-Attribut, Gatekeeper
+blockiert dann den Doppelklick auf die `.command`-Datei. Ausweg:
+Rechtsklick auf die Datei, "Öffnen", oder im Terminal
+`bash install/voicewall-setup.sh` starten. Der Klon per git ist der
+empfohlene Weg.
+
+### Vor-Ort-Installation mit Vendor-Stand (Dienstleistungsweg)
+
+Dieser Weg läuft beim Kunden komplett offline und braucht dort kein
+vorinstalliertes Node. Vorab wird auf einer Maschine mit Internet und
+Node 26 ein Vendor-Stand vorbereitet (`node scripts/prepare-vendor.mjs`):
+portables Node, npm-Cache, Electron-Binary und Modelle, alle
+SHA-256-verankert in `install/lib/checksums.json`. Beim Kunden nutzt
+dasselbe Setup-Skript dann die portable Node-Runtime aus `vendor/`,
+`npm ci` läuft offline gegen den Vendor-Cache, die Modelle werden
+verifiziert kopiert. Der
+komplette Ablauf (Vendor-Stand vorbereiten, Termin unter 10 Minuten,
+Funktionsbeleg, Datensauberkeit) steht in `docs/ON-SITE-PROTOKOLL.md`.
+
+### Deinstallation
+
+`install/uninstall.command` (macOS, Doppelklick) beziehungsweise
+`install\uninstall.cmd` (Windows, Doppelklick), alternativ direkt
+`install/uninstall.sh` oder `install\uninstall.ps1`. Entfernt nur
+VoiceWall-Eigenes; Firmendaten bleiben immer stehen.
 
 ## Entwicklung
 

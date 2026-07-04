@@ -43,11 +43,19 @@ Telemetrie. Das Kernversprechen ist beweisbar, nicht behauptet: siehe
 
 ## Voraussetzungen
 
-- Node.js 26 (`node --version`), npm 11. Kein Compiler, kein Xcode,
-  keine Build-Tools nötig: alle nativen Bausteine kommen prebuilt.
-- Rund 3 GB freier Plattenplatz, einmalig Internet für den
-  Modell-Download (574 MB von huggingface.co, SHA-256-verifiziert; das
-  ist der einzige Netzwerkzugriff, den du je sehen wirst).
+- Node.js 26 (`node --version` muss v26.x zeigen), npm 11. Achtung
+  Fehlpfad: Node 26 ist die "Current"-Linie; der Standard-Button auf
+  <https://nodejs.org/en/download> liefert die ältere LTS-Version, die
+  das Setup ablehnt. Also dort ausdrücklich Version 26 ("Current")
+  wählen; auf macOS geht alternativ `brew install node` (liefert
+  derzeit die 26er-Linie). Kein Compiler, kein Xcode, keine Build-Tools
+  nötig: alle nativen Bausteine kommen prebuilt.
+- Rund 3 GB freier Plattenplatz, Internet für `npm ci` (die
+  Selbst-Installation lädt die Abhängigkeiten online aus der
+  npm-Registry; der Offline-Vendor-Weg ist der
+  Vor-Ort-Dienstleistungsweg) und einmalig für den Modell-Download
+  (574 MB von huggingface.co, SHA-256-verifiziert; danach ist das der
+  einzige Netzwerkzugriff, den du je sehen wirst).
 - Ein Mikrofon.
 
 ## Installation
@@ -56,14 +64,19 @@ Grundsatz review-then-run: erst Quellcode ansehen, dann ausführen.
 
 **Weg A, das Install-Skript (der Produktweg):**
 
-1. Repo klonen, kurz reinschauen (`install/`, `scripts/`,
+1. Repo per `git clone` beziehen (bitte nicht als ZIP: macOS setzt auf
+   ZIP-Downloads das Quarantäne-Attribut und Gatekeeper blockiert dann
+   den Doppelklick auf die `.command`-Datei; Ausweg wäre Rechtsklick,
+   "Öffnen"), kurz reinschauen (`install/`, `scripts/`,
    `package-lock.json`).
 2. macOS: `install/voicewall-setup.command` doppelklicken (oder
    `bash install/voicewall-setup.sh`). Windows:
    `install\voicewall-setup.cmd` doppelklicken.
 3. Das Skript arbeitet acht idempotente Schritte ab und startet die
    App; Log unter `~/.voicewall/logs/`. Zweiter Lauf muss in Sekunden
-   durchlaufen (Idempotenz, bitte mittesten).
+   durchlaufen (Idempotenz, bitte mittesten). Deinstallation danach:
+   `install/uninstall.command` beziehungsweise `install\uninstall.cmd`
+   (Firmendaten bleiben immer erhalten).
 
 **Weg B, der Entwicklerweg:**
 

@@ -8,6 +8,17 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- Deinstallation per Doppelklick (Entscheidung E49):
+  `install/uninstall.command` (macOS) und `install\uninstall.cmd`
+  (Windows, prozess-scoped ExecutionPolicy Bypass), analog zu den
+  Setup-Wrappern. Firmendaten bleiben wie immer erhalten.
+
+- Drift-Gate für die Install-Checksummen (Entscheidung E49): der neue
+  Unit-Test tests/unit/install-checksums.test.ts erzwingt, dass
+  `install/lib/checksums.json` exakt die Modelle aus
+  `resources/model-manifest.json` mit identischen SHA-256-Werten
+  listet (beidseitig, keine verwaisten Einträge).
+
 - Modelle-Reiter in der Verwaltung (Entscheidung E46): alle vier
   Katalog-Modelle (Deutsch Q5_0, Deutsch fp16, Englisch/mehrsprachig,
   Silero-VAD) mit Zweck, Größe, Status (vorhanden und verifiziert /
@@ -53,6 +64,27 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   Erwartung (Entscheidung E45).
 
 ### Fixed
+
+- Install-Audit des Selbst-Installations-Wegs (Entscheidung E49,
+  sieben Funde): Die Setup-Skripte nennen bei fehlendem Node 26 jetzt
+  die exakte Bezugsquelle (nodejs.org/en/download, ausdrücklich
+  Version 26 "Current" wählen, nicht die vorausgewählte LTS; macOS
+  alternativ `brew install node`) statt eines zirkulären Verweises auf
+  den Vendor-Weg; README und Testleitfaden nennen die Voraussetzung
+  vor Schritt 1 und trennen Selbst-Installation (online) sauber vom
+  Vor-Ort-Vendor-Weg (offline). `npm audit` bricht die Installation
+  nicht mehr nach erfolgreichem Build ab, sondern warnt deutlich
+  (Log plus Schluss-Zusammenfassung); in der CI bleibt audit ein
+  hartes Gate. Der python3-Aufruf in Schritt 8 der setup.sh ist
+  geguardet (Macs ohne Xcode CLT: Stub mit Exit ungleich 0 hätte das
+  Skript nach dem App-Start abrupt beendet), die
+  Vendor-Verifikationspfade prüfen python3 vorab, der Preflight prüft
+  shasum. `install/lib/checksums.json` enthält jetzt auch das vierte
+  Modell (`ggml-large-v3-turbo-q5_0.bin`, EN); ein gevendortes
+  EN-Modell wurde bisher stillschweigend ignoriert. Der
+  Windows-Rebuild-Hash bezieht `electron.vite.config.ts` ein (wie
+  macOS). Das README warnt ehrlich vor dem ZIP-Download-Weg auf macOS
+  (Gatekeeper blockiert `.command`; git clone empfohlen).
 
 - Sprachkommandos erzeugen keinen Interpunktions-Müll mehr, wenn
   Whisper um das Kommandowort selbst Satzzeichen setzt (Entscheidung
