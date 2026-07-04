@@ -37,6 +37,15 @@ export const workerCommandSchema = z.discriminatedUnion('type', [
   /** Akkumuliertes Segment ohne Transkription verwerfen. */
   z.object({ type: z.literal('reset') }),
   /**
+   * Initial-Prompt fuer alle folgenden Transkriptionen setzen (Stufe 1,
+   * Fach-Woerterbuch: kommaseparierte Begriffsliste, im Main-Prozess bereits
+   * hart gekappt). null loescht den Prompt. WICHTIG: Der VAD-Gate-Pfad
+   * (hadSpeech) bleibt davon unberuehrt; bei Stille wird gar nicht erst
+   * transkribiert, ein gesetzter Prompt kann also keine Halluzination bei
+   * Stille ausloesen (Integrationstest vokabular-whisper.test.ts).
+   */
+  z.object({ type: z.literal('set-prompt'), prompt: z.string().max(2000).nullable() }),
+  /**
    * Einmal-Transkription eines vollstaendigen PCM-Segments. Genutzt vom
    * Dev-/Test-Injektionskanal: geht durch dieselbe VAD-Schleuse wie echtes
    * Audio (Stille erzeugt keinen Text), umgeht aber das Endpointing.

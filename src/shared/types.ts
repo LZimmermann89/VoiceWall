@@ -32,13 +32,16 @@ import type {
   ActionResult,
   AppStatus,
   AudioLevel,
+  AufbereitungConfig,
   DeliveryResult,
+  DevDictateResult,
   ModelChoiceView,
   ModelProgress,
   PingResponse,
   SystemInfo,
   TranscriptPayload,
 } from './schema';
+import type { VokabularGetResult, VokabularSaveInput } from './vokabular';
 
 /** Funktion zum Abmelden eines Event-Listeners. */
 export type Unsubscribe = () => void;
@@ -143,6 +146,14 @@ export interface VoiceWallBridge {
   /** Beleg-Informationen (Modelle, Pruefsummen, Konsent, Log-Pfad). */
   readonly belegInfo: () => Promise<BelegInfoResult>;
 
+  // Stufe 1: Fach-Woerterbuch und regelbasierte Textaufbereitung.
+  /** Vokabular (Begriffe, Ersetzungen) der aktiven Firma lesen. */
+  readonly getVokabular: () => Promise<VokabularGetResult>;
+  /** Vokabular der aktiven Firma speichern (zod-validiert, atomar). */
+  readonly saveVokabular: (input: VokabularSaveInput) => Promise<ActionResult>;
+  /** Globale Aufbereitungs-Schalter setzen (Fuellwoerter, Sprachkommandos). */
+  readonly setAufbereitung: (config: AufbereitungConfig) => Promise<ActionResult>;
+
   // M8 (v1.1): Stapel-Export, Tag-Batch-Rename, verschluesselter Export.
   /** Mehrere Diktate exportieren (Unterordner `Exporte/<datum>-stapel/`). */
   readonly exportDictatesBatch: (input: BatchExportInput) => Promise<BatchExportResult>;
@@ -173,10 +184,16 @@ export interface VoiceWallBridge {
    */
   readonly devSetAccessibility: (trusted: boolean | null) => Promise<ActionResult>;
   /**
-   * Nur Dev/Test: fuehrt die komplette Ergebnis-Zustellung (Clipboard-Sequenz,
-   * Accessibility-Check, Auto-Paste) fuer einen gegebenen Text aus.
+   * Nur Dev/Test: fuehrt die komplette Ergebnis-Zustellung (Ersetzungen,
+   * Aufbereitung, Clipboard-Sequenz, Accessibility-Check, Auto-Paste) fuer
+   * einen gegebenen Text aus.
    */
   readonly devRunDictationResult: (text: string) => Promise<DeliveryResult>;
+  /**
+   * Nur Dev/Test: kompletter Diktat-Beweis aus PCM (Engine-Injektion mit
+   * Woerterbuch-Prompt, VAD-Schleuse, Ersetzungen, Aufbereitung, Zustellung).
+   */
+  readonly devDictatePcm: (pcm: ArrayBuffer) => Promise<DevDictateResult>;
 }
 
 /**

@@ -103,3 +103,38 @@ describe('globalConfigSchema', () => {
     expect(globalConfigSchema.safeParse(tooLong).success).toBe(false);
   });
 });
+
+describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
+  it('hat die Default-Schalter Fuellwoerter AN, Sprachkommandos AUS', () => {
+    const config = defaultGlobalConfig();
+    expect(config.aufbereitung).toEqual({
+      fuellwoerterEntfernen: true,
+      sprachkommandos: false,
+    });
+  });
+
+  it('ergaenzt fehlende Aufbereitung mit Defaults (Alt-Konfig bleibt gueltig)', () => {
+    const alt = { ...defaultGlobalConfig() } as Record<string, unknown>;
+    delete alt['aufbereitung'];
+    const parsed = globalConfigSchema.safeParse(alt);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.aufbereitung).toEqual({
+        fuellwoerterEntfernen: true,
+        sprachkommandos: false,
+      });
+    }
+  });
+
+  it('uebernimmt gesetzte Schalter unveraendert', () => {
+    const parsed = globalConfigSchema.safeParse({
+      ...defaultGlobalConfig(),
+      aufbereitung: { fuellwoerterEntfernen: false, sprachkommandos: true },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.aufbereitung.fuellwoerterEntfernen).toBe(false);
+      expect(parsed.data.aufbereitung.sprachkommandos).toBe(true);
+    }
+  });
+});

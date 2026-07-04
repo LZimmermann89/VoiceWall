@@ -60,6 +60,12 @@ export class WhisperEngineManager {
   private child: UtilityProcess | null = null;
   private ready = false;
   private restarts = 0;
+  /**
+   * Zuletzt gesetzter Initial-Prompt (Fach-Woerterbuch, Stufe 1). Wird nach
+   * einem Engine-Neustart automatisch erneut gesetzt, damit ein Absturz den
+   * Prompt nicht verliert.
+   */
+  private lastPrompt: string | null = null;
   private shuttingDown = false;
   private requestCounter = 0;
   private readonly pending = new Map<string, PendingSegment>();
@@ -146,6 +152,10 @@ export class WhisperEngineManager {
         this.ready = true;
         this.restarts = 0;
         this.logger.info('Whisper-Engine bereit (Modell geladen).');
+        // Initial-Prompt nach (Neu-)Start wieder anlegen (Stufe 1).
+        if (this.lastPrompt !== null) {
+          this.post({ type: 'set-prompt', prompt: this.lastPrompt });
+        }
         settleStart(ok(undefined));
         return;
       case 'init-error':
@@ -297,6 +307,15 @@ export class WhisperEngineManager {
   /** Laufendes Segment ohne Transkription verwerfen. */
   reset(): void {
     this.post({ type: 'reset' });
+  }
+
+  /**
+   * Initial-Prompt (Fach-Woerterbuch) fuer alle folgenden Transkriptionen
+   * setzen bzw. mit null loeschen. Es werden NIE Inhalte geloggt.
+   */
+  setPrompt(prompt: string | null): void {
+    this.lastPrompt = prompt;
+    this.post({ type: 'set-prompt', prompt });
   }
 
   /**

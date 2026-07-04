@@ -56,12 +56,18 @@ export async function detectSpeech(
 /**
  * VAD-Schleuse plus Transkription. Findet der VAD keine Sprache, wird nicht
  * transkribiert und hadSpeech=false zurueckgegeben (kein Halluzinationstext).
+ *
+ * `prompt` ist der optionale Initial-Prompt aus dem Fach-Woerterbuch
+ * (Stufe 1). Er wird NUR an transcribeData gereicht, NIE an den VAD: die
+ * Anti-Halluzinations-Schleuse entscheidet vor und unabhaengig vom Prompt,
+ * Stille erzeugt auch mit gesetztem Prompt keinen Text.
  */
 export async function transcribeWithVadGate(
   whisper: WhisperContext,
   vad: WhisperVadContext,
   pcm: ArrayBuffer,
   tuning: VadTuning,
+  prompt?: string,
 ): Promise<SegmentOutcome> {
   const audioMs = (pcm.byteLength / 2 / TARGET_SAMPLE_RATE) * 1000;
   const speechSegments = await detectSpeech(vad, pcm, tuning);
@@ -69,7 +75,11 @@ export async function transcribeWithVadGate(
     return { speechSegments, hadSpeech: false, text: '', durationMs: 0, audioMs };
   }
   const started = Date.now();
-  const { promise } = whisper.transcribeData(pcm, { language: 'de', temperature: 0 });
+  const { promise } = whisper.transcribeData(pcm, {
+    language: 'de',
+    temperature: 0,
+    ...(prompt === undefined || prompt.length === 0 ? {} : { prompt }),
+  });
   const result = await promise;
   const durationMs = Date.now() - started;
   // Nur den primitiven Text uebernehmen, nie das Napi-Ergebnisobjekt.

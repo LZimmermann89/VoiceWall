@@ -39,6 +39,12 @@ die Windows-Hardware-Abnahme.
   Schnellsuche, Filtern (Zeitraum, Tags, Quelle), Volltextsuche über
   die Diktat-Inhalte, Detailansicht, Bearbeiten, manuelle Notizen,
   Tags mit Autocomplete und firmenweitem Umbenennen.
+- **Fach-Wörterbuch und Textaufbereitung:** pro Firma ein auditierbares
+  Wörterbuch (`.voicewall/vokabular.json`) mit Begriffen als lokalem
+  Erkennungs-Kontext und deterministischer Ersetzungsliste für häufige
+  Fehltranskriptionen, dazu rein regelbasierte Aufbereitung
+  (Interpunktions-Nachschärfung, abschaltbarer Füllwörter-Filter,
+  optionale Sprachkommandos) ohne Modell und ohne externen Aufruf.
 - **Export:** Markdown, reiner Text und PDF (Prüfdokument-Layout,
   korrekte Umlaute nachgewiesen), einzeln oder als Stapel; zusätzlich
   verschlüsselter Einzel-Export als `.vwenc` (AES-256-GCM, scrypt)

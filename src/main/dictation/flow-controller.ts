@@ -30,7 +30,15 @@ import {
   type DictationFlowEvent,
   type DictationFlowState,
 } from '../../shared/dictation-flow';
-import { modelChoiceSchema, type ActionResult, type DeliveryResult } from '../../shared/schema';
+import {
+  aufbereitungConfigSchema,
+  modelChoiceSchema,
+  type ActionResult,
+  type DeliveryResult,
+  type DevDictateResult,
+} from '../../shared/schema';
+import { aufbereitenText } from '../../shared/textaufbereitung';
+import { applyErsetzungen } from '../../shared/vokabular';
 import type { OverlayStatePayload } from '../../shared/types';
 import type { Result } from '../../shared/result';
 import type { SaveDictateResult } from '../../shared/company';
@@ -48,7 +56,7 @@ import {
   openAccessibilitySettings,
   requestAccessibilityGrant,
 } from '../permission/accessibility';
-import type { DictationOrchestrator, FlowStatus } from '../stt/orchestrator';
+import { toArrayBuffer, type DictationOrchestrator, type FlowStatus } from '../stt/orchestrator';
 import { createTrayController, type TrayController } from '../tray/tray';
 
 export interface FlowControllerDeps {
@@ -236,10 +244,13 @@ export class DictationFlowController {
   }
 
   private async deliverSession(): Promise<void> {
-    const text = joinTranscriptSegments(this.sessionSegments);
+    const roh = joinTranscriptSegments(this.sessionSegments);
     const audioMs = this.sessionAudioMs;
     this.sessionSegments = [];
     this.sessionAudioMs = 0;
+    // Stufe 1: Ersetzungsliste (Firma) und Aufbereitung (globale Schalter)
+    // auf dem finalen Text, VOR Clipboard/Paste und VOR Speicherung.
+    const text = roh.length === 0 ? '' : await this.processTranscriptText(roh);
     if (text.length === 0) {
       this.showOverlay({ kind: 'no-speech', message: null }, OVERLAY_DONE_VISIBLE_MS);
       this.dispatch('delivery-complete');
@@ -258,6 +269,29 @@ export class DictationFlowController {
       );
     }
     this.dispatch('delivery-complete');
+  }
+
+  /**
+   * Stufe 1 (ABARBEITUNG 2.7): finaler Text = Ersetzungsliste der aktiven
+   * Firma (deterministisch, Literal, Wortgrenzen), dann regelbasierte
+   * Aufbereitung (Interpunktion immer; Fuellwoerter/Sprachkommandos gemaess
+   * globaler Schalter). Reine lokale String-Verarbeitung, KEIN Modell,
+   * KEIN externer Aufruf (harte Guardrail). Fehler beim Laden der
+   * Ersetzungsliste blockieren die Zustellung nie.
+   */
+  private async processTranscriptText(roh: string): Promise<string> {
+    let text = roh;
+    const companies = this.deps.companies;
+    if (companies !== null) {
+      try {
+        text = applyErsetzungen(text, await companies.activeErsetzungen());
+      } catch (error) {
+        this.deps.logger.warn(
+          `Ersetzungsliste nicht anwendbar, Text bleibt unverändert: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    return aufbereitenText(text, this.config.aufbereitung);
   }
 
   // ---------------------------------------------------------------------
@@ -513,6 +547,23 @@ export class DictationFlowController {
     return { ok: true };
   }
 
+  /**
+   * Schalter der Textaufbereitung setzen (Stufe 1; global, Entscheidung
+   * E35). Persistiert in der globalen Konfig, wirkt ab dem naechsten Diktat.
+   */
+  private async setAufbereitung(next: {
+    fuellwoerterEntfernen: boolean;
+    sprachkommandos: boolean;
+  }): Promise<ActionResult> {
+    this.config = {
+      ...this.config,
+      aufbereitung: { ...this.config.aufbereitung, ...next },
+    };
+    await writeGlobalConfig(this.deps.userDataPath, this.config);
+    this.deps.orchestrator.notifyStatusChanged();
+    return { ok: true };
+  }
+
   // ---------------------------------------------------------------------
   // Resilienz: Kopieren-Knopf
   // ---------------------------------------------------------------------
@@ -583,6 +634,10 @@ export class DictationFlowController {
       accessibility: this.effectiveAccessibility(),
       lastTranscript: this.lastTranscript,
       clipboardRestoreEnabled: this.config.clipboard.restorePrevious,
+      aufbereitung: {
+        fuellwoerterEntfernen: this.config.aufbereitung.fuellwoerterEntfernen,
+        sprachkommandos: this.config.aufbereitung.sprachkommandos,
+      },
     };
   }
 
@@ -603,6 +658,17 @@ export class DictationFlowController {
           return { ok: false, message: 'Ungültige Eingabe für den Zwischenablage-Schalter.' };
         }
         return this.setClipboardRestore(parsed.data);
+      },
+    );
+
+    ipcMain.handle(
+      IpcChannel.SetAufbereitung,
+      async (_event, raw: unknown): Promise<ActionResult> => {
+        const parsed = aufbereitungConfigSchema.safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, message: 'Ungültige Eingabe für die Aufbereitungs-Schalter.' };
+        }
+        return this.setAufbereitung(parsed.data);
       },
     );
 
@@ -703,7 +769,62 @@ export class DictationFlowController {
         if (!parsed.success) {
           return { delivered: false, pasted: false, message: 'Ungültiger Text.' };
         }
-        return this.deliverText(parsed.data);
+        // Wie ein echtes Diktat: Ersetzungen + Aufbereitung vor Zustellung.
+        const text = await this.processTranscriptText(parsed.data);
+        if (text.length === 0) {
+          return {
+            delivered: false,
+            pasted: false,
+            message: 'Der aufbereitete Text ist leer (nur Füllwörter/Leerraum).',
+          };
+        }
+        return this.deliverText(text);
+      },
+    );
+
+    // Kompletter Diktat-Beweis aus PCM (Stufe 1): Engine-Injektion (mit
+    // Woerterbuch-Prompt und VAD-Schleuse), dann Ersetzungen, Aufbereitung
+    // und echte Zustellung. Stille liefert delivered=false und text=null.
+    ipcMain.handle(
+      IpcChannel.DevDictatePcm,
+      async (_event, raw: unknown): Promise<DevDictateResult> => {
+        const pcm = toArrayBuffer(raw);
+        if (pcm === null) {
+          return {
+            delivered: false,
+            pasted: false,
+            text: null,
+            message: 'Kein gültiger PCM-Puffer.',
+          };
+        }
+        const transcribed = await this.deps.orchestrator.transcribeInjectedPcm(pcm);
+        if (!transcribed.ok) {
+          return { delivered: false, pasted: false, text: null, message: transcribed.message };
+        }
+        if (transcribed.transcript === null) {
+          return {
+            delivered: false,
+            pasted: false,
+            text: null,
+            message: 'VAD meldete Stille, kein Text erzeugt.',
+          };
+        }
+        const text = await this.processTranscriptText(transcribed.transcript.text);
+        if (text.length === 0) {
+          return {
+            delivered: false,
+            pasted: false,
+            text: null,
+            message: 'Der aufbereitete Text ist leer (nur Füllwörter/Leerraum).',
+          };
+        }
+        const delivery = await this.deliverText(text, transcribed.transcript.audioMs);
+        return {
+          delivered: delivery.delivered,
+          pasted: delivery.pasted,
+          text,
+          message: delivery.message,
+        };
       },
     );
   }

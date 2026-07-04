@@ -6,6 +6,31 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Added
+
+- Stufe 1: Fach-Wörterbuch pro Firma und regelbasierte lokale
+  Textaufbereitung (ABARBEITUNG 2.7; rein deterministische
+  String-Verarbeitung, kein Modell, kein externer Aufruf). Neue Datei
+  `.voicewall/vokabular.json` je Firma (zod-validiert, atomar
+  geschrieben): bis zu 200 Begriffe werden Whisper als Initial-Prompt
+  mitgegeben (kommaseparierte Liste, hart auf 600 Zeichen gekappt,
+  Entscheidung E37; der Anti-Halluzinations-Pfad bleibt unberührt,
+  Stille erzeugt auch mit Prompt keinen Text), und bis zu 200
+  Ersetzungsregeln korrigieren häufige Fehltranskriptionen
+  deterministisch (nur ganze Wörter, Unicode-korrekte Wortgrenzen mit
+  Umlauten, case-sensitiv, längste zuerst, Literalbehandlung,
+  Entscheidung E36). Aufbereitungs-Pipeline
+  (`src/shared/textaufbereitung.ts`): Interpunktions-Nachschärfung
+  (immer an, konservativ), Füllwörter-Filter (Schalter, Standard an)
+  und Sprachkommandos ("Punkt", "neue Zeile", ...; Schalter, Standard
+  aus, Entscheidung E38); die Schalter liegen global in der
+  Konfiguration (Entscheidung E35). Editor für Begriffe und
+  Ersetzungen im Bereich Diktat; neue IPC-Kanäle `vocab:get`,
+  `vocab:save`, `config:set-aufbereitung`. Die Wortzahl im
+  Front-Matter zählt den finalen Text. Die AI-Act-Einordnung wurde um
+  die Aufbereitung ergänzt (Carveout "unterstützende Funktion für die
+  Standardbearbeitung").
+
 - Für 1.0.0 vorgesehen: bestandene manuelle Abnahme nach
   `docs/ABNAHME-CHECKLISTE.md` (Auto-Paste auf macOS und Windows,
   TCC-Rebuild-Test, Windows-Setup-Trockenlauf, Schwachhardware-Latenz,

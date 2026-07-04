@@ -85,6 +85,13 @@ export const IpcChannel = {
   DictateExportEncrypted: 'dictate:export-encrypted',
   DictateDecryptVwenc: 'dictate:decrypt-vwenc',
 
+  // Fach-Woerterbuch und Textaufbereitung (Stufe 1, ABARBEITUNG 2.7):
+  // vokabular.json der aktiven Firma lesen/speichern (zod, atomar) und die
+  // globalen Aufbereitungs-Schalter setzen.
+  VocabGet: 'vocab:get',
+  VocabSave: 'vocab:save',
+  SetAufbereitung: 'config:set-aufbereitung',
+
   // App kontrolliert neu starten (macOS: frisch erteilte TCC-Freigaben
   // werden einem laufenden Prozess oft erst nach Neustart gemeldet).
   SystemRelaunch: 'system:relaunch',
@@ -96,6 +103,12 @@ export const IpcChannel = {
   DevGetPasteCalls: 'dev:get-paste-calls',
   DevSetAccessibility: 'dev:set-accessibility',
   DevRunDictationResult: 'dev:run-dictation-result',
+  /**
+   * Nur Dev/Test: kompletter Diktat-Beweis aus PCM: Injektion durch die
+   * VAD-/Whisper-Engine (mit aktivem Woerterbuch-Prompt), dann Ersetzungen,
+   * Aufbereitung und echte Zustellung (Clipboard/Paste/Auto-Speichern).
+   */
+  DevDictatePcm: 'dev:dictate-pcm',
 } as const;
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel];

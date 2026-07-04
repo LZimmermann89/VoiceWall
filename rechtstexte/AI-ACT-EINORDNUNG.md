@@ -82,6 +82,19 @@ stattdessen "Einsatzgeber"; gemeint ist dieselbe Rolle.
    Betreiber bereitgestellten Eingabedaten oder deren Semantik nicht
    wesentlich verändern," gelten (Wortlaut der amtlichen deutschen
    Fassung, Erwägungsgrund 133).
+4. **Auch die lokale Textaufbereitung ändert an dieser Einordnung
+   nichts:** Die regelbasierte Aufbereitung (Interpunktions-Nachschärfung,
+   optionaler Füllwörter-Filter, optionale Sprachkommandos) und die vom
+   Nutzer selbst definierte, deterministische Ersetzungsliste des
+   Fach-Wörterbuchs sind eine "unterstützende Funktion für die
+   Standardbearbeitung" im Sinne des oben zitierten Carveouts
+   (erste Alternative). Sie sind reine, lokale String-Verarbeitung ohne
+   Modell und ohne generative Komponente; jede Regel ist deterministisch,
+   abschaltbar und in der Datei `vokabular.json` beziehungsweise im
+   Quellcode auditierbar. Entfernte Füllwörter, nachgeschärfte
+   Zeichensetzung und vom Nutzer vorgegebene Begriffskorrekturen
+   verändern die Semantik der Nutzeräußerung nicht inhaltlich; das
+   Transkript bleibt die Aussage des Nutzers.
 
 ## 4. Kein Hochrisiko-System (Anhang III)
 

@@ -96,6 +96,16 @@ import { renameTagEverywhere } from './tag-rename';
 import { writeFileAtomic } from './atomic-write';
 import { sanitizeCompanyName } from './sanitize';
 import {
+  buildInitialPrompt,
+  defaultVokabular,
+  vokabularSaveInputSchema,
+  VOKABULAR_SCHEMA_VERSION,
+  type Ersetzung,
+  type Vokabular,
+  type VokabularGetResult,
+} from '../../shared/vokabular';
+import { readVokabular, writeVokabular } from './vokabular-store';
+import {
   checkSyncExposure,
   createDesktopLink,
   localStorageBaseDir,
@@ -955,6 +965,90 @@ export class CompanyManager {
     return readKnownTags(companyDir);
   }
 
+  // ------------------------------------------------------------------
+  // Fach-Woerterbuch (Stufe 1, ABARBEITUNG 2.7): vokabular.json der
+  // aktiven Firma. Lesen/Schreiben laeuft ausschliesslich ueber die
+  // .voicewall-Pfadlogik (vokabular-store.ts), nie ueber rohe Pfade.
+  // ------------------------------------------------------------------
+
+  /** Vokabular der aktiven Firma (fuer den Editor in der Diktat-Ansicht). */
+  async getVokabular(): Promise<VokabularGetResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const result = await readVokabular(active.dir);
+    if (!result.ok) {
+      return { ok: false, message: result.error };
+    }
+    return { ok: true, vokabular: result.value };
+  }
+
+  /** Speichert das Vokabular der aktiven Firma (zod-validiert, atomar). */
+  async saveVokabular(input: {
+    begriffe: readonly string[];
+    ersetzungen: readonly Ersetzung[];
+  }): Promise<ActionResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const vokabular: Vokabular = {
+      schemaVersion: VOKABULAR_SCHEMA_VERSION,
+      begriffe: [...input.begriffe],
+      ersetzungen: input.ersetzungen.map((regel) => ({ von: regel.von, zu: regel.zu })),
+    };
+    const written = await writeVokabular(active.dir, vokabular);
+    if (!written.ok) {
+      return { ok: false, message: written.error };
+    }
+    this.deps.logger.info('Fach-Wörterbuch gespeichert.', {
+      begriffe: vokabular.begriffe.length,
+      ersetzungen: vokabular.ersetzungen.length,
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Vokabular der aktiven Firma fuer den Diktatfluss: Fehler (kaputte Datei)
+   * werden geloggt und auf das leere Vokabular abgebildet, damit ein Diktat
+   * nie an einer defekten vokabular.json scheitert.
+   */
+  private async activeVokabularLenient(): Promise<Vokabular> {
+    const companyDir = await this.activeCompanyDir();
+    if (companyDir === null) {
+      return defaultVokabular();
+    }
+    const result = await readVokabular(companyDir);
+    if (!result.ok) {
+      this.deps.logger.warn(`Fach-Wörterbuch nicht nutzbar, Diktat läuft ohne: ${result.error}`);
+      return defaultVokabular();
+    }
+    return result.value;
+  }
+
+  /**
+   * Initial-Prompt fuer Whisper aus den Begriffen der aktiven Firma
+   * (Stufe 1, Teil A2). Eine Kappung wird geloggt (NUR Anzahlen, nie
+   * Inhalte); ohne Begriffe oder ohne aktive Firma: null.
+   */
+  async activePrompt(): Promise<string | null> {
+    const vokabular = await this.activeVokabularLenient();
+    const built = buildInitialPrompt(vokabular.begriffe);
+    if (built.gekappt) {
+      this.deps.logger.warn('Initial-Prompt gekappt (Whisper-Prompt-Limit).', {
+        begriffeGesamt: vokabular.begriffe.length,
+        begriffeVerwendet: built.verwendeteBegriffe,
+      });
+    }
+    return built.prompt;
+  }
+
+  /** Ersetzungsliste der aktiven Firma (Stufe 1, Teil A3). */
+  async activeErsetzungen(): Promise<readonly Ersetzung[]> {
+    return (await this.activeVokabularLenient()).ersetzungen;
+  }
+
   /** Beleg-Informationen (Modelle, Pruefsummen, Konsent, Log-Pfad). */
   async belegInfo(): Promise<BelegInfoResult> {
     const config = await this.loadConfig();
@@ -1257,5 +1351,23 @@ export class CompanyManager {
     ipcMain.handle(IpcChannel.BelegInfo, () =>
       guard<BelegInfoResult>({ ok: false, message: internalError }, () => this.belegInfo()),
     );
+
+    // Fach-Woerterbuch (Stufe 1): vokabular.json der aktiven Firma.
+    ipcMain.handle(IpcChannel.VocabGet, () =>
+      guard<VokabularGetResult>({ ok: false, message: internalError }, () => this.getVokabular()),
+    );
+
+    ipcMain.handle(IpcChannel.VocabSave, (_event, raw: unknown) => {
+      const parsed = vokabularSaveInputSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<ActionResult>({
+          ok: false,
+          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für das Fach-Wörterbuch.',
+        });
+      }
+      return guard<ActionResult>({ ok: false, message: internalError }, () =>
+        this.saveVokabular(parsed.data),
+      );
+    });
   }
 }

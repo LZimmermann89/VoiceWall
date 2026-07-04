@@ -147,6 +147,21 @@ export const globalConfigSchema = z
     modell: z.enum(['q5_0', 'fp16']).default('q5_0'),
     /** Informative Modellpfad-Struktur (nie sicherheitsrelevant, siehe oben). */
     modellPfade: z.record(z.string(), z.string().max(2048)).default({}),
+    /**
+     * Regelbasierte Textaufbereitung (Stufe 1, ABARBEITUNG 2.7). Die Schalter
+     * sind GLOBAL und nicht firmenbezogen (Entscheidung E35): sie beschreiben,
+     * wie der NUTZER spricht (Fuellwoerter, gesprochene Kommandos), nicht die
+     * Firma; das firmenspezifische Fachwissen liegt in vokabular.json im
+     * Firmenordner. Fuellwoerter-Filter Default AN (konservative Liste),
+     * Sprachkommandos Default AUS (bewusst Opt-in, Entscheidung E38).
+     */
+    aufbereitung: z
+      .object({
+        fuellwoerterEntfernen: z.boolean().default(true),
+        sprachkommandos: z.boolean().default(false),
+      })
+      .passthrough()
+      .default({ fuellwoerterEntfernen: true, sprachkommandos: false }),
   })
   .passthrough();
 
@@ -166,5 +181,6 @@ export function defaultGlobalConfig(): GlobalConfig {
     diktatAutoSpeichern: true,
     modell: 'q5_0',
     modellPfade: {},
+    aufbereitung: { fuellwoerterEntfernen: true, sprachkommandos: false },
   };
 }

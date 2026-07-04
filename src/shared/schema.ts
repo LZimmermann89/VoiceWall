@@ -49,6 +49,18 @@ export const hotkeyStatusSchema = z.object({
 });
 export type HotkeyStatus = z.infer<typeof hotkeyStatusSchema>;
 
+/**
+ * Globale Schalter der regelbasierten Textaufbereitung (Stufe 1,
+ * ABARBEITUNG 2.7; Konfig-Ort-Entscheidung E35).
+ */
+export const aufbereitungConfigSchema = z.object({
+  /** Fuellwoerter ("äh", "ähm", ...) und direkte Wortdopplungen entfernen. */
+  fuellwoerterEntfernen: z.boolean(),
+  /** Gesprochene Kommandos ("Punkt", "neue Zeile", ...) umsetzen (Opt-in). */
+  sprachkommandos: z.boolean(),
+});
+export type AufbereitungConfig = z.infer<typeof aufbereitungConfigSchema>;
+
 /** Gesamtzustand der App, Grundlage der Status-UI. */
 export const appStatusSchema = z.object({
   consentGranted: z.boolean(),
@@ -68,6 +80,8 @@ export const appStatusSchema = z.object({
   lastTranscript: z.string().nullable(),
   /** Zwischenablage nach dem Einfuegen wiederherstellen (Konfig-Schalter). */
   clipboardRestoreEnabled: z.boolean(),
+  /** Schalter der Textaufbereitung (Stufe 1). */
+  aufbereitung: aufbereitungConfigSchema,
 });
 export type AppStatus = z.infer<typeof appStatusSchema>;
 
@@ -85,6 +99,19 @@ export const deliveryResultSchema = z.object({
   message: z.string().nullable(),
 });
 export type DeliveryResult = z.infer<typeof deliveryResultSchema>;
+
+/**
+ * Ergebnis des Dev-/Test-Kanals "Diktat aus PCM" (nur Dev/Test): kompletter
+ * Pfad Injektion -> Ersetzungen -> Aufbereitung -> Zustellung. `text` ist der
+ * final zugestellte Text (null bei Stille).
+ */
+export const devDictateResultSchema = z.object({
+  delivered: z.boolean(),
+  pasted: z.boolean(),
+  text: z.string().nullable(),
+  message: z.string().nullable(),
+});
+export type DevDictateResult = z.infer<typeof devDictateResultSchema>;
 
 /** Ein neues Transkript-Segment. */
 export const transcriptPayloadSchema = z.object({

@@ -54,6 +54,13 @@ interface EngineState {
 
 let state: EngineState | null = null;
 
+/**
+ * Initial-Prompt aus dem Fach-Woerterbuch (Stufe 1), gesetzt per
+ * `set-prompt`. Er beeinflusst NUR transcribeData; die VAD-Schleuse
+ * (Anti-Halluzination) laeuft davor und unabhaengig davon.
+ */
+let initialPrompt: string | null = null;
+
 /** Akkumulierte PCM-Chunks des laufenden (noch offenen) Sprachbereichs. */
 let pendingChunks: Int16Array[] = [];
 let pendingSamples = 0;
@@ -89,7 +96,13 @@ async function processSegment(
   pcm: ArrayBuffer,
   requestId?: string,
 ): Promise<void> {
-  const outcome = await transcribeWithVadGate(active.whisper, active.vad, pcm, active.tuning);
+  const outcome = await transcribeWithVadGate(
+    active.whisper,
+    active.vad,
+    pcm,
+    active.tuning,
+    initialPrompt ?? undefined,
+  );
   if (!outcome.hadSpeech) {
     send(requestId === undefined ? { type: 'silence' } : { type: 'silence', requestId });
     return;
@@ -135,7 +148,11 @@ async function tryEndpoint(active: EngineState): Promise<void> {
   }
 
   const started = Date.now();
-  const { promise } = active.whisper.transcribeData(pcm, { language: 'de', temperature: 0 });
+  const { promise } = active.whisper.transcribeData(pcm, {
+    language: 'de',
+    temperature: 0,
+    ...(initialPrompt === null ? {} : { prompt: initialPrompt }),
+  });
   const result = await promise;
   const durationMs = Date.now() - started;
   const text = result.result.trim();
@@ -233,6 +250,14 @@ function handleCommand(command: WorkerCommand): void {
     case 'reset':
       enqueue(() => {
         clearPending();
+        return Promise.resolve();
+      });
+      return;
+    case 'set-prompt':
+      // In der Verarbeitungskette setzen, damit ein laufendes Segment noch
+      // mit dem bisherigen Prompt abgeschlossen wird (deterministisch).
+      enqueue(() => {
+        initialPrompt = command.prompt;
         return Promise.resolve();
       });
       return;

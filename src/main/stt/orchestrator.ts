@@ -19,6 +19,7 @@ import { z } from 'zod';
 import type {
   AccessibilityState,
   AppStatus,
+  AufbereitungConfig,
   DictationFlowStateView,
   HotkeyStatus,
   MicrophoneState,
@@ -43,7 +44,11 @@ import {
 } from '../model/model-catalog';
 import { ensureModel, getModelStatuses } from '../model/model-store';
 import { ensureMicrophoneAccess } from '../permission/microphone';
-import { DEFAULT_ENGINE_TUNING, WhisperEngineManager } from '../whisper/engine-manager';
+import {
+  DEFAULT_ENGINE_TUNING,
+  WhisperEngineManager,
+  type TranscriptEvent,
+} from '../whisper/engine-manager';
 
 export interface OrchestratorDeps {
   readonly userDataPath: string;
@@ -66,6 +71,8 @@ export interface FlowStatus {
   readonly accessibility: AccessibilityState;
   readonly lastTranscript: string | null;
   readonly clipboardRestoreEnabled: boolean;
+  /** Schalter der Textaufbereitung (Stufe 1, globale Konfig). */
+  readonly aufbereitung: AufbereitungConfig;
 }
 
 const DEFAULT_FLOW_STATUS: FlowStatus = {
@@ -74,6 +81,7 @@ const DEFAULT_FLOW_STATUS: FlowStatus = {
   accessibility: 'not-applicable',
   lastTranscript: null,
   clipboardRestoreEnabled: true,
+  aufbereitung: { fuellwoerterEntfernen: true, sprachkommandos: false },
 };
 
 /** Timeout fuer das Warten auf das letzte Segment beim Hotkey-Stop. */
@@ -93,6 +101,12 @@ export class DictationOrchestrator {
   private lastError: string | null = null;
   private transcriptListener: ((text: string, audioMs: number) => void) | null = null;
   private flowStatusProvider: (() => FlowStatus) | null = null;
+  /**
+   * Liefert den Initial-Prompt des Fach-Woerterbuchs der aktiven Firma
+   * (Stufe 1). Registriert vom Bootstrap (CompanyManager); solange keiner
+   * registriert ist, laeuft die Engine ohne Prompt.
+   */
+  private promptProvider: (() => Promise<string | null>) | null = null;
 
   private engine: WhisperEngineManager | null = null;
   private captureWindow: BrowserWindow | null = null;
@@ -248,6 +262,32 @@ export class DictationOrchestrator {
     this.flowStatusProvider = provider;
   }
 
+  /** Registriert den Initial-Prompt-Lieferanten (Fach-Woerterbuch, Stufe 1). */
+  setPromptProvider(provider: (() => Promise<string | null>) | null): void {
+    this.promptProvider = provider;
+  }
+
+  /**
+   * Setzt den aktuellen Initial-Prompt an der Engine (vor jedem Diktat-Start
+   * und vor jeder Test-Injektion, damit Vokabular-Aenderungen und
+   * Firmenwechsel sofort greifen). Fehler blockieren das Diktat nie; es
+   * werden nie Prompt-Inhalte geloggt.
+   */
+  private async applyVocabularyPrompt(): Promise<void> {
+    if (this.engine === null) {
+      return;
+    }
+    try {
+      const prompt = this.promptProvider === null ? null : await this.promptProvider();
+      this.engine.setPrompt(prompt);
+    } catch (error) {
+      this.deps.logger.warn(
+        `Initial-Prompt konnte nicht geladen werden, Diktat läuft ohne Prompt weiter: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      this.engine.setPrompt(null);
+    }
+  }
+
   /** Stoesst eine Statusmeldung an das Hauptfenster an (fuer den Controller). */
   notifyStatusChanged(): void {
     void this.broadcastStatus();
@@ -290,6 +330,7 @@ export class DictationOrchestrator {
       accessibility: flow.accessibility,
       lastTranscript: flow.lastTranscript,
       clipboardRestoreEnabled: flow.clipboardRestoreEnabled,
+      aufbereitung: flow.aufbereitung,
     };
   }
 
@@ -441,6 +482,8 @@ export class DictationOrchestrator {
     if (!engineOk.ok) {
       return engineOk;
     }
+    // Fach-Woerterbuch (Stufe 1): aktuellen Initial-Prompt setzen.
+    await this.applyVocabularyPrompt();
     this.engine?.reset();
     this.ringBuffer.clear();
     this.lastError = null;
@@ -515,10 +558,14 @@ export class DictationOrchestrator {
   }
 
   /**
-   * Dev-/Test-Injektion: transkribiert ein vollstaendiges PCM-Segment. Laeuft
-   * durch dieselbe VAD-Schleuse. Stille erzeugt bewusst keinen Text.
+   * Dev-/Test-Injektion (Kern): transkribiert ein vollstaendiges PCM-Segment
+   * mit dem aktuellen Initial-Prompt und liefert das Ergebnis zurueck.
+   * Laeuft durch dieselbe VAD-Schleuse: Stille liefert ok(null), auch mit
+   * gesetztem Prompt (Anti-Halluzination).
    */
-  async injectSegment(pcm: ArrayBuffer): Promise<{ ok: true } | { ok: false; message: string }> {
+  async transcribeInjectedPcm(
+    pcm: ArrayBuffer,
+  ): Promise<{ ok: true; transcript: TranscriptEvent | null } | { ok: false; message: string }> {
     const engineOk = await this.ensureEngine();
     if (!engineOk.ok) {
       return engineOk;
@@ -526,16 +573,30 @@ export class DictationOrchestrator {
     if (this.engine === null) {
       return { ok: false, message: 'Engine nicht verfügbar.' };
     }
+    // Fach-Woerterbuch (Stufe 1): aktuellen Initial-Prompt setzen.
+    await this.applyVocabularyPrompt();
     const result = await this.engine.transcribeSegment(pcm);
     if (!result.ok) {
       this.setError(result.error);
       return { ok: false, message: result.error };
     }
-    if (result.value !== null) {
+    return { ok: true, transcript: result.value };
+  }
+
+  /**
+   * Dev-/Test-Injektion: transkribiert ein vollstaendiges PCM-Segment. Laeuft
+   * durch dieselbe VAD-Schleuse. Stille erzeugt bewusst keinen Text.
+   */
+  async injectSegment(pcm: ArrayBuffer): Promise<{ ok: true } | { ok: false; message: string }> {
+    const result = await this.transcribeInjectedPcm(pcm);
+    if (!result.ok) {
+      return result;
+    }
+    if (result.transcript !== null) {
       this.sendToMain(IpcChannel.TranscriptNew, {
-        text: result.value.text,
-        durationMs: result.value.durationMs,
-        audioMs: result.value.audioMs,
+        text: result.transcript.text,
+        durationMs: result.transcript.durationMs,
+        audioMs: result.transcript.audioMs,
       });
     } else {
       this.deps.logger.info('Injektion: VAD meldete Stille, kein Text erzeugt.');
@@ -562,7 +623,7 @@ export class DictationOrchestrator {
  * Electron liefert je nach Pfad ArrayBuffer, Node-Buffer oder TypedArray; alle
  * werden hier auf genau die relevanten Bytes zugeschnitten.
  */
-function toArrayBuffer(value: unknown): ArrayBuffer | null {
+export function toArrayBuffer(value: unknown): ArrayBuffer | null {
   if (value instanceof ArrayBuffer) {
     return value;
   }

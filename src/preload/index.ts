@@ -30,11 +30,13 @@ import {
   appStatusSchema,
   audioLevelSchema,
   deliveryResultSchema,
+  devDictateResultSchema,
   modelProgressSchema,
   pingResponseSchema,
   systemInfoSchema,
   transcriptPayloadSchema,
 } from '../shared/schema';
+import { vokabularGetResultSchema } from '../shared/vokabular';
 import type { Unsubscribe, VoiceWallBridge } from '../shared/types';
 
 /** Meldet einen validierenden Listener an einen Main-zu-Renderer-Kanal an. */
@@ -149,6 +151,12 @@ const bridge: VoiceWallBridge = {
   },
   belegInfo: async () =>
     belegInfoResultSchema.parse(await ipcRenderer.invoke(IpcChannel.BelegInfo)),
+  getVokabular: async () =>
+    vokabularGetResultSchema.parse(await ipcRenderer.invoke(IpcChannel.VocabGet)),
+  saveVokabular: async (input) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.VocabSave, input)),
+  setAufbereitung: async (config) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetAufbereitung, config)),
   exportDictatesBatch: async (input) =>
     batchExportResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateExportBatch, input)),
   onExportProgress: (listener) =>
@@ -193,6 +201,13 @@ const bridge: VoiceWallBridge = {
   },
   devRunDictationResult: async (text) =>
     deliveryResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevRunDictationResult, text)),
+  devDictatePcm: async (pcm) => {
+    try {
+      return devDictateResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevDictatePcm, pcm));
+    } catch (error) {
+      return { delivered: false, pasted: false, text: null, message: toDevErrorMessage(error) };
+    }
+  },
 };
 
 /** Deutsche Fehlermeldung fuer nicht verfuegbare Dev-/Test-Kanaele. */

@@ -241,6 +241,12 @@ if (!hasSingleInstanceLock) {
     });
     companyManager.register();
 
+    // Fach-Woerterbuch (Stufe 1): der Orchestrator holt sich vor jedem
+    // Diktat-Start den Initial-Prompt der aktiven Firma (gecacht ueber
+    // mtime im vokabular-store; Kappung wird als Anzahl geloggt).
+    const companies = companyManager;
+    orchestrator.setPromptProvider(() => companies.activePrompt());
+
     flowController = new DictationFlowController({
       userDataPath: app.getPath('userData'),
       logger,

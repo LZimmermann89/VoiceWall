@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import type { CompanyListView } from '../../shared/company';
 import type { AppStatus, ModelProgress, SystemInfo, TranscriptPayload } from '../../shared/schema';
+import type { Ersetzung } from '../../shared/vokabular';
 import { FLOW_STATE_LABELS, formatAccelerator, formatBytes } from './format';
 
 interface TranscriptLine {
@@ -37,6 +38,15 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   const [hotkeyInput, setHotkeyInput] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const levelDecay = useRef<number | null>(null);
+
+  // Fach-Woerterbuch der aktiven Firma (Stufe 1).
+  const [begriffe, setBegriffe] = useState<string[]>([]);
+  const [ersetzungen, setErsetzungen] = useState<Ersetzung[]>([]);
+  const [begriffInput, setBegriffInput] = useState('');
+  const [vonInput, setVonInput] = useState('');
+  const [zuInput, setZuInput] = useState('');
+  const [vokabularError, setVokabularError] = useState<string | null>(null);
+  const [vokabularNotice, setVokabularNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const offTranscript = window.voicewall.onTranscript((payload: TranscriptPayload) => {
@@ -68,6 +78,33 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
     };
   }, []);
 
+  // Vokabular der aktiven Firma laden (bei Firmenwechsel neu).
+  const aktiveFirma = companies?.aktiveFirma ?? null;
+  useEffect(() => {
+    let cancelled = false;
+    setVokabularError(null);
+    setVokabularNotice(null);
+    if (aktiveFirma === null) {
+      setBegriffe([]);
+      setErsetzungen([]);
+      return;
+    }
+    void window.voicewall.getVokabular().then((result) => {
+      if (cancelled) {
+        return;
+      }
+      if (result.ok) {
+        setBegriffe([...result.vokabular.begriffe]);
+        setErsetzungen([...result.vokabular.ersetzungen]);
+      } else {
+        setVokabularError(result.message);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [aktiveFirma]);
+
   const runAction = useCallback(
     async (action: () => Promise<{ ok: boolean; message?: string }>) => {
       setBusy(true);
@@ -92,6 +129,10 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   const accessibility = status?.accessibility ?? 'not-applicable';
   const lastTranscript = status?.lastTranscript ?? null;
   const clipboardRestoreEnabled = status?.clipboardRestoreEnabled ?? true;
+  const aufbereitung = status?.aufbereitung ?? {
+    fuellwoerterEntfernen: true,
+    sprachkommandos: false,
+  };
   const flowState = status?.flowState ?? 'idle';
   const platform = systemInfo?.platform ?? 'darwin';
   const hasCompany = (companies?.firmen.length ?? 0) > 0;
@@ -355,6 +396,212 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
               </li>
             ))}
           </ol>
+        )}
+      </section>
+
+      {/* 04 Wörterbuch und Aufbereitung ---------------------------------- */}
+      <section className="main-section" aria-label="Wörterbuch und Aufbereitung">
+        <div className="section-head">
+          <span className="section-no">04</span>
+          <h3>Wörterbuch und Aufbereitung</h3>
+        </div>
+        <p className="notice">
+          Alles hier ist reine, lokale Regelverarbeitung: kein Sprachmodell, kein externer Aufruf.
+          Jede Regel ist deterministisch und nachvollziehbar.
+        </p>
+        <div className="actions">
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              data-testid="switch-fuellwoerter"
+              checked={aufbereitung.fuellwoerterEntfernen}
+              disabled={busy}
+              onChange={(event) =>
+                void runAction(() =>
+                  window.voicewall.setAufbereitung({
+                    fuellwoerterEntfernen: event.target.checked,
+                    sprachkommandos: aufbereitung.sprachkommandos,
+                  }),
+                )
+              }
+            />{' '}
+            Füllwörter entfernen: eigenständige &quot;äh&quot;, &quot;ähm&quot;, &quot;öhm&quot;,
+            &quot;hm&quot; und direkte Wortdopplungen (&quot;das das&quot;). Konservativ; seltene
+            legitime Dopplungen können mitgetroffen werden.
+          </label>
+        </div>
+        <div className="actions">
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              data-testid="switch-sprachkommandos"
+              checked={aufbereitung.sprachkommandos}
+              disabled={busy}
+              onChange={(event) =>
+                void runAction(() =>
+                  window.voicewall.setAufbereitung({
+                    fuellwoerterEntfernen: aufbereitung.fuellwoerterEntfernen,
+                    sprachkommandos: event.target.checked,
+                  }),
+                )
+              }
+            />{' '}
+            Sprachkommandos umsetzen: &quot;Punkt&quot;, &quot;Komma&quot;,
+            &quot;Fragezeichen&quot;, &quot;Ausrufezeichen&quot;, &quot;Doppelpunkt&quot;,
+            &quot;neue Zeile&quot;, &quot;neuer Absatz&quot;. Standardmäßig aus, weil die Regel auch
+            die normale Verwendung des Wortes &quot;Punkt&quot; treffen kann.
+          </label>
+        </div>
+        <h4>Fach-Wörterbuch der aktiven Firma</h4>
+        {!hasCompany ? (
+          <p className="placeholder">
+            Noch keine Firma angelegt. Das Fach-Wörterbuch gehört zur Firma und liegt auditierbar in
+            deren Ordner (.voicewall/vokabular.json).
+          </p>
+        ) : (
+          <>
+            <p className="notice">
+              Begriffe (Eigennamen, Fachbegriffe, Aktenzeichen) verbessern die Erkennung: sie werden
+              der Spracherkennung lokal als Kontext mitgegeben. Ersetzungen korrigieren häufige
+              Fehltranskriptionen deterministisch, nur als ganze Wörter und exakt in der
+              eingegebenen Groß-/Kleinschreibung.
+            </p>
+            {begriffe.length > 0 && (
+              <ul className="status-list" data-testid="vocab-begriffe">
+                {begriffe.map((begriff, index) => (
+                  <li key={`${String(index)}-${begriff}`}>
+                    <span className="mono">{begriff}</span>{' '}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        setBegriffe((prev) => prev.filter((_, i) => i !== index));
+                      }}
+                    >
+                      Entfernen
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="actions">
+              <label htmlFor="vocab-begriff-input">Neuer Begriff:</label>
+              <input
+                id="vocab-begriff-input"
+                data-testid="vocab-begriff-input"
+                type="text"
+                maxLength={80}
+                value={begriffInput}
+                placeholder="z. B. VoiceWall"
+                onChange={(event) => {
+                  setBegriffInput(event.target.value);
+                }}
+              />
+              <button
+                type="button"
+                data-testid="vocab-add-begriff"
+                disabled={busy || begriffInput.trim().length === 0}
+                onClick={() => {
+                  setBegriffe((prev) => [...prev, begriffInput.trim()]);
+                  setBegriffInput('');
+                }}
+              >
+                Hinzufügen
+              </button>
+            </div>
+            {ersetzungen.length > 0 && (
+              <ul className="status-list" data-testid="vocab-ersetzungen">
+                {ersetzungen.map((regel, index) => (
+                  <li key={`${String(index)}-${regel.von}`}>
+                    <span className="mono">{regel.von}</span> {'->'}{' '}
+                    <span className="mono">{regel.zu}</span>{' '}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        setErsetzungen((prev) => prev.filter((_, i) => i !== index));
+                      }}
+                    >
+                      Entfernen
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="actions">
+              <label htmlFor="vocab-von-input">Ersetzung von:</label>
+              <input
+                id="vocab-von-input"
+                data-testid="vocab-von-input"
+                type="text"
+                maxLength={80}
+                value={vonInput}
+                placeholder="z. B. Voice Wall"
+                onChange={(event) => {
+                  setVonInput(event.target.value);
+                }}
+              />
+              <label htmlFor="vocab-zu-input">zu:</label>
+              <input
+                id="vocab-zu-input"
+                data-testid="vocab-zu-input"
+                type="text"
+                maxLength={80}
+                value={zuInput}
+                placeholder="z. B. VoiceWall"
+                onChange={(event) => {
+                  setZuInput(event.target.value);
+                }}
+              />
+              <button
+                type="button"
+                data-testid="vocab-add-ersetzung"
+                disabled={busy || vonInput.trim().length === 0}
+                onClick={() => {
+                  setErsetzungen((prev) => [...prev, { von: vonInput, zu: zuInput }]);
+                  setVonInput('');
+                  setZuInput('');
+                }}
+              >
+                Hinzufügen
+              </button>
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                data-testid="vocab-save"
+                disabled={busy}
+                onClick={() =>
+                  void runAction(async () => {
+                    setVokabularError(null);
+                    setVokabularNotice(null);
+                    const result = await window.voicewall.saveVokabular({
+                      begriffe,
+                      ersetzungen,
+                    });
+                    if (result.ok) {
+                      setVokabularNotice('Wörterbuch gespeichert (atomar, im Firmenordner).');
+                    } else {
+                      setVokabularError(result.message);
+                    }
+                    return { ok: true };
+                  })
+                }
+              >
+                Wörterbuch speichern
+              </button>
+            </div>
+            {vokabularNotice !== null && (
+              <p className="notice" data-testid="vocab-notice">
+                {vokabularNotice}
+              </p>
+            )}
+            {vokabularError !== null && (
+              <p className="warn-text" data-testid="vocab-error">
+                {vokabularError}
+              </p>
+            )}
+          </>
         )}
       </section>
 
