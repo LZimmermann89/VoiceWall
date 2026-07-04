@@ -33,3 +33,7 @@ Thumbs.db
 
 # Session-lokale Werkzeuge
 .claude/
+
+# Internes Planungsdokument, bleibt lokal (Strategie, Preise, Risikoregister)
+ABARBEITUNG.md
+ROADMAP.md
