@@ -42,6 +42,14 @@ export type ModelChoiceView = z.infer<typeof modelChoiceSchema>;
 export const dictationLanguageSchema = z.enum(['de', 'en']);
 export type DictationLanguage = z.infer<typeof dictationLanguageSchema>;
 
+/**
+ * Sprache der Oberflaeche (Paket B2, Entscheidung E40). Bewusst ein EIGENES
+ * Schema neben der Diktatsprache: die beiden sind fachlich unabhaengig
+ * (die UI-Sprache ist global, die Diktatsprache gilt pro Firma).
+ */
+export const uiLanguageSchema = z.enum(['de', 'en']);
+export type UiLanguage = z.infer<typeof uiLanguageSchema>;
+
 /** Zustand des systemweiten Diktat-Flows (siehe shared/dictation-flow.ts). */
 export const dictationFlowStateSchema = z.enum(['idle', 'recording', 'transcribing', 'delivering']);
 export type DictationFlowStateView = z.infer<typeof dictationFlowStateSchema>;
@@ -94,6 +102,8 @@ export const appStatusSchema = z.object({
   clipboardRestoreEnabled: z.boolean(),
   /** Schalter der Textaufbereitung (Stufe 1). */
   aufbereitung: aufbereitungConfigSchema,
+  /** Sprache der Oberflaeche (globale Konfig, Paket B2). */
+  uiLanguage: uiLanguageSchema,
 });
 export type AppStatus = z.infer<typeof appStatusSchema>;
 

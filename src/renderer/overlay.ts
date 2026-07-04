@@ -3,7 +3,14 @@
  * "Transkribiere", Ergebnis/Fehler) und bietet bei Ergebnis/Fehler den
  * Kopieren-Knopf (Resilienz-Primaerpfad). Nur DOM plus Preload-Bruecke,
  * keine Node-/Electron-APIs.
+ *
+ * Sprache (Paket B2): jeder Anzeige-Zustand traegt die UI-Sprache aus der
+ * globalen Konfiguration; die eigenen Overlay-Texte kommen aus den
+ * Katalogen (shared/i18n). Meldungen, die der Main-Prozess als fertigen
+ * String mitliefert (`state.message`, done/error), werden unveraendert
+ * angezeigt (Main-Texte sind Paket B3).
  */
+import { KATALOGE } from '../shared/i18n';
 
 const overlay = document.getElementById('overlay');
 const message = document.getElementById('message');
@@ -13,17 +20,18 @@ if (overlay === null || message === null || !(copyButton instanceof HTMLButtonEl
   throw new Error('Overlay-Bootstrap fehlgeschlagen: erwartete Elemente fehlen in overlay.html.');
 }
 
-const DEFAULT_TEXTS: Record<string, string> = {
-  recording: 'Ich höre zu ...',
-  transcribing: 'Transkribiere ...',
-  done: 'Text eingefügt.',
-  'no-speech': 'Keine Sprache erkannt.',
-  error: 'Fehler beim Einfügen.',
-};
-
 window.voicewallOverlay.onState((state) => {
+  const texte = KATALOGE[state.uiSprache ?? 'de'].overlay;
+  const defaultTexts: Record<string, string> = {
+    recording: texte.recording,
+    transcribing: texte.transcribing,
+    done: texte.done,
+    'no-speech': texte.noSpeech,
+    error: texte.error,
+  };
   overlay.dataset['kind'] = state.kind;
-  message.textContent = state.message ?? DEFAULT_TEXTS[state.kind] ?? '';
+  message.textContent = state.message ?? defaultTexts[state.kind] ?? '';
+  copyButton.textContent = texte.kopieren;
   // Kopieren-Knopf nur, wenn es ein Transkript gibt, das kopierbar ist.
   copyButton.hidden = !(state.kind === 'done' || state.kind === 'error');
 });

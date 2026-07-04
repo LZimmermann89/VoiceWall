@@ -19,18 +19,24 @@ const OVERLAY_CHANNELS = {
 } as const;
 
 const VALID_KINDS = new Set(['recording', 'transcribing', 'done', 'no-speech', 'error']);
+const VALID_UI_LANGUAGES = new Set(['de', 'en']);
 
 /** Minimale strukturelle Validierung des eingehenden Zustands. */
 function parseState(raw: unknown): OverlayStatePayload | null {
   if (typeof raw !== 'object' || raw === null) {
     return null;
   }
-  const candidate = raw as { kind?: unknown; message?: unknown };
+  const candidate = raw as { kind?: unknown; message?: unknown; uiSprache?: unknown };
   if (typeof candidate.kind !== 'string' || !VALID_KINDS.has(candidate.kind)) {
     return null;
   }
   const message = typeof candidate.message === 'string' ? candidate.message : null;
-  return { kind: candidate.kind as OverlayStatePayload['kind'], message };
+  // Sprache der Oberflaeche (Paket B2): unbekannte Werte fallen auf 'de'.
+  const uiSprache: 'de' | 'en' =
+    typeof candidate.uiSprache === 'string' && VALID_UI_LANGUAGES.has(candidate.uiSprache)
+      ? (candidate.uiSprache as 'de' | 'en')
+      : 'de';
+  return { kind: candidate.kind as OverlayStatePayload['kind'], message, uiSprache };
 }
 
 const bridge: VoiceWallOverlayBridge = {

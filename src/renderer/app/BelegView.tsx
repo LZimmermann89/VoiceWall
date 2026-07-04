@@ -12,21 +12,20 @@
  * Seit M9: Abschnitt "Über VoiceWall" mit der vollständigen, lokal
  * angezeigten Anbieterkennzeichnung (§ 5 DDG, shared/impressum.ts,
  * deckungsgleich mit rechtstexte/IMPRESSUM.md) plus Knopf zur statischen
- * Impressums-Quelle (openExternal-Ausnahme E31).
+ * Impressums-Quelle (openExternal-Ausnahme E31). Die Anbieterkennzeichnung
+ * bleibt auch in der englischen Oberfläche DEUTSCH (deutsches Recht,
+ * Entscheidung E40); der Katalog liefert dafür eine Einordnungszeile.
  */
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import type { BelegInfo } from '../../shared/company';
-import {
-  BACKUP_HINWEISE,
-  BACKUP_HINWEISE_DOKUMENT,
-  BACKUP_KLARTEXT_WARNUNG,
-} from '../../shared/backup-hinweise';
 import { IMPRESSUM_ANGABEN, IMPRESSUM_HINWEIS, IMPRESSUM_QUELLE_URL } from '../../shared/impressum';
-import { NETZWERK_SELBSTTEST_DOKUMENT, NETZWERK_SELBSTTEST_PROBEN } from '../../shared/selbsttest';
-import { formatGermanDateTime } from './format';
+import { formatDateTime } from './format';
+import { useSprache } from './i18n';
 import { PasswordDialog } from './PasswordDialog';
 
 export function BelegView(): ReactElement {
+  const { sprache: uiSprache, texte } = useSprache();
+  const t = texte.beleg;
   const [beleg, setBeleg] = useState<BelegInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showDecrypt, setShowDecrypt] = useState(false);
@@ -46,42 +45,38 @@ export function BelegView(): ReactElement {
     })();
   }, []);
 
-  const runDecrypt = useCallback(async (passwort: string) => {
-    setDecryptBusy(true);
-    setDecryptNotice(null);
-    setDecryptError(null);
-    try {
-      const result = await window.voicewall.decryptVwencFile(passwort);
-      setShowDecrypt(false);
-      if (result.ok) {
-        setDecryptNotice(`Entschlüsselt nach: ${result.zielPfad}`);
-      } else {
-        setDecryptError(result.message);
+  const runDecrypt = useCallback(
+    async (passwort: string) => {
+      setDecryptBusy(true);
+      setDecryptNotice(null);
+      setDecryptError(null);
+      try {
+        const result = await window.voicewall.decryptVwencFile(passwort);
+        setShowDecrypt(false);
+        if (result.ok) {
+          setDecryptNotice(t.entschluesseltNach(result.zielPfad));
+        } else {
+          setDecryptError(result.message);
+        }
+      } finally {
+        setDecryptBusy(false);
       }
-    } finally {
-      setDecryptBusy(false);
-    }
-  }, []);
+    },
+    [t],
+  );
 
   return (
     <div className="view-body">
       <h2 className="view-title" tabIndex={-1}>
-        Beleg
+        {t.titel}
       </h2>
-      <p className="lede">
-        VoiceWall arbeitet vollständig auf diesem Rechner. Dieser Bereich belegt das mit prüfbaren
-        Fakten, statt es nur zu behaupten.
-      </p>
+      <p className="lede">{t.lede}</p>
 
       <div className="stamp-panel" data-testid="beleg-network">
         <span className="stamp-mark">0</span>
         <div>
-          <p className="stamp-headline">Null externe Verbindungen im Betrieb</p>
-          <p className="notice">
-            Nach dem einmaligen Modell-Download baut VoiceWall keine Netzwerkverbindung mehr auf.
-            Die Content-Security-Policy der Oberfläche verbietet jede externe Verbindung. Sie können
-            das selbst nachprüfen (siehe unten, ausführlich in {NETZWERK_SELBSTTEST_DOKUMENT}).
-          </p>
+          <p className="stamp-headline">{t.stempelTitel}</p>
+          <p className="notice">{t.stempelText(t.selbsttestDokument)}</p>
         </div>
       </div>
 
@@ -91,52 +86,52 @@ export function BelegView(): ReactElement {
         </p>
       )}
 
-      {beleg === null && error === null && <p className="placeholder">Wird geladen ...</p>}
+      {beleg === null && error === null && <p className="placeholder">{t.wirdGeladen}</p>}
 
       {beleg !== null && (
         <>
-          <h3>Eckdaten</h3>
+          <h3>{t.eckdatenTitel}</h3>
           <table className="proto-table" data-testid="beleg-facts">
             <tbody>
               <tr>
-                <th scope="row">App-Version</th>
+                <th scope="row">{t.zeileAppVersion}</th>
                 <td className="mono">{beleg.appVersion}</td>
               </tr>
               <tr>
-                <th scope="row">Plattform</th>
+                <th scope="row">{t.zeilePlattform}</th>
                 <td className="mono">{beleg.plattform}</td>
               </tr>
               <tr>
-                <th scope="row">Mikrofon-Einwilligung</th>
+                <th scope="row">{t.zeileEinwilligung}</th>
                 <td className={beleg.konsentZeitstempel !== null ? 'value-ok' : 'value-warn'}>
                   {beleg.konsentZeitstempel !== null
-                    ? `erteilt am ${formatGermanDateTime(beleg.konsentZeitstempel)}`
-                    : 'noch nicht erteilt'}
+                    ? t.einwilligungErteiltAm(formatDateTime(beleg.konsentZeitstempel, uiSprache))
+                    : t.einwilligungFehlt}
                 </td>
               </tr>
               <tr>
-                <th scope="row">Modellordner</th>
+                <th scope="row">{t.zeileModellordner}</th>
                 <td className="mono breakable">{beleg.modellOrdner}</td>
               </tr>
               <tr>
-                <th scope="row">Betriebslog</th>
+                <th scope="row">{t.zeileBetriebslog}</th>
                 <td className="mono breakable">{beleg.logPfad}</td>
               </tr>
             </tbody>
           </table>
 
-          <h3>Modelle (Version und Prüfsumme)</h3>
+          <h3>{t.modelleTitel}</h3>
           <ul className="beleg-models" data-testid="beleg-models">
             {beleg.modelle.map((modell) => (
               <li key={modell.id} className="beleg-model">
                 <div className="beleg-model-head">
                   <span className="beleg-model-label">{modell.label}</span>
-                  {modell.aktiv && <span className="badge">aktiv</span>}
+                  {modell.aktiv && <span className="badge">{t.badgeAktiv}</span>}
                   <span
                     className={modell.vorhanden ? 'status-ok' : 'status-missing'}
                     data-testid={`beleg-model-state-${modell.id}`}
                   >
-                    {modell.vorhanden ? 'vorhanden und verifiziert' : 'nicht geladen'}
+                    {modell.vorhanden ? t.modellVorhanden : t.modellFehlt}
                   </span>
                 </div>
                 <p className="beleg-hash mono">SHA-256: {modell.sha256}</p>
@@ -145,13 +140,10 @@ export function BelegView(): ReactElement {
             ))}
           </ul>
 
-          <h3>Netzwerk-Selbsttest</h3>
-          <p className="notice">
-            Prüfen Sie das Versprechen &quot;100 Prozent lokal&quot; selbst. Drei unabhängige
-            Proben, von der eingebauten Netzwerk-Anzeige bis zum gezogenen Netzstecker:
-          </p>
+          <h3>{t.selbsttestTitel}</h3>
+          <p className="notice">{t.selbsttestIntro}</p>
           <ol className="selftest-list" data-testid="beleg-selbsttest">
-            {NETZWERK_SELBSTTEST_PROBEN.map((probe) => (
+            {t.selbsttestProben.map((probe) => (
               <li key={probe.titel} className="selftest-item">
                 <p className="selftest-title">{probe.titel}</p>
                 <ol className="selftest-steps">
@@ -160,18 +152,18 @@ export function BelegView(): ReactElement {
                   ))}
                 </ol>
                 <p className="selftest-result">
-                  <strong>Erwartetes Ergebnis:</strong> {probe.ergebnis}
+                  <strong>{t.selbsttestErgebnis}</strong> {probe.ergebnis}
                 </p>
               </li>
             ))}
           </ol>
 
-          <h3>Backup und Verschlüsselung</h3>
+          <h3>{t.backupTitel}</h3>
           <p className="note warn" data-testid="backup-warnung">
-            {BACKUP_KLARTEXT_WARNUNG}
+            {t.backupWarnung}
           </p>
           <div className="backup-hinweise" data-testid="backup-hinweise">
-            {BACKUP_HINWEISE.map((abschnitt) => (
+            {t.backupHinweise.map((abschnitt) => (
               <div key={abschnitt.titel} className="backup-abschnitt">
                 <h4>{abschnitt.titel}</h4>
                 {abschnitt.absaetze.map((absatz) => (
@@ -182,10 +174,7 @@ export function BelegView(): ReactElement {
               </div>
             ))}
           </div>
-          <p className="notice">
-            Diese Hinweise liegen ausführlich in {BACKUP_HINWEISE_DOKUMENT} bei (Teil des
-            Beleg-Blatts).
-          </p>
+          <p className="notice">{t.backupDokumentHinweis(t.backupDokument)}</p>
           <div className="actions">
             <button
               type="button"
@@ -195,7 +184,7 @@ export function BelegView(): ReactElement {
                 setShowDecrypt(true);
               }}
             >
-              Datei entschlüsseln (.vwenc)
+              {t.entschluesseln}
             </button>
           </div>
           {decryptNotice !== null && (
@@ -209,7 +198,10 @@ export function BelegView(): ReactElement {
             </p>
           )}
 
-          <h3>Über VoiceWall (Anbieterkennzeichnung)</h3>
+          <h3>{t.impressumTitel}</h3>
+          <p className="notice" data-testid="beleg-impressum-sprachhinweis">
+            {t.impressumSprachHinweis}
+          </p>
           <table className="proto-table" data-testid="beleg-impressum">
             <tbody>
               {IMPRESSUM_ANGABEN.map((zeile) => (
@@ -235,7 +227,7 @@ export function BelegView(): ReactElement {
                 })();
               }}
             >
-              Quelle im Browser öffnen ({IMPRESSUM_QUELLE_URL})
+              {t.impressumQuelle(IMPRESSUM_QUELLE_URL)}
             </button>
           </div>
           {impressumError !== null && (
@@ -248,9 +240,9 @@ export function BelegView(): ReactElement {
 
       {showDecrypt && (
         <PasswordDialog
-          titel="Datei entschlüsseln (.vwenc)"
-          beschreibung="Nach der Passwort-Eingabe öffnet sich die Dateiauswahl. Die entschlüsselte Datei wird neben der .vwenc-Datei abgelegt, nichts wird überschrieben."
-          bestaetigenText="Datei wählen und entschlüsseln"
+          titel={t.entschluesselnTitel}
+          beschreibung={t.entschluesselnBeschreibung}
+          bestaetigenText={t.entschluesselnBestaetigen}
           minLength={1}
           mitWiederholung={false}
           busy={decryptBusy}

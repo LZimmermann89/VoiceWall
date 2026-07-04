@@ -1,31 +1,43 @@
-/** Kleine, reine Anzeige-Helfer des Renderers (keine Node-/Electron-APIs). */
+/**
+ * Kleine, reine Anzeige-Helfer des Renderers (keine Node-/Electron-APIs).
+ * Seit Paket B2 lokalisiert: Datum, Zahlen und Modifier-Namen folgen der
+ * UI-Sprache (Intl.DateTimeFormat mit de-DE bzw. en-GB); die Quelle- und
+ * Flow-Zustands-Beschriftungen liegen in den Katalogen (shared/i18n).
+ */
+import type { UiLanguage } from '../../shared/schema';
 
-/** Formatiert Bytes als deutsche MB-/GB-Angabe. */
-export function formatBytes(bytes: number): string {
+/** Formatiert Bytes als MB-/GB-Angabe (Dezimaltrennzeichen je Sprache). */
+export function formatBytes(bytes: number, sprache: UiLanguage = 'de'): string {
   const mb = bytes / (1024 * 1024);
   if (mb >= 1024) {
-    return `${(mb / 1024).toFixed(2).replace('.', ',')} GB`;
+    const gb = (mb / 1024).toFixed(2);
+    return `${sprache === 'de' ? gb.replace('.', ',') : gb} GB`;
   }
   return `${mb.toFixed(0)} MB`;
 }
 
 /**
  * Zeigt einen Electron-Accelerator menschenlesbar an (plattformgerecht):
- * CommandOrControl wird auf macOS zu Cmd, sonst zu Strg.
+ * CommandOrControl wird auf macOS zu Cmd, sonst zu Strg (DE) bzw. Ctrl (EN).
  */
-export function formatAccelerator(accelerator: string, platform: string): string {
+export function formatAccelerator(
+  accelerator: string,
+  platform: string,
+  sprache: UiLanguage = 'de',
+): string {
   const isMac = platform === 'darwin';
+  const controlName = sprache === 'de' ? 'Strg' : 'Ctrl';
   return accelerator
     .split('+')
     .map((part) => {
       if (part === 'CommandOrControl' || part === 'CmdOrCtrl') {
-        return isMac ? 'Cmd' : 'Strg';
+        return isMac ? 'Cmd' : controlName;
       }
       if (part === 'Command' || part === 'Cmd') {
         return 'Cmd';
       }
       if (part === 'Control' || part === 'Ctrl') {
-        return isMac ? 'Ctrl' : 'Strg';
+        return isMac ? 'Ctrl' : controlName;
       }
       if (part === 'Option') {
         return 'Alt';
@@ -35,59 +47,40 @@ export function formatAccelerator(accelerator: string, platform: string): string
     .join('+');
 }
 
-const MONATE = [
-  'Januar',
-  'Februar',
-  'März',
-  'April',
-  'Mai',
-  'Juni',
-  'Juli',
-  'August',
-  'September',
-  'Oktober',
-  'November',
-  'Dezember',
-];
+/** Intl-Locale je UI-Sprache (en-GB: 24-Stunden-Uhr, "2 July 2026"). */
+function localeFor(sprache: UiLanguage): string {
+  return sprache === 'de' ? 'de-DE' : 'en-GB';
+}
 
 /**
- * Formatiert einen ISO-Zeitstempel deutsch, z. B. "2. Juli 2026, 14:32".
- * Rein zeichenbasiert (kein Intl-Locale-Zwang), damit die Anzeige auf allen
- * Rechnern identisch bleibt. Bei ungueltigem Wert wird der Rohwert gezeigt.
+ * Formatiert einen ISO-Zeitstempel lokalisiert, z. B. "2. Juli 2026, 14:32"
+ * (de-DE) bzw. "2 July 2026, 14:32" (en-GB). Datum und Uhrzeit werden
+ * getrennt formatiert und mit ", " verbunden, damit die deutsche Anzeige
+ * exakt dem bisherigen Format entspricht. Bei ungueltigem Wert wird der
+ * Rohwert gezeigt.
  */
-export function formatGermanDateTime(iso: string): string {
+export function formatDateTime(iso: string, sprache: UiLanguage = 'de'): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
     return iso;
   }
-  const tag = date.getDate();
-  const monat = MONATE[date.getMonth()] ?? '';
-  const jahr = date.getFullYear();
-  const stunde = String(date.getHours()).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
-  return `${String(tag)}. ${monat} ${String(jahr)}, ${stunde}:${minute}`;
+  const zeit = new Intl.DateTimeFormat(localeFor(sprache), {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+  return `${formatDate(iso, sprache)}, ${zeit}`;
 }
 
-/** Nur das Datum (ohne Uhrzeit), z. B. "2. Juli 2026". */
-export function formatGermanDate(iso: string): string {
+/** Nur das Datum (ohne Uhrzeit), z. B. "2. Juli 2026" bzw. "2 July 2026". */
+export function formatDate(iso: string, sprache: UiLanguage = 'de'): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
     return iso;
   }
-  return `${String(date.getDate())}. ${MONATE[date.getMonth()] ?? ''} ${String(date.getFullYear())}`;
+  return new Intl.DateTimeFormat(localeFor(sprache), {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date);
 }
-
-/** Deutsche Bezeichnung der Diktat-Quelle. */
-export const QUELLE_LABELS: Record<string, string> = {
-  diktat: 'Diktat',
-  import: 'Import',
-  manuell: 'Notiz',
-};
-
-/** Deutsche Anzeige des Diktat-Flow-Zustands. */
-export const FLOW_STATE_LABELS: Record<string, string> = {
-  idle: 'bereit',
-  recording: 'Aufnahme läuft',
-  transcribing: 'transkribiert',
-  delivering: 'fügt Text ein',
-};

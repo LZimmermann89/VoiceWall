@@ -1,10 +1,17 @@
 /**
  * First-Run-Wizard (M6, ABARBEITUNG 4.2): mehrstufig, jede Stufe validiert
  * vor "Weiter". KEIN Schritt schreibt vor der Bestätigung Konfiguration
- * oder Firmendaten; einzige dokumentierte Ausnahme ist der explizite
- * Modell-Download (Schritt Modell), der die geteilten Modelldateien in den
- * App-Support-Ordner legt (Infrastruktur, keine Nutzer-/Firmendaten).
- * Zurück-Navigation erhält alle Eingaben; Abbruch ist möglich.
+ * oder Firmendaten; dokumentierte Ausnahmen sind der explizite
+ * Modell-Download (Schritt Modell; Infrastruktur, keine Nutzer-/Firmendaten)
+ * und die Sprachwahl in Schritt 0 (Paket B2: die UI-Sprache wirkt sofort
+ * und wird sofort persistiert, damit die gesamte Einrichtung in der
+ * gewählten Sprache abläuft). Zurück-Navigation erhält alle Eingaben;
+ * Abbruch ist möglich.
+ *
+ * Schritt 0 (nur First-Run): Sprache / Language, bewusst zweisprachig
+ * beschriftet. Die Wahl stellt die Oberfläche live um und schlägt die
+ * Diktatsprache im späteren Sprache-Schritt entsprechend vor
+ * (überschreibbar; UI-Sprache und Diktatsprache bleiben unabhängig).
  *
  * Barrierefreiheit (Kritik D4): komplette Tastatur-Bedienbarkeit, sichtbare
  * Fokus-Zustaende (styles.css), genau eine H1 je Ansicht (App-Shell),
@@ -21,11 +28,14 @@ import {
   type ReactElement,
 } from 'react';
 import { EMAIL_LAX_PATTERN, type CreateCompanyResult } from '../../shared/company';
+import type { Uebersetzung } from '../../shared/i18n';
 import type { AppStatus, DictationLanguage, ModelProgress, SystemInfo } from '../../shared/schema';
 import type { WizardMode } from './App';
 import { formatAccelerator, formatBytes } from './format';
+import { useSprache } from './i18n';
 
 type StepId =
+  | 'sprachwahl'
   | 'willkommen'
   | 'firma'
   | 'speicherort'
@@ -34,17 +44,6 @@ type StepId =
   | 'hotkey'
   | 'bedienungshilfen'
   | 'zusammenfassung';
-
-const STEP_LABELS: Record<StepId, string> = {
-  willkommen: 'Willkommen',
-  firma: 'Firmendaten',
-  speicherort: 'Speicherort',
-  sprache: 'Sprache',
-  modell: 'Modell',
-  hotkey: 'Tastenkürzel',
-  bedienungshilfen: 'Bedienungshilfen',
-  zusammenfassung: 'Zusammenfassung',
-};
 
 const DEFAULT_HOTKEY = 'CommandOrControl+Shift+D';
 
@@ -68,13 +67,22 @@ interface ApplyOutcome {
 
 export function Wizard(props: WizardProps): ReactElement {
   const { mode, status, systemInfo, progress, onRefreshStatus, onFinished, onCancel } = props;
+  const { sprache: uiSprache, setSprache: setUiSprache, texte } = useSprache();
   const isMac = systemInfo?.platform === 'darwin';
 
   const steps = useMemo<readonly StepId[]>(() => {
     if (mode === 'add-company') {
       return ['firma', 'speicherort', 'zusammenfassung'];
     }
-    const full: StepId[] = ['willkommen', 'firma', 'speicherort', 'sprache', 'modell', 'hotkey'];
+    const full: StepId[] = [
+      'sprachwahl',
+      'willkommen',
+      'firma',
+      'speicherort',
+      'sprache',
+      'modell',
+      'hotkey',
+    ];
     if (isMac) {
       full.push('bedienungshilfen');
     }
@@ -109,6 +117,7 @@ export function Wizard(props: WizardProps): ReactElement {
   const [strategie, setStrategie] = useState<'desktop' | 'lokal-mit-verknuepfung'>('desktop');
 
   // Schritt 4: Diktatsprache (Deutsch empfohlen und Standard, Paket B1).
+  // Schritt 0 (Sprachwahl) schlaegt sie entsprechend vor (ueberschreibbar).
   const [sprache, setSprache] = useState<DictationLanguage>('de');
 
   // Schritt 5: Modellwahl.
@@ -165,14 +174,17 @@ export function Wizard(props: WizardProps): ReactElement {
     });
   }, [currentStep, syncChecked]);
 
-  const testHotkey = useCallback(async (accelerator: string) => {
-    const result = await window.voicewall.testHotkey(accelerator);
-    setHotkeyTest(
-      result.ok
-        ? { ok: true, message: 'Diese Tastenkombination ist frei und funktioniert.' }
-        : { ok: false, message: result.message },
-    );
-  }, []);
+  const testHotkey = useCallback(
+    async (accelerator: string) => {
+      const result = await window.voicewall.testHotkey(accelerator);
+      setHotkeyTest(
+        result.ok
+          ? { ok: true, message: texte.wizard.hotkey.testOk }
+          : { ok: false, message: result.message },
+      );
+    },
+    [texte],
+  );
 
   // Hotkey-Schritt: beim Betreten die aktuelle Kombination einmal live testen.
   const hotkeyStepTested = useRef(false);
@@ -288,7 +300,7 @@ export function Wizard(props: WizardProps): ReactElement {
         setApplyError(
           created.vorschlag === null
             ? created.message
-            : `${created.message} Vorschlag: ${created.vorschlag}`,
+            : texte.wizard.zusammenfassung.fehlerMitVorschlag(created.message, created.vorschlag),
         );
         return;
       }
@@ -323,6 +335,7 @@ export function Wizard(props: WizardProps): ReactElement {
     ordnername,
     ordnernameEdited,
     onRefreshStatus,
+    texte,
   ]);
 
   // Hotkey-Recorder: faengt eine Tastenkombination als Accelerator ein.
@@ -363,16 +376,21 @@ export function Wizard(props: WizardProps): ReactElement {
   const stepNumber = stepIndex + 1;
   const kicker =
     outcome !== null
-      ? 'Einrichtung abgeschlossen'
-      : `Schritt ${String(stepNumber).padStart(2, '0')} von ${String(steps.length).padStart(2, '0')}`;
+      ? texte.wizard.kickerAbgeschlossen
+      : texte.wizard.kickerSchritt(
+          String(stepNumber).padStart(2, '0'),
+          String(steps.length).padStart(2, '0'),
+        );
 
   // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
   return (
     <div className="wizard-layout">
-      <nav className="wizard-rail" aria-label="Einrichtungsschritte">
-        <p className="wizard-rail-title">Prüfschritte</p>
+      <nav className="wizard-rail" aria-label={texte.wizard.railAria}>
+        <p className="wizard-rail-title" data-testid="wizard-rail-title">
+          {texte.wizard.railTitel}
+        </p>
         <ol className="wizard-steps">
           {steps.map((step, index) => {
             const state =
@@ -390,9 +408,9 @@ export function Wizard(props: WizardProps): ReactElement {
                 aria-current={state === 'current' ? 'step' : undefined}
               >
                 <span className="step-index">{String(index + 1).padStart(2, '0')}</span>
-                {STEP_LABELS[step]}
+                {texte.wizard.schrittNamen[step]}
                 {state === 'done' && (
-                  <span className="step-check" aria-label="abgeschlossen">
+                  <span className="step-check" aria-label={texte.wizard.schrittAbgeschlossen}>
                     ✓
                   </span>
                 )}
@@ -412,30 +430,78 @@ export function Wizard(props: WizardProps): ReactElement {
             platform={systemInfo?.platform ?? 'darwin'}
             headingRef={headingRef}
             onFinished={onFinished}
+            texte={texte}
+            uiSprache={uiSprache}
           />
         ) : (
           <>
+            {currentStep === 'sprachwahl' && (
+              <>
+                <h2 ref={headingRef} tabIndex={-1}>
+                  {texte.wizard.sprachwahl.titel}
+                </h2>
+                <p className="lede">{texte.wizard.sprachwahl.lede}</p>
+                <div
+                  className="choice-list"
+                  role="radiogroup"
+                  aria-label={texte.wizard.sprachwahl.aria}
+                >
+                  <label className="choice-card">
+                    <input
+                      type="radio"
+                      name="ui-sprache"
+                      value="de"
+                      checked={uiSprache === 'de'}
+                      data-testid="wizard-ui-language-de"
+                      onChange={() => {
+                        setUiSprache('de');
+                        // Vorschlag fuer die spaetere Diktatsprache.
+                        setSprache('de');
+                      }}
+                    />
+                    <span className="choice-title">{texte.wizard.sprachwahl.deutschTitel}</span>
+                    <p className="choice-desc">{texte.wizard.sprachwahl.deutschBeschreibung}</p>
+                  </label>
+                  <label className="choice-card">
+                    <input
+                      type="radio"
+                      name="ui-sprache"
+                      value="en"
+                      checked={uiSprache === 'en'}
+                      data-testid="wizard-ui-language-en"
+                      onChange={() => {
+                        setUiSprache('en');
+                        // Vorschlag fuer die spaetere Diktatsprache.
+                        setSprache('en');
+                      }}
+                    />
+                    <span className="choice-title">{texte.wizard.sprachwahl.englischTitel}</span>
+                    <p className="choice-desc">{texte.wizard.sprachwahl.englischBeschreibung}</p>
+                  </label>
+                </div>
+                <p className="note">{texte.wizard.sprachwahl.hinweis}</p>
+              </>
+            )}
+
             {currentStep === 'willkommen' && (
               <StepWillkommen
                 headingRef={headingRef}
                 consentChecked={consentChecked}
                 onConsentChange={setConsentChecked}
+                texte={texte}
               />
             )}
 
             {currentStep === 'firma' && (
               <>
                 <h2 ref={headingRef} tabIndex={-1}>
-                  Firmendaten
+                  {texte.wizard.firma.titel}
                 </h2>
-                <p className="lede">
-                  Diese Angaben beschreiben den Datenraum der Firma. Sie bleiben auf diesem Rechner
-                  und werden in der Firmen-Konfiguration im Firmenordner abgelegt.
-                </p>
+                <p className="lede">{texte.wizard.firma.lede}</p>
                 <div className="field-grid">
                   <div className="field">
                     <label className="field-label" htmlFor="wz-name">
-                      Firmenname <span className="req">*</span>
+                      {texte.wizard.firma.nameLabel} <span className="req">*</span>
                     </label>
                     <input
                       id="wz-name"
@@ -445,20 +511,19 @@ export function Wizard(props: WizardProps): ReactElement {
                       data-testid="wizard-company-name"
                       aria-invalid={name.length > 0 && !nameValid}
                       aria-describedby="wz-name-hint"
-                      placeholder="z. B. Müller & Söhne GmbH"
+                      placeholder={texte.wizard.firma.namePlatzhalter}
                       onChange={(event) => {
                         setName(event.target.value);
                       }}
                     />
                     <p className="field-hint" id="wz-name-hint">
-                      1 bis 120 Zeichen, echte Umlaute erlaubt. Der Anzeigename bleibt unverändert
-                      erhalten.
+                      {texte.wizard.firma.nameHinweis}
                     </p>
                   </div>
 
                   <div className="field">
                     <label className="field-label" htmlFor="wz-ordnername">
-                      Ordnername (abgeleitet, anpassbar)
+                      {texte.wizard.firma.ordnernameLabel}
                     </label>
                     <input
                       id="wz-ordnername"
@@ -479,14 +544,16 @@ export function Wizard(props: WizardProps): ReactElement {
                         data-testid="wizard-folder-preview"
                         aria-live="polite"
                       >
-                        {preview.ok ? `Ordner: ${preview.text}` : preview.text}
+                        {preview.ok
+                          ? texte.wizard.firma.ordnerVorschau(preview.text)
+                          : preview.text}
                       </p>
                     )}
                   </div>
 
                   <div className="field">
                     <label className="field-label" htmlFor="wz-ansprechpartner">
-                      Ansprechpartner (optional)
+                      {texte.wizard.firma.ansprechpartnerLabel}
                     </label>
                     <input
                       id="wz-ansprechpartner"
@@ -502,7 +569,7 @@ export function Wizard(props: WizardProps): ReactElement {
 
                   <div className="field">
                     <label className="field-label" htmlFor="wz-email">
-                      E-Mail (optional, nur lokale Anzeige)
+                      {texte.wizard.firma.emailLabel}
                     </label>
                     <input
                       id="wz-email"
@@ -518,15 +585,14 @@ export function Wizard(props: WizardProps): ReactElement {
                     />
                     {!emailValid && (
                       <p className="field-error" id="wz-email-error" role="alert">
-                        Bitte eine gültige E-Mail-Adresse eingeben (z. B. name@firma.de) oder das
-                        Feld leer lassen.
+                        {texte.wizard.firma.emailFehler}
                       </p>
                     )}
                   </div>
 
                   <div className="field">
                     <label className="field-label" htmlFor="wz-standort">
-                      Standort/Abteilung (optional)
+                      {texte.wizard.firma.standortLabel}
                     </label>
                     <input
                       id="wz-standort"
@@ -541,7 +607,7 @@ export function Wizard(props: WizardProps): ReactElement {
 
                   <div className="field">
                     <label className="field-label" htmlFor="wz-hinweis">
-                      Interner Hinweis (optional)
+                      {texte.wizard.firma.hinweisLabel}
                     </label>
                     <input
                       id="wz-hinweis"
@@ -560,29 +626,31 @@ export function Wizard(props: WizardProps): ReactElement {
             {currentStep === 'speicherort' && (
               <>
                 <h2 ref={headingRef} tabIndex={-1}>
-                  Speicherort der Diktate
+                  {texte.wizard.speicherort.titel}
                 </h2>
-                <p className="lede">
-                  Der Firmenordner ist die Datenbank: einfache Dateien, jederzeit kopierbar. Vor der
-                  Anlage prüft VoiceWall, ob der Desktop von einem Cloud-Dienst synchronisiert wird.
-                </p>
-                {!syncChecked && <p className="placeholder">Prüfe Speicherort ...</p>}
+                <p className="lede">{texte.wizard.speicherort.lede}</p>
+                {!syncChecked && (
+                  <p className="placeholder">{texte.wizard.speicherort.pruefeSpeicherort}</p>
+                )}
                 {syncChecked && syncInfo.synchronisiert && (
                   <div className="note warn" data-testid="wizard-sync-warning" role="alert">
                     <p>
-                      <strong>Cloud-Synchronisation erkannt.</strong>
+                      <strong>{texte.wizard.speicherort.syncErkannt}</strong>
                     </p>
                     <p>{syncInfo.hinweis}</p>
                   </div>
                 )}
                 {syncChecked && !syncInfo.synchronisiert && (
                   <p className="note" data-testid="wizard-sync-ok">
-                    Keine Cloud-Synchronisation des Desktops erkannt. Der Desktop ist als
-                    Speicherort geeignet.
+                    {texte.wizard.speicherort.syncOk}
                   </p>
                 )}
-                <h3>Wo sollen die Diktate liegen?</h3>
-                <div className="choice-list" role="radiogroup" aria-label="Speicherort">
+                <h3>{texte.wizard.speicherort.frage}</h3>
+                <div
+                  className="choice-list"
+                  role="radiogroup"
+                  aria-label={texte.wizard.speicherort.aria}
+                >
                   <label className="choice-card">
                     <input
                       type="radio"
@@ -595,14 +663,12 @@ export function Wizard(props: WizardProps): ReactElement {
                       }}
                     />
                     <span className="choice-title">
-                      Lokaler Ordner mit Desktop-Verknüpfung
-                      {syncInfo.synchronisiert && <span className="badge">empfohlen</span>}
+                      {texte.wizard.speicherort.lokalTitel}
+                      {syncInfo.synchronisiert && (
+                        <span className="badge">{texte.wizard.speicherort.badgeEmpfohlen}</span>
+                      )}
                     </span>
-                    <p className="choice-desc">
-                      Diktate liegen unter ~/VoiceWall (wird nie synchronisiert); auf dem Desktop
-                      erscheint eine Verknüpfung. Sichert das Versprechen &quot;100 Prozent
-                      lokal&quot;.
-                    </p>
+                    <p className="choice-desc">{texte.wizard.speicherort.lokalBeschreibung}</p>
                   </label>
                   <label className="choice-card">
                     <input
@@ -616,14 +682,14 @@ export function Wizard(props: WizardProps): ReactElement {
                       }}
                     />
                     <span className="choice-title">
-                      Direkt auf dem Desktop
-                      {!syncInfo.synchronisiert && <span className="badge">Standard</span>}
+                      {texte.wizard.speicherort.desktopTitel}
+                      {!syncInfo.synchronisiert && (
+                        <span className="badge">{texte.wizard.speicherort.badgeStandard}</span>
+                      )}
                     </span>
                     <p className="choice-desc">
-                      Der Firmenordner liegt direkt auf dem Desktop.
-                      {syncInfo.synchronisiert
-                        ? ' Achtung: Er würde dann in die Cloud synchronisiert.'
-                        : ''}
+                      {texte.wizard.speicherort.desktopBeschreibung}
+                      {syncInfo.synchronisiert ? texte.wizard.speicherort.desktopSyncWarnung : ''}
                     </p>
                   </label>
                 </div>
@@ -633,14 +699,14 @@ export function Wizard(props: WizardProps): ReactElement {
             {currentStep === 'sprache' && (
               <>
                 <h2 ref={headingRef} tabIndex={-1}>
-                  Diktatsprache
+                  {texte.wizard.sprache.titel}
                 </h2>
-                <p className="lede">
-                  VoiceWall ist primär auf deutsches Diktat optimiert. Die Sprache gilt pro Firma
-                  und wird der Spracherkennung fest übergeben, ohne automatische Spracherkennung.
-                  Das spart Zeit und verhindert Sprachwechsel-Fehler.
-                </p>
-                <div className="choice-list" role="radiogroup" aria-label="Diktatsprache">
+                <p className="lede">{texte.wizard.sprache.lede}</p>
+                <div
+                  className="choice-list"
+                  role="radiogroup"
+                  aria-label={texte.wizard.sprache.aria}
+                >
                   <label className="choice-card">
                     <input
                       type="radio"
@@ -654,12 +720,10 @@ export function Wizard(props: WizardProps): ReactElement {
                       }}
                     />
                     <span className="choice-title">
-                      Deutsch (de) <span className="badge">empfohlen</span>
+                      {texte.wizard.sprache.deutschTitel}{' '}
+                      <span className="badge">{texte.wizard.modell.badgeEmpfohlen}</span>
                     </span>
-                    <p className="choice-desc">
-                      Nutzt das deutsch-feinabgestimmte Whisper-Modell (der Markenkern dieser
-                      Ausgabe): beste deutsche Erkennung, Standard für neue Firmen.
-                    </p>
+                    <p className="choice-desc">{texte.wizard.sprache.deutschBeschreibung}</p>
                   </label>
                   <label className="choice-card">
                     <input
@@ -673,18 +737,11 @@ export function Wizard(props: WizardProps): ReactElement {
                         setDownloadError(null);
                       }}
                     />
-                    <span className="choice-title">Englisch (en)</span>
-                    <p className="choice-desc">
-                      Nutzt das mehrsprachige Whisper-Originalmodell (large-v3-turbo). Ehrlicher
-                      Hinweis: VoiceWall ist primär für Deutsch optimiert; für Englisch fällt ein
-                      zusätzlicher einmaliger Modell-Download von ca. 574 MB an.
-                    </p>
+                    <span className="choice-title">{texte.wizard.sprache.englischTitel}</span>
+                    <p className="choice-desc">{texte.wizard.sprache.englischBeschreibung}</p>
                   </label>
                 </div>
-                <p className="note">
-                  Die Oberflächensprache bleibt Deutsch. Die Diktatsprache lässt sich später in der
-                  Verwaltung pro Firma ändern.
-                </p>
+                <p className="note">{texte.wizard.sprache.hinweis}</p>
               </>
             )}
 
@@ -707,21 +764,20 @@ export function Wizard(props: WizardProps): ReactElement {
                 onDownload={() => {
                   void startDownload();
                 }}
+                texte={texte}
+                uiSprache={uiSprache}
               />
             )}
 
             {currentStep === 'hotkey' && (
               <>
                 <h2 ref={headingRef} tabIndex={-1}>
-                  Tastenkürzel für das Diktat
+                  {texte.wizard.hotkey.titel}
                 </h2>
-                <p className="lede">
-                  Ein Druck startet die Aufnahme, ein zweiter Druck beendet sie und fügt den Text in
-                  die aktive Anwendung ein. Das Kürzel gilt systemweit.
-                </p>
+                <p className="lede">{texte.wizard.hotkey.lede}</p>
                 <div className="field">
                   <label className="field-label" htmlFor="wz-hotkey">
-                    Tastenkombination
+                    {texte.wizard.hotkey.label}
                   </label>
                   <input
                     id="wz-hotkey"
@@ -736,9 +792,11 @@ export function Wizard(props: WizardProps): ReactElement {
                     }}
                   />
                   <p className="field-hint">
-                    Anzeige:{' '}
-                    <kbd>{formatAccelerator(hotkey, systemInfo?.platform ?? 'darwin')}</kbd> ·
-                    Schreibweise nach Electron, z. B. CommandOrControl+Shift+D.
+                    {texte.wizard.hotkey.anzeigeVor}
+                    <kbd>
+                      {formatAccelerator(hotkey, systemInfo?.platform ?? 'darwin', uiSprache)}
+                    </kbd>
+                    {texte.wizard.hotkey.anzeigeNach}
                   </p>
                 </div>
                 <div className="actions">
@@ -753,9 +811,7 @@ export function Wizard(props: WizardProps): ReactElement {
                     }}
                     data-testid="wizard-hotkey-record"
                   >
-                    {recording
-                      ? 'Jetzt Tastenkombination drücken (Esc bricht ab)'
-                      : 'Kombination einfangen'}
+                    {recording ? texte.wizard.hotkey.aufnehmenAktiv : texte.wizard.hotkey.aufnehmen}
                   </button>
                   <button
                     type="button"
@@ -765,7 +821,7 @@ export function Wizard(props: WizardProps): ReactElement {
                       void testHotkey(hotkey.trim());
                     }}
                   >
-                    Live testen
+                    {texte.wizard.hotkey.testen}
                   </button>
                 </div>
                 <div id="wz-hotkey-result" aria-live="polite">
@@ -786,74 +842,78 @@ export function Wizard(props: WizardProps): ReactElement {
                 headingRef={headingRef}
                 accessibility={status?.accessibility ?? 'not-applicable'}
                 onRefresh={onRefreshStatus}
+                texte={texte}
               />
             )}
 
             {currentStep === 'zusammenfassung' && (
               <>
                 <h2 ref={headingRef} tabIndex={-1}>
-                  Zusammenfassung
+                  {texte.wizard.zusammenfassung.titel}
                 </h2>
-                <p className="lede">
-                  Bitte prüfen Sie die Angaben. Erst mit &quot;Einrichten&quot; legt VoiceWall den
-                  Firmenordner an und speichert die Konfiguration.
-                </p>
+                <p className="lede">{texte.wizard.zusammenfassung.lede}</p>
                 <table className="proto-table" data-testid="wizard-summary">
                   <tbody>
                     <tr>
-                      <th scope="row">Firma</th>
+                      <th scope="row">{texte.wizard.zusammenfassung.zeileFirma}</th>
                       <td>{name.trim()}</td>
                     </tr>
                     <tr>
-                      <th scope="row">Zielordner</th>
+                      <th scope="row">{texte.wizard.zusammenfassung.zeileZielordner}</th>
                       <td className="mono">
                         {strategie === 'desktop'
-                          ? `Desktop/${ordnername || '?'}`
-                          : `~/VoiceWall/${ordnername || '?'} (Desktop zeigt eine Verknüpfung)`}
+                          ? texte.wizard.zusammenfassung.zielDesktop(ordnername || '?')
+                          : texte.wizard.zusammenfassung.zielLokal(ordnername || '?')}
                       </td>
                     </tr>
                     {ansprechpartner.trim().length > 0 && (
                       <tr>
-                        <th scope="row">Ansprechpartner</th>
+                        <th scope="row">{texte.wizard.zusammenfassung.zeileAnsprechpartner}</th>
                         <td>{ansprechpartner.trim()}</td>
                       </tr>
                     )}
                     {email.trim().length > 0 && (
                       <tr>
-                        <th scope="row">E-Mail</th>
+                        <th scope="row">{texte.wizard.zusammenfassung.zeileEmail}</th>
                         <td>{email.trim()}</td>
                       </tr>
                     )}
                     {standort.trim().length > 0 && (
                       <tr>
-                        <th scope="row">Standort</th>
+                        <th scope="row">{texte.wizard.zusammenfassung.zeileStandort}</th>
                         <td>{standort.trim()}</td>
                       </tr>
                     )}
                     {mode === 'first-run' && (
                       <>
                         <tr>
-                          <th scope="row">Sprache</th>
-                          <td>{sprache === 'en' ? 'Englisch (en)' : 'Deutsch (de)'}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Modell</th>
+                          <th scope="row">{texte.wizard.zusammenfassung.zeileSprache}</th>
                           <td>
                             {sprache === 'en'
-                              ? 'Mehrsprachig (large-v3-turbo, Q5_0)'
-                              : modell === 'fp16'
-                                ? 'fp16 (maximale Genauigkeit)'
-                                : 'Q5_0 (empfohlen)'}
+                              ? texte.wizard.zusammenfassung.spracheEnglisch
+                              : texte.wizard.zusammenfassung.spracheDeutsch}
                           </td>
                         </tr>
                         <tr>
-                          <th scope="row">Tastenkürzel</th>
+                          <th scope="row">{texte.wizard.zusammenfassung.zeileModell}</th>
+                          <td>
+                            {sprache === 'en'
+                              ? texte.wizard.zusammenfassung.modellMehrsprachig
+                              : modell === 'fp16'
+                                ? texte.wizard.zusammenfassung.modellFp16
+                                : texte.wizard.zusammenfassung.modellQ5}
+                          </td>
+                        </tr>
+                        <tr>
+                          <th scope="row">{texte.wizard.zusammenfassung.zeileHotkey}</th>
                           <td className="mono">{hotkey}</td>
                         </tr>
                         <tr>
-                          <th scope="row">Mikrofon-Einwilligung</th>
+                          <th scope="row">{texte.wizard.zusammenfassung.zeileEinwilligung}</th>
                           <td className={consentChecked ? 'value-ok' : 'value-warn'}>
-                            {consentChecked ? 'wird bei Einrichtung erteilt' : 'fehlt'}
+                            {consentChecked
+                              ? texte.wizard.zusammenfassung.einwilligungWird
+                              : texte.wizard.zusammenfassung.einwilligungFehlt}
                           </td>
                         </tr>
                       </>
@@ -871,7 +931,7 @@ export function Wizard(props: WizardProps): ReactElement {
             <div className="wizard-nav">
               {onCancel !== null ? (
                 <button type="button" className="ghost" onClick={onCancel} disabled={busy}>
-                  Abbrechen
+                  {texte.wizard.navigation.abbrechen}
                 </button>
               ) : (
                 <button
@@ -882,7 +942,7 @@ export function Wizard(props: WizardProps): ReactElement {
                     window.close();
                   }}
                 >
-                  Einrichtung beenden
+                  {texte.wizard.navigation.beenden}
                 </button>
               )}
               <span className="nav-spacer" />
@@ -895,7 +955,7 @@ export function Wizard(props: WizardProps): ReactElement {
                   setStepIndex((index) => Math.max(0, index - 1));
                 }}
               >
-                Zurück
+                {texte.wizard.navigation.zurueck}
               </button>
               {currentStep === 'zusammenfassung' ? (
                 <button
@@ -907,7 +967,7 @@ export function Wizard(props: WizardProps): ReactElement {
                     void applySetup();
                   }}
                 >
-                  {busy ? 'Richte ein ...' : 'Einrichten'}
+                  {busy ? texte.wizard.navigation.richteEin : texte.wizard.navigation.einrichten}
                 </button>
               ) : (
                 <button
@@ -919,7 +979,7 @@ export function Wizard(props: WizardProps): ReactElement {
                     setStepIndex((index) => Math.min(steps.length - 1, index + 1));
                   }}
                 >
-                  Weiter
+                  {texte.wizard.navigation.weiter}
                 </button>
               )}
             </div>
@@ -968,40 +1028,36 @@ function StepWillkommen(
   props: HeadingRefProp & {
     readonly consentChecked: boolean;
     readonly onConsentChange: (checked: boolean) => void;
+    readonly texte: Uebersetzung;
   },
 ): ReactElement {
+  const t = props.texte.wizard.willkommen;
   return (
     <>
       <h2 ref={props.headingRef} tabIndex={-1}>
-        Willkommen bei VoiceWall
+        {t.titel}
       </h2>
-      <p className="lede">
-        VoiceWall wandelt Ihre Sprache in Text um: Tastenkürzel drücken, sprechen, Tastenkürzel
-        drücken, der Text erscheint in der aktiven Anwendung. Die gesamte Verarbeitung findet auf
-        diesem Rechner statt.
-      </p>
+      <p className="lede">{t.lede}</p>
       <table className="proto-table">
         <tbody>
           <tr>
-            <th scope="row">Verarbeitung</th>
-            <td className="value-ok">100 % lokal auf diesem Rechner</td>
+            <th scope="row">{t.zeileVerarbeitung}</th>
+            <td className="value-ok">{t.zeileVerarbeitungWert}</td>
           </tr>
           <tr>
-            <th scope="row">Cloud/Server</th>
-            <td className="value-ok">keine, es werden keine Daten gesendet</td>
+            <th scope="row">{t.zeileCloud}</th>
+            <td className="value-ok">{t.zeileCloudWert}</td>
           </tr>
           <tr>
-            <th scope="row">Audio-Aufzeichnung</th>
-            <td className="value-ok">nur im Arbeitsspeicher, nie als Datei</td>
+            <th scope="row">{t.zeileAudio}</th>
+            <td className="value-ok">{t.zeileAudioWert}</td>
           </tr>
         </tbody>
       </table>
       <div className="note" data-testid="wizard-ai-act">
         <p>
-          <strong>Transparenzhinweis (EU-KI-Verordnung):</strong> Die Umwandlung von Sprache in Text
-          erfolgt durch ein KI-Modell (Whisper, deutsch optimiert). Wie bei jeder automatischen
-          Erkennung sind Fehler möglich, besonders bei Namen und Fachbegriffen. Bitte prüfen Sie das
-          Ergebnis, bevor Sie es verwenden.
+          <strong>{t.aiActTitel}</strong>
+          {t.aiActText}
         </p>
       </div>
       <label className="consent-row">
@@ -1013,12 +1069,7 @@ function StepWillkommen(
             props.onConsentChange(event.target.checked);
           }}
         />
-        <span>
-          Ich willige ein, dass VoiceWall das Mikrofon dieses Rechners für die lokale
-          Sprachumwandlung verwendet. Es werden keine Audiodaten gespeichert oder an einen Server
-          übertragen. Diese Einwilligung wird mit Zeitstempel lokal dokumentiert und ist jederzeit
-          widerrufbar (Mikrofonzugriff in den Systemeinstellungen entziehen).
-        </span>
+        <span>{t.einwilligung}</span>
       </label>
     </>
   );
@@ -1037,9 +1088,12 @@ function StepModell(
     readonly progress: ModelProgress | null;
     readonly downloadError: string | null;
     readonly onDownload: () => void;
+    readonly texte: Uebersetzung;
+    readonly uiSprache: 'de' | 'en';
   },
 ): ReactElement {
-  const { systemInfo } = props;
+  const { systemInfo, uiSprache } = props;
+  const t = props.texte.wizard.modell;
   const fp16Erlaubt = systemInfo?.fp16Erlaubt ?? false;
   const q5 = props.models.find((entry) => entry.id === 'whisper-q5');
   const fp16 = props.models.find((entry) => entry.id === 'whisper-fp16');
@@ -1050,11 +1104,72 @@ function StepModell(
   const statusLine = (entry: AppStatus['models'][number] | undefined): ReactElement => (
     <p className="choice-status">
       {entry?.present === true ? (
-        <span className="status-ok">vorhanden und verifiziert</span>
+        <span className="status-ok">{t.statusVorhanden}</span>
       ) : (
         <span className="status-missing">
-          noch nicht geladen · {entry !== undefined ? formatBytes(entry.byteSize) : ''}
+          {t.statusFehlt(entry !== undefined ? formatBytes(entry.byteSize, uiSprache) : '')}
         </span>
+      )}
+    </p>
+  );
+
+  const progressBlock = (
+    <div aria-live="polite">
+      {props.downloading && props.progress !== null && (
+        <>
+          <progress
+            max={100}
+            value={props.progress.percent ?? 0}
+            aria-label={t.downloadAria(props.progress.label)}
+          />
+          <p className="progress-line" data-testid="wizard-download-progress">
+            {t.progressZeile(
+              props.progress.label,
+              formatBytes(props.progress.receivedBytes, uiSprache),
+              props.progress.totalBytes !== null
+                ? formatBytes(props.progress.totalBytes, uiSprache)
+                : null,
+              props.progress.percent !== null ? props.progress.percent.toFixed(0) : null,
+            )}
+          </p>
+        </>
+      )}
+      {ready && (
+        <p className="note" data-testid="wizard-model-ready">
+          {t.bereit}
+        </p>
+      )}
+    </div>
+  );
+
+  const downloadBlock = (
+    <>
+      {!ready && (
+        <div className="actions">
+          <button
+            type="button"
+            className="primary"
+            disabled={props.downloading}
+            data-testid="wizard-model-download"
+            onClick={props.onDownload}
+          >
+            {props.downloading ? t.laedt : t.ladeKnopf}
+          </button>
+        </div>
+      )}
+      {props.downloadError !== null && (
+        <div className="note error" role="alert">
+          <p>{props.downloadError}</p>
+        </div>
+      )}
+    </>
+  );
+
+  const vadHinweis = (
+    <p className="field-hint">
+      {t.vadHinweis(
+        vad !== undefined ? formatBytes(vad.byteSize, uiSprache) : t.vadGroesseUnbekannt,
+        props.vadPresent,
       )}
     </p>
   );
@@ -1064,77 +1179,26 @@ function StepModell(
     return (
       <>
         <h2 ref={props.headingRef} tabIndex={-1}>
-          Erkennungsmodell
+          {t.titel}
         </h2>
-        <p className="lede">
-          Für die Diktatsprache Englisch nutzt VoiceWall das mehrsprachige Whisper-Originalmodell
-          (large-v3-turbo, Q5_0). Der Download erfolgt einmalig; danach arbeitet VoiceWall zu 100 %
-          offline.
-        </p>
+        <p className="lede">{t.ledeEnglisch}</p>
         <div className="choice-list">
           <label className="choice-card">
             <span className="choice-title">
-              Englisch / mehrsprachig (large-v3-turbo, Q5_0){' '}
-              <span className="badge">für Englisch</span>
+              {t.multilingualTitel} <span className="badge">{t.badgeFuerEnglisch}</span>
             </span>
             <p className="choice-desc" data-testid="wizard-model-multilingual">
-              Originalmodell von OpenAI/whisper.cpp, nicht deutsch-optimiert.{' '}
-              {multilingual !== undefined ? formatBytes(multilingual.byteSize) : ''}.
+              {t.multilingualBeschreibung(
+                multilingual !== undefined ? formatBytes(multilingual.byteSize, uiSprache) : '',
+              )}
             </p>
             {statusLine(multilingual)}
           </label>
         </div>
-        <p className="field-hint">
-          Zusätzlich wird das kleine Sprach-Erkennungsmodell (VAD,{' '}
-          {vad !== undefined ? formatBytes(vad.byteSize) : 'unter 1 MB'}) geladen:{' '}
-          {props.vadPresent ? 'vorhanden.' : 'noch nicht geladen.'}
-        </p>
-        <div aria-live="polite">
-          {props.downloading && props.progress !== null && (
-            <>
-              <progress
-                max={100}
-                value={props.progress.percent ?? 0}
-                aria-label={`Download ${props.progress.label}`}
-              />
-              <p className="progress-line" data-testid="wizard-download-progress">
-                {props.progress.label}: {formatBytes(props.progress.receivedBytes)}
-                {props.progress.totalBytes !== null
-                  ? ` von ${formatBytes(props.progress.totalBytes)}`
-                  : ''}
-                {props.progress.percent !== null ? ` (${props.progress.percent.toFixed(0)} %)` : ''}
-              </p>
-            </>
-          )}
-          {ready && (
-            <p className="note" data-testid="wizard-model-ready">
-              Alle benötigten Modelldateien sind vorhanden und gegen die fest hinterlegten
-              Prüfsummen verifiziert. Es ist kein Download nötig.
-            </p>
-          )}
-        </div>
-        {!ready && (
-          <div className="actions">
-            <button
-              type="button"
-              className="primary"
-              disabled={props.downloading}
-              data-testid="wizard-model-download"
-              onClick={props.onDownload}
-            >
-              {props.downloading ? 'Lädt ...' : 'Modell jetzt laden (einmalig)'}
-            </button>
-          </div>
-        )}
-        {props.downloadError !== null && (
-          <div className="note error" role="alert">
-            <p>{props.downloadError}</p>
-          </div>
-        )}
-        <p className="field-hint">
-          Hinweis: Der Modell-Download ist der einzige Moment, in dem VoiceWall das Internet nutzt
-          (huggingface.co, mit Prüfsummen-Verifikation).
-        </p>
+        {vadHinweis}
+        {progressBlock}
+        {downloadBlock}
+        <p className="field-hint">{t.downloadHinweisEnglisch}</p>
       </>
     );
   }
@@ -1142,17 +1206,18 @@ function StepModell(
   return (
     <>
       <h2 ref={props.headingRef} tabIndex={-1}>
-        Erkennungsmodell
+        {t.titel}
       </h2>
       <p className="lede">
-        Empfehlung für diesen Rechner (
-        {systemInfo !== null
-          ? `${String(systemInfo.cpuKerne)} Kerne, ${String(systemInfo.ramGb)} GB RAM`
-          : 'wird ermittelt'}
-        ): <strong>Q5_0</strong>. Der Download erfolgt einmalig; danach arbeitet VoiceWall zu 100 %
-        offline.
+        {t.ledeDeutschVor(
+          systemInfo !== null
+            ? t.hardwareKurz(systemInfo.cpuKerne, systemInfo.ramGb)
+            : t.hardwareUnbekannt,
+        )}
+        <strong>Q5_0</strong>
+        {t.ledeDeutschNach}
       </p>
-      <div className="choice-list" role="radiogroup" aria-label="Erkennungsmodell">
+      <div className="choice-list" role="radiogroup" aria-label={t.aria}>
         <label className="choice-card">
           <input
             type="radio"
@@ -1165,11 +1230,10 @@ function StepModell(
             }}
           />
           <span className="choice-title">
-            Q5_0 <span className="badge">empfohlen</span>
+            {t.q5Titel} <span className="badge">{t.badgeEmpfohlen}</span>
           </span>
           <p className="choice-desc">
-            Bester Kompromiss aus deutscher Genauigkeit und Geschwindigkeit; läuft auf normaler
-            Büro-Hardware. {q5 !== undefined ? formatBytes(q5.byteSize) : ''}.
+            {t.q5Beschreibung(q5 !== undefined ? formatBytes(q5.byteSize, uiSprache) : '')}
           </p>
           {statusLine(q5)}
         </label>
@@ -1186,68 +1250,19 @@ function StepModell(
               props.onModellChange('fp16');
             }}
           />
-          <span className="choice-title">Maximale Genauigkeit (fp16)</span>
+          <span className="choice-title">{t.fp16Titel}</span>
           <p className="choice-desc" id="wz-fp16-hint">
             {fp16Erlaubt
-              ? `Für starke Rechner; höhere Genauigkeit bei längerer Rechenzeit. ${fp16 !== undefined ? formatBytes(fp16.byteSize) : ''}.`
-              : 'Für diesen Rechner nicht empfohlen (benötigt mindestens 16 GB RAM und 6 Kerne); Auswahl deaktiviert.'}
+              ? t.fp16Beschreibung(fp16 !== undefined ? formatBytes(fp16.byteSize, uiSprache) : '')
+              : t.fp16Gesperrt}
           </p>
           {fp16Erlaubt && statusLine(fp16)}
         </label>
       </div>
-      <p className="field-hint">
-        Zusätzlich wird das kleine Sprach-Erkennungsmodell (VAD,{' '}
-        {vad !== undefined ? formatBytes(vad.byteSize) : 'unter 1 MB'}) geladen:{' '}
-        {props.vadPresent ? 'vorhanden.' : 'noch nicht geladen.'}
-      </p>
-
-      <div aria-live="polite">
-        {props.downloading && props.progress !== null && (
-          <>
-            <progress
-              max={100}
-              value={props.progress.percent ?? 0}
-              aria-label={`Download ${props.progress.label}`}
-            />
-            <p className="progress-line" data-testid="wizard-download-progress">
-              {props.progress.label}: {formatBytes(props.progress.receivedBytes)}
-              {props.progress.totalBytes !== null
-                ? ` von ${formatBytes(props.progress.totalBytes)}`
-                : ''}
-              {props.progress.percent !== null ? ` (${props.progress.percent.toFixed(0)} %)` : ''}
-            </p>
-          </>
-        )}
-        {ready && (
-          <p className="note" data-testid="wizard-model-ready">
-            Alle benötigten Modelldateien sind vorhanden und gegen die fest hinterlegten Prüfsummen
-            verifiziert. Es ist kein Download nötig.
-          </p>
-        )}
-      </div>
-      {!ready && (
-        <div className="actions">
-          <button
-            type="button"
-            className="primary"
-            disabled={props.downloading}
-            data-testid="wizard-model-download"
-            onClick={props.onDownload}
-          >
-            {props.downloading ? 'Lädt ...' : 'Modell jetzt laden (einmalig)'}
-          </button>
-        </div>
-      )}
-      {props.downloadError !== null && (
-        <div className="note error" role="alert">
-          <p>{props.downloadError}</p>
-        </div>
-      )}
-      <p className="field-hint">
-        Hinweis: Der Modell-Download ist der einzige Moment, in dem VoiceWall das Internet nutzt
-        (huggingface.co, mit Prüfsummen-Verifikation). Eine besonders kleine Q4-Notvariante für sehr
-        schwache Rechner ist für eine spätere Version vorgesehen.
-      </p>
+      {vadHinweis}
+      {progressBlock}
+      {downloadBlock}
+      <p className="field-hint">{t.downloadHinweisDeutsch}</p>
     </>
   );
 }
@@ -1256,50 +1271,35 @@ function StepBedienungshilfen(
   props: HeadingRefProp & {
     readonly accessibility: AppStatus['accessibility'];
     readonly onRefresh: () => Promise<void>;
+    readonly texte: Uebersetzung;
   },
 ): ReactElement {
+  const t = props.texte.wizard.bedienungshilfen;
   const granted = props.accessibility === 'granted';
   return (
     <>
       <h2 ref={props.headingRef} tabIndex={-1}>
-        macOS-Freigabe: Bedienungshilfen
+        {t.titel}
       </h2>
-      <p className="lede">
-        Für das automatische Einfügen simuliert VoiceWall genau einen Tastendruck (Cmd+V). Dafür
-        verlangt macOS die Freigabe &quot;Bedienungshilfen&quot;. VoiceWall liest damit keine
-        Tastatur mit, liest keine Fenster anderer Programme und steuert nichts weiter (die
-        vollständige, auditierbare Begründung liegt in docs/ACCESSIBILITY.md bei).
-      </p>
+      <p className="lede">{t.lede}</p>
       <table className="proto-table">
         <tbody>
           <tr>
-            <th scope="row">Freigabe-Status</th>
+            <th scope="row">{t.statusZeile}</th>
             <td
               className={granted ? 'value-ok' : 'value-warn'}
               data-testid="wizard-accessibility-status"
             >
-              {granted ? 'erteilt' : 'noch nicht erteilt'}
+              {granted ? t.statusErteilt : t.statusFehlt}
             </td>
           </tr>
         </tbody>
       </table>
       {!granted && (
         <div className="note warn">
-          <p>
-            Ohne die Freigabe funktioniert alles außer dem automatischen Einfügen: der Text liegt
-            dann in der Zwischenablage und wird mit Cmd+V eingefügt. Sie können die Freigabe auch
-            später jederzeit erteilen.
-          </p>
-          <p>
-            So geht es: Knopf drücken, dann VoiceWall in der Liste aktivieren (ggf. über das
-            Plus-Symbol hinzufügen), danach hier &quot;Status aktualisieren&quot; wählen.
-          </p>
-          <p>
-            Wichtig: macOS meldet eine frisch erteilte Freigabe an ein bereits laufendes Programm
-            oft erst nach einem Neustart des Programms. Bleibt der Status hier auf &quot;noch nicht
-            erteilt&quot;, schließen Sie die Einrichtung einfach normal ab und starten VoiceWall
-            danach einmal neu (der Knopf dafür steht anschließend im Bereich Diktat).
-          </p>
+          <p>{t.hinweisAbsatz1}</p>
+          <p>{t.hinweisAbsatz2}</p>
+          <p>{t.hinweisAbsatz3}</p>
         </div>
       )}
       <div className="actions">
@@ -1309,7 +1309,7 @@ function StepBedienungshilfen(
             void window.voicewall.requestAccessibility();
           }}
         >
-          Freigabe anfordern (macOS-Dialog)
+          {t.freigabeAnfordern}
         </button>
         <button
           type="button"
@@ -1317,7 +1317,7 @@ function StepBedienungshilfen(
             void window.voicewall.openAccessibilitySettings();
           }}
         >
-          Systemeinstellungen öffnen
+          {t.systemeinstellungen}
         </button>
         <button
           type="button"
@@ -1326,7 +1326,7 @@ function StepBedienungshilfen(
             void props.onRefresh();
           }}
         >
-          Status aktualisieren
+          {t.statusAktualisieren}
         </button>
       </div>
     </>
@@ -1339,16 +1339,18 @@ function SuccessPage(props: {
   readonly platform: string;
   readonly headingRef: React.MutableRefObject<HTMLHeadingElement | null>;
   readonly onFinished: () => Promise<void>;
+  readonly texte: Uebersetzung;
+  readonly uiSprache: 'de' | 'en';
 }): ReactElement {
-  const shownHotkey = formatAccelerator(props.hotkey, props.platform);
+  const t = props.texte.wizard.erfolg;
+  const shownHotkey = formatAccelerator(props.hotkey, props.platform, props.uiSprache);
   return (
     <div data-testid="wizard-success">
       <h2 ref={props.headingRef} tabIndex={-1}>
-        Einrichtung abgeschlossen
+        {t.titel}
       </h2>
       <p className="success-seal">
-        ✓ Firma &quot;{props.outcome.ordnername}&quot;{' '}
-        {props.outcome.uebernommen ? 'übernommen' : 'angelegt'}
+        {t.siegel(props.outcome.ordnername, props.outcome.uebernommen)}
       </p>
       <p className="mono">{props.outcome.pfad}</p>
       {props.outcome.hinweise.map((hinweisText) => (
@@ -1356,46 +1358,39 @@ function SuccessPage(props: {
           <p>{hinweisText}</p>
         </div>
       ))}
-      <h3>So diktieren Sie</h3>
+      <h3>{t.anleitungTitel}</h3>
       <ol className="kurzanleitung">
         <li>
-          Cursor in ein Textfeld setzen (Word, Outlook, Browser), dann <kbd>{shownHotkey}</kbd>{' '}
-          drücken.
+          {t.schritt1Vor}
+          <kbd>{shownHotkey}</kbd>
+          {t.schritt1Nach}
         </li>
-        <li>Sprechen. Ein kleines Fenster zeigt &quot;Ich höre zu&quot;.</li>
+        <li>{t.schritt2}</li>
         <li>
-          Erneut <kbd>{shownHotkey}</kbd> drücken: der Text erscheint an der Cursor-Position (und
-          liegt zusätzlich in der Zwischenablage).
+          {t.schritt3Vor}
+          <kbd>{shownHotkey}</kbd>
+          {t.schritt3Nach}
         </li>
       </ol>
       <details className="selftest">
-        <summary>Selbst prüfen: VoiceWall sendet keine Daten (Netzwerk-Selbsttest)</summary>
+        <summary>{t.selbsttestTitel}</summary>
         <div className="selftest-body">
-          <p>
-            Das Versprechen &quot;100 Prozent lokal&quot; müssen Sie nicht glauben, Sie können es
-            selbst nachprüfen (ausführlich in der beiliegenden Anleitung
-            docs/NETZWERK-SELBSTTEST.md):
-          </p>
+          <p>{t.selbsttestIntro}</p>
           <ol>
             <li>
-              <strong>Netzwerk-Anzeige der App:</strong> Entwicklertools öffnen (Cmd+Alt+I bzw.
-              F12), Reiter Netzwerk, dann diktieren. Es erscheint kein einziger Eintrag zu einer
-              externen Adresse.
+              <strong>{t.selbsttestPunkt1Titel}</strong>
+              {t.selbsttestPunkt1}
             </li>
             <li>
-              <strong>Verbindungsmonitor des Systems:</strong> macOS: LuLu/Little Snitch oder lsof;
-              Windows: Ressourcenmonitor, Reiter Netzwerk. VoiceWall baut im Betrieb keine
-              Verbindung auf.
+              <strong>{t.selbsttestPunkt2Titel}</strong>
+              {t.selbsttestPunkt2}
             </li>
             <li>
-              <strong>Der Netzstecker:</strong> Internet trennen (WLAN aus, Kabel ziehen) und wie
-              gewohnt diktieren. VoiceWall funktioniert vollständig offline.
+              <strong>{t.selbsttestPunkt3Titel}</strong>
+              {t.selbsttestPunkt3}
             </li>
           </ol>
-          <p>
-            Einzige Ausnahme: der einmalige, prüfsummen-verifizierte Modell-Download bei der
-            Einrichtung.
-          </p>
+          <p>{t.selbsttestAusnahme}</p>
         </div>
       </details>
       <div className="wizard-nav">
@@ -1408,7 +1403,7 @@ function SuccessPage(props: {
             void props.onFinished();
           }}
         >
-          Zur Verwaltung
+          {t.zurVerwaltung}
         </button>
       </div>
     </div>

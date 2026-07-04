@@ -8,12 +8,20 @@
  * Wizard. Der Wizard ist aus der Verwaltung erneut aufrufbar ("Neue Firma
  * einrichten", ABARBEITUNG 4.6) und durchläuft dann nur die Firmen-Schritte.
  *
+ * Seit Paket B2 hält die App-Shell zusätzlich die UI-Sprache: initialisiert
+ * aus der globalen Konfiguration (AppStatus.uiLanguage), umschaltbar zur
+ * Laufzeit ohne Reload (Wizard-Schritt 0 bzw. Umschalter in der Kopfzeile
+ * der Verwaltung), persistiert über config:set-ui-language. Die UI-Sprache
+ * ist unabhängig von der Diktatsprache der Firmen.
+ *
  * Die Ansichts-Struktur ist bewusst einfach (view-Zustand statt Router):
  * M7 haengt weitere Ansichten ein, ohne ein Router-Paket zu brauchen.
  */
-import { useCallback, useEffect, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { CompanyListView } from '../../shared/company';
-import type { AppStatus, ModelProgress, SystemInfo } from '../../shared/schema';
+import { KATALOGE } from '../../shared/i18n';
+import type { AppStatus, ModelProgress, SystemInfo, UiLanguage } from '../../shared/schema';
+import { I18nProvider, type I18nContextValue } from './i18n';
 import { MainView } from './MainView';
 import { Wizard } from './Wizard';
 
@@ -27,6 +35,12 @@ export function App(): ReactElement {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [companies, setCompanies] = useState<CompanyListView | null>(null);
   const [progress, setProgress] = useState<ModelProgress | null>(null);
+
+  // UI-Sprache (Paket B2): Start mit Deutsch, dann einmalig aus der
+  // persistierten Konfiguration uebernommen; Wechsel wirken sofort lokal
+  // und werden parallel persistiert (kein Warten auf den Roundtrip).
+  const [sprache, setSpracheState] = useState<UiLanguage>('de');
+  const spracheAdopted = useRef(false);
 
   const refreshStatus = useCallback(async () => {
     setStatus(await window.voicewall.getStatus());
@@ -52,6 +66,16 @@ export function App(): ReactElement {
     })();
   }, [refreshStatus, refreshCompanies]);
 
+  // Persistierte UI-Sprache genau einmal uebernehmen (danach fuehrt der
+  // lokale Zustand, damit ein Live-Wechsel nicht durch einen noch
+  // laufenden Status-Broadcast zurueckgesetzt wird).
+  useEffect(() => {
+    if (status !== null && !spracheAdopted.current) {
+      spracheAdopted.current = true;
+      setSpracheState(status.uiLanguage);
+    }
+  }, [status]);
+
   // Laufende Ereignisse abonnieren.
   useEffect(() => {
     const offStatus = window.voicewall.onStatus(setStatus);
@@ -61,6 +85,20 @@ export function App(): ReactElement {
       offProgress();
     };
   }, []);
+
+  const setSprache = useCallback((next: UiLanguage) => {
+    spracheAdopted.current = true;
+    setSpracheState(next);
+    // Persistenz im Hintergrund; ein Fehlschlag laesst die Live-Umschaltung
+    // unangetastet (naechster Start faellt dann auf den alten Wert zurueck).
+    void window.voicewall.setUiLanguage(next);
+  }, []);
+
+  const i18n = useMemo<I18nContextValue>(
+    () => ({ sprache, texte: KATALOGE[sprache], setSprache }),
+    [sprache, setSprache],
+  );
+  const texte = i18n.texte;
 
   const openAddCompanyWizard = useCallback(() => {
     setWizardMode('add-company');
@@ -81,63 +119,85 @@ export function App(): ReactElement {
   const contextLabel =
     view === 'wizard'
       ? wizardMode === 'first-run'
-        ? 'Einrichtungsprotokoll'
-        : 'Neue Firma einrichten'
-      : 'Verwaltung';
+        ? texte.app.kontextEinrichtung
+        : texte.app.kontextNeueFirma
+      : texte.app.kontextVerwaltung;
 
   return (
-    <div className="app-frame">
-      <header className="app-header">
-        <h1 className="wordmark">
-          VoiceWall<span className="wordmark-dot">.</span>
-        </h1>
-        <span className="context-label">{contextLabel}</span>
-        <span className="header-spacer" />
-        <span className="local-badge" title="Alle Verarbeitung findet auf diesem Rechner statt.">
-          100 % lokal
-        </span>
-      </header>
+    <I18nProvider value={i18n}>
+      <div className="app-frame">
+        <header className="app-header">
+          <h1 className="wordmark">
+            VoiceWall<span className="wordmark-dot">.</span>
+          </h1>
+          <span className="context-label">{contextLabel}</span>
+          <span className="header-spacer" />
+          {view === 'main' && (
+            <label className="switch-row ui-language">
+              {texte.app.sprachumschalterLabel}{' '}
+              <select
+                value={sprache}
+                data-testid="ui-language-select"
+                onChange={(event) => {
+                  i18n.setSprache(event.target.value === 'en' ? 'en' : 'de');
+                }}
+              >
+                <option value="de">{texte.app.sprachumschalterDeutsch}</option>
+                <option value="en">{texte.app.sprachumschalterEnglisch}</option>
+              </select>
+            </label>
+          )}
+          <span className="local-badge" title={texte.app.lokalBadgeTitel}>
+            {texte.app.lokalBadge}
+          </span>
+        </header>
 
-      <div className="app-content">
-        {view === 'loading' && <p className="main-layout placeholder">Wird geladen ...</p>}
-        {view === 'wizard' && (
-          <Wizard
-            mode={wizardMode}
-            status={status}
-            systemInfo={systemInfo}
-            progress={progress}
-            onRefreshStatus={refreshStatus}
-            onFinished={finishWizard}
-            onCancel={wizardMode === 'add-company' ? cancelWizard : null}
-          />
-        )}
-        {view === 'main' && (
-          <MainView
-            status={status}
-            companies={companies}
-            progress={progress}
-            systemInfo={systemInfo}
-            onRefreshStatus={refreshStatus}
-            onRefreshCompanies={async () => {
-              await refreshCompanies();
-            }}
-            onAddCompany={openAddCompanyWizard}
-          />
-        )}
+        <div className="app-content">
+          {view === 'loading' && <p className="main-layout placeholder">{texte.app.wirdGeladen}</p>}
+          {view === 'wizard' && (
+            <Wizard
+              mode={wizardMode}
+              status={status}
+              systemInfo={systemInfo}
+              progress={progress}
+              onRefreshStatus={refreshStatus}
+              onFinished={finishWizard}
+              onCancel={wizardMode === 'add-company' ? cancelWizard : null}
+            />
+          )}
+          {view === 'main' && (
+            <MainView
+              status={status}
+              companies={companies}
+              progress={progress}
+              systemInfo={systemInfo}
+              onRefreshStatus={refreshStatus}
+              onRefreshCompanies={async () => {
+                await refreshCompanies();
+              }}
+              onAddCompany={openAddCompanyWizard}
+            />
+          )}
+        </div>
+
+        <footer className="app-footer">
+          <span>VoiceWall {systemInfo?.appVersion ?? ''}</span>
+          <span>
+            {texte.app.fussModellPruefsumme}{' '}
+            <span className="mono">{systemInfo?.modellPruefsumme ?? ''}</span>
+          </span>
+          <span className="stamp-seal">{texte.app.fussNullVerbindungen}</span>
+          <span>
+            {systemInfo !== null
+              ? texte.app.fussHardware(
+                  `${systemInfo.platform}/${systemInfo.arch}`,
+                  systemInfo.cpuKerne,
+                  systemInfo.ramGb,
+                )
+              : ''}
+          </span>
+        </footer>
       </div>
-
-      <footer className="app-footer">
-        <span>VoiceWall {systemInfo?.appVersion ?? ''}</span>
-        <span>
-          Modell-Prüfsumme <span className="mono">{systemInfo?.modellPruefsumme ?? ''}</span>
-        </span>
-        <span className="stamp-seal">0 externe Verbindungen im Betrieb</span>
-        <span>
-          {systemInfo !== null
-            ? `${systemInfo.platform}/${systemInfo.arch} · ${String(systemInfo.cpuKerne)} Kerne · ${String(systemInfo.ramGb)} GB RAM`
-            : ''}
-        </span>
-      </footer>
-    </div>
+    </I18nProvider>
   );
 }

@@ -1,19 +1,22 @@
 /**
  * Ansicht "Papierkorb" (M7, ABARBEITUNG 4.8): zeigt geloeschte Diktate,
- * stellt sie wieder her oder loescht sie endgueltig (mit deutschem
- * Bestaetigungsdialog, unwiderruflich). Soft-Delete verschiebt Dateien nur;
- * hier ist der einzige Ort, an dem endgueltig vernichtet wird.
+ * stellt sie wieder her oder loescht sie endgueltig (mit Bestaetigungsdialog,
+ * unwiderruflich). Soft-Delete verschiebt Dateien nur; hier ist der einzige
+ * Ort, an dem endgueltig vernichtet wird.
  */
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import type { TrashEntry } from '../../shared/company';
 import { ConfirmDialog } from './RegisterView';
-import { QUELLE_LABELS, formatGermanDate } from './format';
+import { formatDate } from './format';
+import { useSprache } from './i18n';
 
 interface TrashViewProps {
   readonly onDataChanged: () => void;
 }
 
 export function TrashView(props: TrashViewProps): ReactElement {
+  const { sprache: uiSprache, texte } = useSprache();
+  const t = texte.papierkorb;
   const [entries, setEntries] = useState<TrashEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -75,12 +78,9 @@ export function TrashView(props: TrashViewProps): ReactElement {
   return (
     <div className="view-body">
       <h2 className="view-title" tabIndex={-1}>
-        Papierkorb
+        {t.titel}
       </h2>
-      <p className="lede">
-        Gelöschte Diktate liegen hier, bis sie wiederhergestellt oder endgültig gelöscht werden. So
-        ist ein versehentliches Löschen eines Kundendiktats umkehrbar.
-      </p>
+      <p className="lede">{t.lede}</p>
 
       {error !== null && (
         <p className="note error" role="alert">
@@ -88,12 +88,12 @@ export function TrashView(props: TrashViewProps): ReactElement {
         </p>
       )}
 
-      {entries === null && error === null && <p className="placeholder">Wird geladen ...</p>}
+      {entries === null && error === null && <p className="placeholder">{t.wirdGeladen}</p>}
 
       {entries !== null &&
         (entries.length === 0 ? (
           <p className="placeholder" data-testid="trash-empty">
-            Der Papierkorb ist leer.
+            {t.leer}
           </p>
         ) : (
           <ol className="register-list" data-testid="trash-list">
@@ -101,12 +101,10 @@ export function TrashView(props: TrashViewProps): ReactElement {
               <li key={entry.id} className="trash-row" data-testid="trash-row">
                 <div className="register-row-head">
                   <span className="register-title">{entry.titel}</span>
-                  <span className="register-quelle">
-                    {QUELLE_LABELS[entry.quelle] ?? entry.quelle}
-                  </span>
+                  <span className="register-quelle">{texte.format.quelle[entry.quelle]}</span>
                 </div>
                 <span className="register-meta">
-                  {formatGermanDate(entry.erstellt)} · {entry.wortzahl} Wörter
+                  {formatDate(entry.erstellt, uiSprache)} · {t.wortzahl(entry.wortzahl)}
                 </span>
                 {entry.vorschau.length > 0 && (
                   <span className="register-preview">{entry.vorschau}</span>
@@ -118,7 +116,7 @@ export function TrashView(props: TrashViewProps): ReactElement {
                     data-testid="trash-restore"
                     onClick={() => void restore(entry.pfad)}
                   >
-                    Wiederherstellen
+                    {t.wiederherstellen}
                   </button>
                   <button
                     type="button"
@@ -129,7 +127,7 @@ export function TrashView(props: TrashViewProps): ReactElement {
                       setConfirm(entry);
                     }}
                   >
-                    Endgültig löschen
+                    {t.endgueltigLoeschen}
                   </button>
                 </div>
               </li>
@@ -139,9 +137,9 @@ export function TrashView(props: TrashViewProps): ReactElement {
 
       {confirm !== null && (
         <ConfirmDialog
-          titel="Endgültig löschen?"
-          text={`Der Eintrag "${confirm.titel}" wird unwiderruflich gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.`}
-          bestaetigenText="Endgültig löschen"
+          titel={t.bestaetigungTitel}
+          text={t.bestaetigungText(confirm.titel)}
+          bestaetigenText={t.endgueltigLoeschen}
           onConfirm={() => {
             const pfad = confirm.pfad;
             setConfirm(null);

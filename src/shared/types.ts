@@ -41,6 +41,7 @@ import type {
   PingResponse,
   SystemInfo,
   TranscriptPayload,
+  UiLanguage,
 } from './schema';
 import type { VokabularGetResult, VokabularSaveInput } from './vokabular';
 
@@ -162,6 +163,10 @@ export interface VoiceWallBridge {
   /** Globale Aufbereitungs-Schalter setzen (Fuellwoerter, Sprachkommandos). */
   readonly setAufbereitung: (config: AufbereitungConfig) => Promise<ActionResult>;
 
+  // Paket B2: Sprache der Oberflaeche (global, unabhaengig von der
+  // Diktatsprache der Firmen; persistiert in der globalen config.json).
+  readonly setUiLanguage: (sprache: UiLanguage) => Promise<ActionResult>;
+
   // M8 (v1.1): Stapel-Export, Tag-Batch-Rename, verschluesselter Export.
   /** Mehrere Diktate exportieren (Unterordner `Exporte/<datum>-stapel/`). */
   readonly exportDictatesBatch: (input: BatchExportInput) => Promise<BatchExportResult>;
@@ -210,8 +215,15 @@ export interface VoiceWallBridge {
  */
 export interface OverlayStatePayload {
   readonly kind: 'recording' | 'transcribing' | 'done' | 'no-speech' | 'error';
-  /** Deutsche Meldung (bei done/error), sonst null. */
+  /** Meldung aus dem Main-Prozess (bei done/error), sonst null. */
   readonly message: string | null;
+  /**
+   * Sprache der Oberflaeche (Paket B2): der Main-Prozess haengt sie an jeden
+   * Zustand an, damit das Overlay seine eigenen Texte ("Ich höre zu ...",
+   * Kopieren-Knopf) in der richtigen Sprache zeigt. Optional, damit aeltere
+   * Payloads gueltig bleiben; ohne Angabe gilt Deutsch.
+   */
+  readonly uiSprache?: UiLanguage;
 }
 
 /**

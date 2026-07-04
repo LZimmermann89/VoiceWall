@@ -162,6 +162,15 @@ export const globalConfigSchema = z
       })
       .passthrough()
       .default({ fuellwoerterEntfernen: true, sprachkommandos: false }),
+    /**
+     * Sprache der Oberflaeche (Paket B2, Entscheidung E40): 'de' ist der
+     * Standard. Die UI-Sprache ist bewusst UNABHAENGIG von der Diktatsprache
+     * der Firmen (die in der Firmen-Konfiguration liegt): ein deutscher
+     * Nutzer kann englische Diktate fuehren und umgekehrt. Ein von Hand
+     * eingetragener fremder Wert faellt kontrolliert auf 'de' zurueck
+     * (catch), damit die App immer startfaehig bleibt.
+     */
+    uiSprache: z.enum(['de', 'en']).catch('de').default('de'),
   })
   .passthrough();
 
@@ -182,5 +191,6 @@ export function defaultGlobalConfig(): GlobalConfig {
     modell: 'q5_0',
     modellPfade: {},
     aufbereitung: { fuellwoerterEntfernen: true, sprachkommandos: false },
+    uiSprache: 'de',
   };
 }

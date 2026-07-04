@@ -11,7 +11,8 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from 'rea
 import type { CompanyListView } from '../../shared/company';
 import type { AppStatus, ModelProgress, SystemInfo, TranscriptPayload } from '../../shared/schema';
 import type { Ersetzung } from '../../shared/vokabular';
-import { FLOW_STATE_LABELS, formatAccelerator, formatBytes } from './format';
+import { formatAccelerator, formatBytes } from './format';
+import { useSprache } from './i18n';
 
 interface TranscriptLine {
   readonly text: string;
@@ -30,6 +31,8 @@ interface DiktatViewProps {
 
 export function DiktatView(props: DiktatViewProps): ReactElement {
   const { status, companies, progress, systemInfo, onRefreshStatus, onRefreshCompanies } = props;
+  const { sprache: uiSprache, texte } = useSprache();
+  const t = texte.diktat;
 
   const [transcripts, setTranscripts] = useState<TranscriptLine[]>([]);
   const [level, setLevel] = useState(0);
@@ -141,49 +144,46 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   return (
     <div className="view-body">
       <h2 className="view-title" tabIndex={-1}>
-        Diktat
+        {t.titel}
       </h2>
-      <p className="lede">
-        Der operative Bereich: systemweites Diktat per Tastenkürzel, das letzte Ergebnis mit
-        Kopieren-Knopf und eine Testaufnahme als Funktionsbeleg für den Vor-Ort-Termin.
-      </p>
+      <p className="lede">{t.lede}</p>
 
       {/* 01 Systemweites Diktat ---------------------------------------- */}
-      <section className="main-section" aria-label="Systemweites Diktat">
+      <section className="main-section" aria-label={t.abschnittDiktatAria}>
         <div className="section-head">
           <span className="section-no">01</span>
-          <h3>Systemweites Diktat</h3>
+          <h3>{t.abschnittDiktat}</h3>
         </div>
         <ul className="status-list">
           <li>
-            Tastenkürzel (Toggle):{' '}
+            {t.hotkeyZeile}{' '}
             <strong className="mono" data-testid="hotkey-current">
-              {hotkey?.accelerator ?? 'unbekannt'}
+              {hotkey?.accelerator ?? t.hotkeyUnbekannt}
             </strong>{' '}
             {hotkey !== null && (
               <span className="notice">
-                ({formatAccelerator(hotkey.accelerator, platform)}
+                ({formatAccelerator(hotkey.accelerator, platform, uiSprache)}
                 {') '}
               </span>
             )}
             {hotkey !== null && !hotkey.registered && (
               <span className="warn-text" data-testid="hotkey-conflict">
-                (nicht aktiv: Kombination ist bereits belegt, bitte eine andere wählen)
+                {t.hotkeyKonflikt}
               </span>
             )}
           </li>
           <li>
-            Zustand:{' '}
-            <strong data-testid="flow-state">{FLOW_STATE_LABELS[flowState] ?? flowState}</strong>
+            {t.zustandZeile}{' '}
+            <strong data-testid="flow-state">{texte.format.flowState[flowState]}</strong>
           </li>
         </ul>
         <div className="actions">
-          <label htmlFor="hotkey-input">Neue Tastenkombination:</label>
+          <label htmlFor="hotkey-input">{t.neueKombination}</label>
           <input
             id="hotkey-input"
             type="text"
             value={hotkeyInput}
-            placeholder="z. B. CommandOrControl+Shift+D"
+            placeholder={t.hotkeyPlatzhalter}
             onChange={(event) => {
               setHotkeyInput(event.target.value);
             }}
@@ -193,7 +193,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             disabled={busy || hotkeyInput.trim().length === 0}
             onClick={() => void runAction(() => window.voicewall.setHotkey(hotkeyInput.trim()))}
           >
-            Hotkey übernehmen
+            {t.hotkeyUebernehmen}
           </button>
         </div>
         <div className="actions">
@@ -206,37 +206,26 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                 void runAction(() => window.voicewall.setClipboardRestore(event.target.checked))
               }
             />{' '}
-            Zwischenablage nach dem Einfügen wiederherstellen (Datenschutz, empfohlen)
+            {t.clipboardWiederherstellen}
           </label>
         </div>
         {accessibility === 'missing' && (
           <div className="accessibility-hint" data-testid="accessibility-hint">
-            <p>
-              Für das automatische Einfügen braucht VoiceWall die macOS-Freigabe
-              &quot;Bedienungshilfen&quot;. Ohne Freigabe bleibt der Text in der Zwischenablage
-              (Cmd+V zum Einfügen). So geht es: Knopf drücken, dann VoiceWall in der Liste
-              aktivieren und das Diktat erneut ausführen. Was VoiceWall mit der Freigabe tut und was
-              nicht, steht in docs/ACCESSIBILITY.md. Zwei Stolpersteine: 1. Nach einem Update zeigt
-              ein ALTER VoiceWall-Eintrag in der Liste den Schalter als aktiv, gilt aber nur für die
-              alte Programmversion: den alten Eintrag mit dem Minus-Symbol entfernen, dann über
-              &quot;Freigabe anfordern&quot; neu eintragen lassen. 2. macOS meldet eine frisch
-              erteilte Freigabe an das laufende Programm oft erst nach einem Neustart, dafür gibt es
-              den Neustart-Knopf.
-            </p>
+            <p>{t.accessibilityHinweis}</p>
             <button
               type="button"
               disabled={busy}
               data-testid="request-accessibility"
               onClick={() => void runAction(() => window.voicewall.requestAccessibility())}
             >
-              Freigabe anfordern (macOS-Dialog)
+              {t.freigabeAnfordern}
             </button>{' '}
             <button
               type="button"
               disabled={busy}
               onClick={() => void runAction(() => window.voicewall.openAccessibilitySettings())}
             >
-              Systemeinstellungen öffnen
+              {t.systemeinstellungen}
             </button>{' '}
             <button
               type="button"
@@ -244,15 +233,14 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
               data-testid="relaunch-app"
               onClick={() => void runAction(() => window.voicewall.relaunchApp())}
             >
-              VoiceWall neu starten
+              {t.neuStarten}
             </button>
           </div>
         )}
-        <h4 className="visually-hidden">Letztes Diktat</h4>
+        <h4 className="visually-hidden">{t.letztesDiktat}</h4>
         {lastTranscript === null ? (
           <p className="placeholder" data-testid="last-transcript-empty">
-            Noch kein Diktat. Der Text des letzten Diktats bleibt hier abrufbar und geht nie
-            verloren, auch wenn das automatische Einfügen scheitert.
+            {t.keinDiktat}
           </p>
         ) : (
           <div className="last-transcript" data-testid="last-transcript">
@@ -266,15 +254,13 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                   void runAction(async () => {
                     const result = await window.voicewall.copyLastTranscript();
                     if (result.ok) {
-                      setNotice(
-                        'Text wurde in die Zwischenablage kopiert (Cmd/Strg+V zum Einfügen).',
-                      );
+                      setNotice(t.kopiertHinweis);
                     }
                     return result;
                   })
                 }
               >
-                Kopieren
+                {t.kopieren}
               </button>
               <button
                 type="button"
@@ -284,7 +270,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                   void runAction(async () => {
                     const result = await window.voicewall.saveLastDictate();
                     if (result.ok) {
-                      setNotice(`Diktat gespeichert: ${result.pfad}`);
+                      setNotice(t.gespeichertHinweis(result.pfad));
                       await onRefreshCompanies();
                       return { ok: true as const };
                     }
@@ -292,7 +278,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                   })
                 }
               >
-                Als Diktat speichern
+                {t.alsDiktatSpeichern}
               </button>
             </div>
           </div>
@@ -301,30 +287,34 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
       </section>
 
       {/* 02 Status ----------------------------------------------------- */}
-      <section className="main-section" aria-label="Status">
+      <section className="main-section" aria-label={t.abschnittStatus}>
         <div className="section-head">
           <span className="section-no">02</span>
-          <h3>Status</h3>
+          <h3>{t.abschnittStatus}</h3>
         </div>
         <ul className="status-list">
           <li>
-            Einwilligung: <strong>{status?.consentGranted ? 'erteilt' : 'ausstehend'}</strong>
-          </li>
-          <li>
-            Mikrofon (OS): <strong>{status?.microphoneState ?? 'unbekannt'}</strong>
-          </li>
-          <li>
-            Diktatsprache (aktive Firma):{' '}
-            <strong data-testid="dictation-language">
-              {status?.dictationLanguage === 'en' ? 'Englisch (en)' : 'Deutsch (de)'}
+            {t.statusEinwilligung}{' '}
+            <strong>
+              {status?.consentGranted ? t.einwilligungErteilt : t.einwilligungAusstehend}
             </strong>
           </li>
           <li>
-            Modelle:{' '}
-            <strong>{modelsReady ? 'vorhanden und verifiziert' : 'nicht vollständig'}</strong>
+            {t.statusMikrofon} <strong>{status?.microphoneState ?? t.mikrofonUnbekannt}</strong>
           </li>
           <li>
-            Engine: <strong>{engineReady ? 'bereit' : 'nicht gestartet'}</strong>
+            {t.statusDiktatsprache}{' '}
+            <strong data-testid="dictation-language">
+              {status?.dictationLanguage === 'en' ? t.spracheEnglisch : t.spracheDeutsch}
+            </strong>
+          </li>
+          <li>
+            {t.statusModelle}{' '}
+            <strong>{modelsReady ? t.modelleVorhanden : t.modelleUnvollstaendig}</strong>
+          </li>
+          <li>
+            {t.statusEngine}{' '}
+            <strong>{engineReady ? t.engineBereit : t.engineNichtGestartet}</strong>
           </li>
         </ul>
         {status?.engineHinweis != null && (
@@ -334,26 +324,32 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
         )}
         {status?.models.map((model) => (
           <p key={model.id} className="model-line">
-            {model.label}: {model.present ? 'vorhanden' : `fehlt (${formatBytes(model.byteSize)})`}
+            {model.label}:{' '}
+            {model.present
+              ? t.modellVorhanden
+              : t.modellFehlt(formatBytes(model.byteSize, uiSprache))}
           </p>
         ))}
         {progress !== null && !modelsReady && (
           <div aria-live="polite">
-            <progress max={100} value={progress.percent ?? 0} aria-label="Modell-Download" />
+            <progress max={100} value={progress.percent ?? 0} aria-label={t.downloadAria} />
             <p className="progress-line">
-              {progress.label}: {formatBytes(progress.receivedBytes)}
-              {progress.totalBytes !== null ? ` von ${formatBytes(progress.totalBytes)}` : ''}
-              {progress.percent !== null ? ` (${progress.percent.toFixed(0)} %)` : ''}
+              {t.progressZeile(
+                progress.label,
+                formatBytes(progress.receivedBytes, uiSprache),
+                progress.totalBytes !== null ? formatBytes(progress.totalBytes, uiSprache) : null,
+                progress.percent !== null ? progress.percent.toFixed(0) : null,
+              )}
             </p>
           </div>
         )}
       </section>
 
       {/* 03 Funktionsbeleg --------------------------------------------- */}
-      <section className="main-section" aria-label="Funktionsbeleg">
+      <section className="main-section" aria-label={t.abschnittFunktionsbelegAria}>
         <div className="section-head">
           <span className="section-no">03</span>
-          <h3>Funktionsbeleg (Testaufnahme)</h3>
+          <h3>{t.abschnittFunktionsbeleg}</h3>
         </div>
         <div className="actions">
           <button
@@ -361,40 +357,37 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             disabled={busy || (status?.consentGranted ?? false)}
             onClick={() => void runAction(() => window.voicewall.grantConsent())}
           >
-            Mikrofon-Einwilligung erteilen
+            {t.einwilligungErteilen}
           </button>
           <button
             type="button"
             disabled={busy || !(status?.consentGranted ?? false) || modelsReady}
             onClick={() => void runAction(() => window.voicewall.prepareModels())}
           >
-            Modelle laden und Engine starten
+            {t.modelleLaden}
           </button>
           <button
             type="button"
             disabled={busy || !engineReady || dictationActive}
             onClick={() => void runAction(() => window.voicewall.startDictation())}
           >
-            Testaufnahme starten
+            {t.testaufnahmeStarten}
           </button>
           <button
             type="button"
             disabled={busy || !dictationActive}
             onClick={() => void runAction(() => window.voicewall.stopDictation())}
           >
-            Testaufnahme stoppen
+            {t.testaufnahmeStoppen}
           </button>
         </div>
-        <p className="notice">
-          Ihre Sprache wird ausschließlich lokal auf diesem Rechner verarbeitet. Es werden keine
-          Audiodaten gespeichert oder an einen Server gesendet.
-        </p>
+        <p className="notice">{t.lokalHinweis}</p>
         <div className="level-track" aria-hidden="true">
           <div className={`level-fill lvl-${String(levelBucket)}`} data-testid="level-fill" />
         </div>
         {transcripts.length === 0 ? (
           <p className="placeholder" data-testid="transcript-empty">
-            Noch kein Transkript.
+            {t.keinTranskript}
           </p>
         ) : (
           <ol className="transcript-list" data-testid="transcript-list">
@@ -402,7 +395,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
               <li key={`${String(index)}-${line.text}`}>
                 <span className="transcript-text">{line.text}</span>
                 <span className="transcript-meta">
-                  {line.durationMs} ms für {(line.audioMs / 1000).toFixed(1)} s Audio
+                  {t.transkriptMeta(line.durationMs, (line.audioMs / 1000).toFixed(1))}
                 </span>
               </li>
             ))}
@@ -411,15 +404,12 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
       </section>
 
       {/* 04 Wörterbuch und Aufbereitung ---------------------------------- */}
-      <section className="main-section" aria-label="Wörterbuch und Aufbereitung">
+      <section className="main-section" aria-label={t.abschnittWoerterbuch}>
         <div className="section-head">
           <span className="section-no">04</span>
-          <h3>Wörterbuch und Aufbereitung</h3>
+          <h3>{t.abschnittWoerterbuch}</h3>
         </div>
-        <p className="notice">
-          Alles hier ist reine, lokale Regelverarbeitung: kein Sprachmodell, kein externer Aufruf.
-          Jede Regel ist deterministisch und nachvollziehbar.
-        </p>
+        <p className="notice">{t.woerterbuchHinweis}</p>
         <div className="actions">
           <label className="switch-row">
             <input
@@ -436,9 +426,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                 )
               }
             />{' '}
-            Füllwörter entfernen: eigenständige &quot;äh&quot;, &quot;ähm&quot;, &quot;öhm&quot;,
-            &quot;hm&quot; und direkte Wortdopplungen (&quot;das das&quot;). Konservativ; seltene
-            legitime Dopplungen können mitgetroffen werden.
+            {t.fuellwoerterLabel}
           </label>
         </div>
         <div className="actions">
@@ -457,26 +445,15 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                 )
               }
             />{' '}
-            Sprachkommandos umsetzen: &quot;Punkt&quot;, &quot;Komma&quot;,
-            &quot;Fragezeichen&quot;, &quot;Ausrufezeichen&quot;, &quot;Doppelpunkt&quot;,
-            &quot;neue Zeile&quot;, &quot;neuer Absatz&quot;. Standardmäßig aus, weil die Regel auch
-            die normale Verwendung des Wortes &quot;Punkt&quot; treffen kann.
+            {t.sprachkommandosLabel}
           </label>
         </div>
-        <h4>Fach-Wörterbuch der aktiven Firma</h4>
+        <h4>{t.fachwoerterbuchTitel}</h4>
         {!hasCompany ? (
-          <p className="placeholder">
-            Noch keine Firma angelegt. Das Fach-Wörterbuch gehört zur Firma und liegt auditierbar in
-            deren Ordner (.voicewall/vokabular.json).
-          </p>
+          <p className="placeholder">{t.fachwoerterbuchKeineFirma}</p>
         ) : (
           <>
-            <p className="notice">
-              Begriffe (Eigennamen, Fachbegriffe, Aktenzeichen) verbessern die Erkennung: sie werden
-              der Spracherkennung lokal als Kontext mitgegeben. Ersetzungen korrigieren häufige
-              Fehltranskriptionen deterministisch, nur als ganze Wörter und exakt in der
-              eingegebenen Groß-/Kleinschreibung.
-            </p>
+            <p className="notice">{t.fachwoerterbuchHinweis}</p>
             {begriffe.length > 0 && (
               <ul className="status-list" data-testid="vocab-begriffe">
                 {begriffe.map((begriff, index) => (
@@ -489,21 +466,21 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                         setBegriffe((prev) => prev.filter((_, i) => i !== index));
                       }}
                     >
-                      Entfernen
+                      {t.entfernen}
                     </button>
                   </li>
                 ))}
               </ul>
             )}
             <div className="actions">
-              <label htmlFor="vocab-begriff-input">Neuer Begriff:</label>
+              <label htmlFor="vocab-begriff-input">{t.neuerBegriff}</label>
               <input
                 id="vocab-begriff-input"
                 data-testid="vocab-begriff-input"
                 type="text"
                 maxLength={80}
                 value={begriffInput}
-                placeholder="z. B. VoiceWall"
+                placeholder={t.begriffPlatzhalter}
                 onChange={(event) => {
                   setBegriffInput(event.target.value);
                 }}
@@ -517,7 +494,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                   setBegriffInput('');
                 }}
               >
-                Hinzufügen
+                {t.hinzufuegen}
               </button>
             </div>
             {ersetzungen.length > 0 && (
@@ -533,33 +510,33 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                         setErsetzungen((prev) => prev.filter((_, i) => i !== index));
                       }}
                     >
-                      Entfernen
+                      {t.entfernen}
                     </button>
                   </li>
                 ))}
               </ul>
             )}
             <div className="actions">
-              <label htmlFor="vocab-von-input">Ersetzung von:</label>
+              <label htmlFor="vocab-von-input">{t.ersetzungVon}</label>
               <input
                 id="vocab-von-input"
                 data-testid="vocab-von-input"
                 type="text"
                 maxLength={80}
                 value={vonInput}
-                placeholder="z. B. Voice Wall"
+                placeholder={t.ersetzungVonPlatzhalter}
                 onChange={(event) => {
                   setVonInput(event.target.value);
                 }}
               />
-              <label htmlFor="vocab-zu-input">zu:</label>
+              <label htmlFor="vocab-zu-input">{t.ersetzungZu}</label>
               <input
                 id="vocab-zu-input"
                 data-testid="vocab-zu-input"
                 type="text"
                 maxLength={80}
                 value={zuInput}
-                placeholder="z. B. VoiceWall"
+                placeholder={t.ersetzungZuPlatzhalter}
                 onChange={(event) => {
                   setZuInput(event.target.value);
                 }}
@@ -574,7 +551,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                   setZuInput('');
                 }}
               >
-                Hinzufügen
+                {t.hinzufuegen}
               </button>
             </div>
             <div className="actions">
@@ -591,7 +568,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                       ersetzungen,
                     });
                     if (result.ok) {
-                      setVokabularNotice('Wörterbuch gespeichert (atomar, im Firmenordner).');
+                      setVokabularNotice(t.woerterbuchGespeichert);
                     } else {
                       setVokabularError(result.message);
                     }
@@ -599,7 +576,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                   })
                 }
               >
-                Wörterbuch speichern
+                {t.woerterbuchSpeichern}
               </button>
             </div>
             {vokabularNotice !== null && (
@@ -617,8 +594,8 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
       </section>
 
       {error !== null && (
-        <section aria-label="Fehler" className="error-box" data-testid="error-box">
-          <h3>Fehler</h3>
+        <section aria-label={t.fehlerAria} className="error-box" data-testid="error-box">
+          <h3>{t.fehlerTitel}</h3>
           <p>{error}</p>
         </section>
       )}

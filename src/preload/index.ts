@@ -160,6 +160,8 @@ const bridge: VoiceWallBridge = {
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.VocabSave, input)),
   setAufbereitung: async (config) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetAufbereitung, config)),
+  setUiLanguage: async (sprache) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetUiLanguage, sprache)),
   exportDictatesBatch: async (input) =>
     batchExportResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DictateExportBatch, input)),
   onExportProgress: (listener) =>

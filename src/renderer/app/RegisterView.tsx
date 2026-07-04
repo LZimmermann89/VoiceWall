@@ -23,7 +23,8 @@ import {
   type ManifestEntry,
   type TranscriptQuelle,
 } from '../../shared/company';
-import { QUELLE_LABELS, formatGermanDate, formatGermanDateTime } from './format';
+import { formatDate, formatDateTime } from './format';
+import { useSprache, useTexte } from './i18n';
 import { PasswordDialog } from './PasswordDialog';
 
 type SortKey = 'datum' | 'titel' | 'wortzahl';
@@ -106,6 +107,8 @@ function sortEntries(entries: readonly ManifestEntry[], key: SortKey): ManifestE
 }
 
 export function RegisterView(props: RegisterViewProps): ReactElement {
+  const { sprache: uiSprache, texte } = useSprache();
+  const t = texte.register;
   const [entries, setEntries] = useState<ManifestEntry[] | null>(null);
   const [knownTags, setKnownTags] = useState<readonly string[]>([]);
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
@@ -134,7 +137,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
     const result = await window.voicewall.listDictates(toSearchFilter(current));
     if (result.ok) {
       setEntries(result.eintraege);
-      setSnippets(new Map((result.volltextTreffer ?? []).map((t) => [t.id, t.snippet])));
+      setSnippets(new Map((result.volltextTreffer ?? []).map((tr) => [tr.id, tr.snippet])));
       setListError(null);
     } else {
       setEntries(null);
@@ -163,12 +166,8 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
           mitFrontMatter: mit,
         });
         if (result.ok) {
-          const fehlerZusatz =
-            result.fehler.length > 0
-              ? ` ${String(result.fehler.length)} Einträge konnten nicht exportiert werden.`
-              : '';
           setBatchNotice(
-            `${String(result.exportiert)} ${result.exportiert === 1 ? 'Eintrag' : 'Einträge'} exportiert nach: ${result.anzeigePfad}.${fehlerZusatz}`,
+            t.exportErgebnis(result.exportiert, result.anzeigePfad, result.fehler.length),
           );
           setBatchRelPfad(result.relPfad);
         } else {
@@ -180,7 +179,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
         setBatchBusy(false);
       }
     },
-    [batchBusy, batchFormat],
+    [batchBusy, batchFormat, t],
   );
 
   useEffect(() => {
@@ -241,26 +240,23 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
   return (
     <div className="view-body">
       <h2 className="view-title" tabIndex={-1} ref={backTargetRef}>
-        Register
+        {t.titel}
       </h2>
-      <p className="lede">
-        Das Aktenverzeichnis dieser Firma: alle Diktate und Notizen, durchsuchbar und filterbar. Ein
-        Klick öffnet den vollständigen Text.
-      </p>
+      <p className="lede">{t.lede}</p>
 
       <div className="actions" role="search">
-        <label htmlFor="reg-search">Schnellsuche:</label>
+        <label htmlFor="reg-search">{t.schnellsuche}</label>
         <input
           id="reg-search"
           type="text"
           value={filter.text}
-          placeholder="Titel, Tag oder Textvorschau"
+          placeholder={t.suchePlatzhalter}
           data-testid="register-search"
           onChange={(event) => {
             setFilter((f) => ({ ...f, text: event.target.value }));
           }}
         />
-        <label htmlFor="reg-sort">Sortierung:</label>
+        <label htmlFor="reg-sort">{t.sortierung}</label>
         <select
           id="reg-sort"
           value={sortKey}
@@ -269,9 +265,9 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
             setSortKey(event.target.value as SortKey);
           }}
         >
-          <option value="datum">Datum (neueste zuerst)</option>
-          <option value="titel">Titel (A bis Z)</option>
-          <option value="wortzahl">Wortzahl (absteigend)</option>
+          <option value="datum">{t.sortDatum}</option>
+          <option value="titel">{t.sortTitel}</option>
+          <option value="wortzahl">{t.sortWortzahl}</option>
         </select>
         <button
           type="button"
@@ -280,7 +276,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
             setShowNote(true);
           }}
         >
-          Neue Notiz
+          {t.neueNotiz}
         </button>
         {knownTags.length > 0 && (
           <button
@@ -290,7 +286,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
               setShowTagRename(true);
             }}
           >
-            Tags verwalten
+            {t.tagsVerwalten}
           </button>
         )}
       </div>
@@ -304,12 +300,12 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
             setFilter((f) => ({ ...f, volltext: event.target.checked }));
           }}
         />{' '}
-        Auch im Volltext suchen (durchsucht die vollständigen Texte, etwas langsamer)
+        {t.volltextToggle}
       </label>
 
       <div className="filter-bar">
         <div className="filter-field">
-          <label htmlFor="reg-von">Zeitraum von</label>
+          <label htmlFor="reg-von">{t.zeitraumVon}</label>
           <input
             id="reg-von"
             type="date"
@@ -320,7 +316,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
           />
         </div>
         <div className="filter-field">
-          <label htmlFor="reg-bis">bis</label>
+          <label htmlFor="reg-bis">{t.zeitraumBis}</label>
           <input
             id="reg-bis"
             type="date"
@@ -331,7 +327,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
           />
         </div>
         <div className="filter-field">
-          <label htmlFor="reg-quelle">Quelle</label>
+          <label htmlFor="reg-quelle">{t.quelleLabel}</label>
           <select
             id="reg-quelle"
             value={filter.quelle}
@@ -339,10 +335,10 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
               setFilter((f) => ({ ...f, quelle: event.target.value as TranscriptQuelle | '' }));
             }}
           >
-            <option value="">alle</option>
-            <option value="diktat">Diktat</option>
-            <option value="import">Import</option>
-            <option value="manuell">Notiz</option>
+            <option value="">{t.quelleAlle}</option>
+            <option value="diktat">{texte.format.quelle.diktat}</option>
+            <option value="import">{texte.format.quelle.import}</option>
+            <option value="manuell">{texte.format.quelle.manuell}</option>
           </select>
         </div>
         {(filter.tags.length > 0 ||
@@ -357,14 +353,14 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
               setFilter(EMPTY_FILTER);
             }}
           >
-            Filter zurücksetzen
+            {t.filterZuruecksetzen}
           </button>
         )}
       </div>
 
       {knownTags.length > 0 && (
-        <div className="tag-filter" aria-label="Nach Tags filtern">
-          <span className="tag-filter-label">Tags:</span>
+        <div className="tag-filter" aria-label={t.tagFilterAria}>
+          <span className="tag-filter-label">{t.tagFilterLabel}</span>
           {knownTags.map((tag) => {
             const active = activeTagFilters.has(tag);
             return (
@@ -376,7 +372,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
                 onClick={() => {
                   setFilter((f) => ({
                     ...f,
-                    tags: active ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
+                    tags: active ? f.tags.filter((tg) => tg !== tag) : [...f.tags, tag],
                   }));
                 }}
               >
@@ -393,14 +389,14 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
         </p>
       )}
 
-      {sorted === null && listError === null && <p className="placeholder">Wird geladen ...</p>}
+      {sorted === null && listError === null && <p className="placeholder">{t.wirdGeladen}</p>}
 
       {sorted !== null && sorted.length > 0 && (
         <div className="batch-bar" data-testid="batch-bar">
           <span className="batch-count" data-testid="batch-count">
-            {selected.size} ausgewählt
+            {t.ausgewaehlt(selected.size)}
           </span>
-          <label htmlFor="batch-format">Exportformat:</label>
+          <label htmlFor="batch-format">{t.exportformat}</label>
           <select
             id="batch-format"
             value={batchFormat}
@@ -410,10 +406,10 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
               setBatchFormat(event.target.value as BatchFormatChoice);
             }}
           >
-            <option value="md">Markdown (mit Kopf)</option>
-            <option value="md-plain">Markdown (ohne Kopf)</option>
-            <option value="txt">TXT</option>
-            <option value="pdf">PDF</option>
+            <option value="md">{t.formatMdMitKopf}</option>
+            <option value="md-plain">{t.formatMdOhneKopf}</option>
+            <option value="txt">{t.formatTxt}</option>
+            <option value="pdf">{t.formatPdf}</option>
           </select>
           <button
             type="button"
@@ -421,7 +417,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
             data-testid="batch-export-selected"
             onClick={() => void runBatchExport([...selected])}
           >
-            Auswahl exportieren ({selected.size})
+            {t.auswahlExportieren(selected.size)}
           </button>
           <button
             type="button"
@@ -429,7 +425,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
             data-testid="batch-export-filtered"
             onClick={() => void runBatchExport(sorted.map((entry) => entry.pfad))}
           >
-            Alle gefilterten exportieren ({sorted.length})
+            {t.gefilterteExportieren(sorted.length)}
           </button>
           {selected.size > 0 && (
             <button
@@ -440,7 +436,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
                 setSelected(new Set());
               }}
             >
-              Auswahl aufheben
+              {t.auswahlAufheben}
             </button>
           )}
         </div>
@@ -449,7 +445,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
       {/* Fortschritt des Stapel-Exports (aria-live fuer Screenreader). */}
       <p className="batch-progress" aria-live="polite" data-testid="batch-progress">
         {batchProgress !== null
-          ? `Exportiere ${String(batchProgress.fertig)} von ${String(batchProgress.gesamt)} Einträgen ...`
+          ? t.exportFortschritt(batchProgress.fertig, batchProgress.gesamt)
           : ''}
       </p>
 
@@ -467,7 +463,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
               data-testid="batch-reveal"
               onClick={() => void window.voicewall.revealExport(batchRelPfad)}
             >
-              Im Finder zeigen
+              {t.imFinderZeigen}
             </button>
           )}
         </div>
@@ -484,7 +480,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
                   type="checkbox"
                   className="register-select"
                   checked={selected.has(entry.pfad)}
-                  aria-label={`"${entry.titel}" für den Stapel-Export auswählen`}
+                  aria-label={t.auswahlAria(entry.titel)}
                   data-testid="register-select"
                   onChange={(event) => {
                     const checked = event.target.checked;
@@ -509,19 +505,17 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
                 >
                   <span className="register-row-head">
                     <span className="register-title">{entry.titel}</span>
-                    <span className="register-quelle">
-                      {QUELLE_LABELS[entry.quelle] ?? entry.quelle}
-                    </span>
+                    <span className="register-quelle">{texte.format.quelle[entry.quelle]}</span>
                   </span>
                   <span className="register-meta">
-                    {formatGermanDate(entry.erstellt)} · {entry.wortzahl} Wörter
+                    {formatDate(entry.erstellt, uiSprache)} · {t.wortzahl(entry.wortzahl)}
                   </span>
                   {entry.vorschau.length > 0 && (
                     <span className="register-preview">{entry.vorschau}</span>
                   )}
                   {snippets.has(entry.id) && (
                     <span className="register-snippet" data-testid="register-snippet">
-                      Volltext-Treffer: {snippets.get(entry.id)}
+                      {t.volltextTreffer(snippets.get(entry.id) ?? '')}
                     </span>
                   )}
                   {entry.tags.length > 0 && (
@@ -568,25 +562,24 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
 
 /** Gestalteter Leerzustand mit Kurzanleitung (Hotkey, sprechen, Hotkey). */
 function EmptyRegister(props: { readonly hasFilter: boolean }): ReactElement {
+  const t = useTexte().register;
   if (props.hasFilter) {
     return (
       <p className="placeholder" data-testid="register-empty">
-        Keine Einträge passen zu den aktuellen Filtern. Bitte Suche oder Filter anpassen.
+        {t.leerMitFilter}
       </p>
     );
   }
   return (
     <div className="empty-state" data-testid="register-empty">
-      <p className="empty-state-title">Noch keine Diktate in dieser Firma.</p>
-      <p className="lede">So entsteht der erste Eintrag:</p>
+      <p className="empty-state-title">{t.leerTitel}</p>
+      <p className="lede">{t.leerLede}</p>
       <ol className="kurzanleitung">
-        <li>Cursor in ein Textfeld setzen und das Tastenkürzel drücken.</li>
-        <li>Sprechen. Ein kleines Fenster zeigt &quot;Ich höre zu&quot;.</li>
-        <li>Erneut das Tastenkürzel drücken: der Text erscheint und wird hier abgelegt.</li>
+        <li>{t.leerSchritt1}</li>
+        <li>{t.leerSchritt2}</li>
+        <li>{t.leerSchritt3}</li>
       </ol>
-      <p className="notice">
-        Alternativ oben über &quot;Neue Notiz&quot; einen Eintrag ohne Diktat anlegen.
-      </p>
+      <p className="notice">{t.leerAlternative}</p>
     </div>
   );
 }
@@ -603,6 +596,8 @@ function DetailPanel(props: {
   readonly onDeleted: () => void;
 }): ReactElement {
   const { detail } = props;
+  const { sprache: uiSprache, texte } = useSprache();
+  const t = texte.register.detail;
   const [editing, setEditing] = useState(false);
   const [titel, setTitel] = useState(detail.meta.titel);
   const [body, setBody] = useState(detail.body);
@@ -665,7 +660,7 @@ function DetailPanel(props: {
         return;
       }
       setEditing(false);
-      setNotice('Änderungen gespeichert.');
+      setNotice(t.gespeichert);
       props.onSaved({
         pfad: detail.pfad,
         body,
@@ -679,7 +674,7 @@ function DetailPanel(props: {
     } finally {
       setBusy(false);
     }
-  }, [detail, titel, body, tags, props]);
+  }, [detail, titel, body, tags, props, t]);
 
   const runExport = useCallback(
     async (format: ExportFormat, mitFrontMatter: boolean) => {
@@ -694,7 +689,7 @@ function DetailPanel(props: {
           mitFrontMatter,
         });
         if (result.ok) {
-          setNotice(`Exportiert nach: ${result.anzeigePfad}`);
+          setNotice(t.exportiertNach(result.anzeigePfad));
           setExportRelPfad(result.relPfad);
         } else {
           setError(result.message);
@@ -703,7 +698,7 @@ function DetailPanel(props: {
         setBusy(false);
       }
     },
-    [detail],
+    [detail, t],
   );
 
   /** Verschluesselter Export (.vwenc): Passwort kommt aus dem Dialog. */
@@ -720,9 +715,7 @@ function DetailPanel(props: {
         });
         if (result.ok) {
           setShowEncrypt(false);
-          setNotice(
-            `Verschlüsselt exportiert nach: ${result.anzeigePfad}. Ohne das Passwort ist die Datei nicht lesbar.`,
-          );
+          setNotice(t.verschluesseltExportiert(result.anzeigePfad));
           setExportRelPfad(result.relPfad);
         } else {
           setError(result.message);
@@ -732,7 +725,7 @@ function DetailPanel(props: {
         setBusy(false);
       }
     },
-    [detail],
+    [detail, t],
   );
 
   const softDelete = useCallback(async () => {
@@ -756,11 +749,11 @@ function DetailPanel(props: {
     <div className="view-body" data-testid="detail-panel">
       <div className="detail-topbar">
         <button type="button" className="ghost" data-testid="detail-back" onClick={props.onBack}>
-          ← Zurück zum Register
+          {t.zurueck}
         </button>
       </div>
       <h2 className="view-title" tabIndex={-1} ref={headingRef} data-testid="detail-title">
-        {editing ? 'Eintrag bearbeiten' : meta.titel}
+        {editing ? t.bearbeitenTitel : meta.titel}
       </h2>
 
       {!editing ? (
@@ -768,46 +761,48 @@ function DetailPanel(props: {
           <table className="proto-table detail-meta">
             <tbody>
               <tr>
-                <th scope="row">Erstellt</th>
-                <td>{formatGermanDateTime(meta.erstellt)}</td>
+                <th scope="row">{t.zeileErstellt}</th>
+                <td>{formatDateTime(meta.erstellt, uiSprache)}</td>
               </tr>
               <tr>
-                <th scope="row">Geändert</th>
-                <td>{formatGermanDateTime(meta.geaendert)}</td>
+                <th scope="row">{t.zeileGeaendert}</th>
+                <td>{formatDateTime(meta.geaendert, uiSprache)}</td>
               </tr>
               <tr>
-                <th scope="row">Quelle</th>
-                <td>{QUELLE_LABELS[meta.quelle] ?? meta.quelle}</td>
+                <th scope="row">{t.zeileQuelle}</th>
+                <td>{texte.format.quelle[meta.quelle]}</td>
               </tr>
               <tr>
-                <th scope="row">Modell</th>
+                <th scope="row">{t.zeileModell}</th>
                 <td className="mono">{meta.modell}</td>
               </tr>
               <tr>
-                <th scope="row">Dauer</th>
-                <td>{meta.dauer_sekunden > 0 ? `${String(meta.dauer_sekunden)} s` : '—'}</td>
+                <th scope="row">{t.zeileDauer}</th>
+                <td>
+                  {meta.dauer_sekunden > 0 ? t.dauerSekunden(meta.dauer_sekunden) : t.keinWert}
+                </td>
               </tr>
               <tr>
-                <th scope="row">Wortzahl</th>
+                <th scope="row">{t.zeileWortzahl}</th>
                 <td>{meta.wortzahl}</td>
               </tr>
               {meta.ziel_app !== undefined && (
                 <tr>
-                  <th scope="row">Ziel-App</th>
+                  <th scope="row">{t.zeileZielApp}</th>
                   <td>{meta.ziel_app}</td>
                 </tr>
               )}
               <tr>
-                <th scope="row">Version</th>
+                <th scope="row">{t.zeileVersion}</th>
                 <td className="mono" data-testid="detail-version">
                   {meta.version}
                 </td>
               </tr>
               <tr>
-                <th scope="row">Tags</th>
+                <th scope="row">{t.zeileTags}</th>
                 <td>
                   {meta.tags.length === 0 ? (
-                    '—'
+                    t.keinWert
                   ) : (
                     <span className="register-tags">
                       {meta.tags.map((tag) => (
@@ -823,14 +818,14 @@ function DetailPanel(props: {
           </table>
 
           {/* Volltext AUSSCHLIESSLICH als Textknoten (kein HTML-Rendering). */}
-          <h3>Volltext</h3>
+          <h3>{t.volltextTitel}</h3>
           <div className="detail-body" data-testid="detail-body">
             {detail.body}
           </div>
 
           <div className="actions detail-actions">
             <button type="button" className="primary" data-testid="detail-edit" onClick={startEdit}>
-              Bearbeiten
+              {t.bearbeiten}
             </button>
             <button
               type="button"
@@ -838,7 +833,7 @@ function DetailPanel(props: {
               data-testid="export-md"
               onClick={() => void runExport('md', true)}
             >
-              Export Markdown (mit Kopf)
+              {t.exportMd}
             </button>
             <button
               type="button"
@@ -846,7 +841,7 @@ function DetailPanel(props: {
               data-testid="export-md-plain"
               onClick={() => void runExport('md', false)}
             >
-              Export Markdown (ohne Kopf)
+              {t.exportMdOhne}
             </button>
             <button
               type="button"
@@ -854,7 +849,7 @@ function DetailPanel(props: {
               data-testid="export-txt"
               onClick={() => void runExport('txt', false)}
             >
-              Export TXT
+              {t.exportTxt}
             </button>
             <button
               type="button"
@@ -862,7 +857,7 @@ function DetailPanel(props: {
               data-testid="export-pdf"
               onClick={() => void runExport('pdf', true)}
             >
-              Export PDF
+              {t.exportPdf}
             </button>
             <button
               type="button"
@@ -872,7 +867,7 @@ function DetailPanel(props: {
                 setShowEncrypt(true);
               }}
             >
-              Verschlüsselt exportieren (.vwenc)
+              {t.exportVerschluesselt}
             </button>
             <button
               type="button"
@@ -883,7 +878,7 @@ function DetailPanel(props: {
                 setConfirmDelete(true);
               }}
             >
-              In den Papierkorb
+              {t.inDenPapierkorb}
             </button>
           </div>
 
@@ -896,7 +891,7 @@ function DetailPanel(props: {
                   data-testid="reveal-export"
                   onClick={() => void window.voicewall.revealExport(exportRelPfad)}
                 >
-                  Im Finder zeigen
+                  {texte.register.imFinderZeigen}
                 </button>
               )}
             </div>
@@ -906,7 +901,7 @@ function DetailPanel(props: {
         <div className="field-grid">
           <div className="field">
             <label className="field-label" htmlFor="edit-titel">
-              Titel <span className="req">*</span>
+              {t.titelLabel} <span className="req">*</span>
             </label>
             <input
               id="edit-titel"
@@ -921,7 +916,7 @@ function DetailPanel(props: {
           </div>
           <div className="field">
             <label className="field-label" htmlFor="edit-body">
-              Text
+              {t.textLabel}
             </label>
             <textarea
               id="edit-body"
@@ -935,7 +930,7 @@ function DetailPanel(props: {
           </div>
           <div className="field">
             <label className="field-label" htmlFor="edit-tag-input">
-              Tags
+              {t.tagsLabel}
             </label>
             <div className="tag-editor" data-testid="tag-editor">
               {tags.map((tag) => (
@@ -944,9 +939,9 @@ function DetailPanel(props: {
                   <button
                     type="button"
                     className="tag-remove"
-                    aria-label={`Tag ${tag} entfernen`}
+                    aria-label={t.tagEntfernenAria(tag)}
                     onClick={() => {
-                      setTags((current) => current.filter((t) => t !== tag));
+                      setTags((current) => current.filter((tg) => tg !== tag));
                     }}
                   >
                     ×
@@ -959,7 +954,7 @@ function DetailPanel(props: {
                 className="tag-input"
                 list="known-tags"
                 value={tagInput}
-                placeholder="Tag hinzufügen, Enter"
+                placeholder={t.tagPlatzhalter}
                 data-testid="tag-input"
                 onChange={(event) => {
                   setTagInput(event.target.value);
@@ -986,10 +981,10 @@ function DetailPanel(props: {
               data-testid="edit-save"
               onClick={() => void save()}
             >
-              {busy ? 'Speichert ...' : 'Speichern'}
+              {busy ? t.speichert : t.speichern}
             </button>
             <button type="button" disabled={busy} data-testid="edit-cancel" onClick={cancelEdit}>
-              Abbrechen
+              {t.abbrechen}
             </button>
           </div>
         </div>
@@ -1003,9 +998,9 @@ function DetailPanel(props: {
 
       {confirmDelete && (
         <ConfirmDialog
-          titel="In den Papierkorb verschieben?"
-          text="Der Eintrag wird in den Papierkorb verschoben. Von dort kann er wiederhergestellt oder endgültig gelöscht werden."
-          bestaetigenText="In den Papierkorb"
+          titel={t.loeschenTitel}
+          text={t.loeschenText}
+          bestaetigenText={t.loeschenBestaetigen}
           onConfirm={() => {
             setConfirmDelete(false);
             void softDelete();
@@ -1018,10 +1013,10 @@ function DetailPanel(props: {
 
       {showEncrypt && (
         <PasswordDialog
-          titel="Verschlüsselt exportieren (.vwenc)"
-          beschreibung="Der Eintrag wird als Markdown mit AES-256-GCM verschlüsselt und im Ordner Exporte/ abgelegt. Entschlüsseln ist in der Beleg-Ansicht unter „Datei entschlüsseln“ möglich."
-          warnung="Wichtig: Das Passwort wird nirgends gespeichert. Geht es verloren, ist der Inhalt der Datei unwiederbringlich verloren."
-          bestaetigenText="Verschlüsselt exportieren"
+          titel={t.verschluesselnTitel}
+          beschreibung={t.verschluesselnBeschreibung}
+          warnung={t.verschluesselnWarnung}
+          bestaetigenText={t.verschluesselnBestaetigen}
           minLength={VWENC_MIN_PASSWORD_LENGTH}
           mitWiederholung={true}
           busy={busy}
@@ -1044,6 +1039,7 @@ function TagRenameDialog(props: {
   readonly onClose: () => void;
   readonly onRenamed: () => void;
 }): ReactElement {
+  const t = useTexte().register.tagRename;
   const [alt, setAlt] = useState(props.knownTags[0] ?? '');
   const [neu, setNeu] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1067,20 +1063,14 @@ function TagRenameDialog(props: {
         return;
       }
       const gesamt = result.geaendert + result.papierkorbGeaendert;
-      const papierkorbZusatz =
-        result.papierkorbGeaendert > 0
-          ? ` (davon ${String(result.papierkorbGeaendert)} im Papierkorb)`
-          : '';
-      setErgebnis(
-        `Tag „${alt}“ wurde zu „${neuTag}“ umbenannt: ${String(gesamt)} ${gesamt === 1 ? 'Eintrag' : 'Einträge'} aktualisiert${papierkorbZusatz}.`,
-      );
+      setErgebnis(t.ergebnis(alt, neuTag, gesamt, result.papierkorbGeaendert));
       setFehlerListe(result.fehler);
       setNeu('');
       props.onRenamed();
     } finally {
       setBusy(false);
     }
-  }, [alt, neu, props]);
+  }, [alt, neu, props, t]);
 
   return (
     <div className="modal-overlay" role="presentation" onClick={props.onClose}>
@@ -1094,14 +1084,11 @@ function TagRenameDialog(props: {
           event.stopPropagation();
         }}
       >
-        <h3 id="tag-rename-title">Tags verwalten</h3>
-        <p className="notice">
-          Ein Tag wird firmenweit umbenannt: über alle Diktate und Notizen, einschließlich
-          Papierkorb.
-        </p>
+        <h3 id="tag-rename-title">{t.titel}</h3>
+        <p className="notice">{t.hinweis}</p>
         <div className="field">
           <label className="field-label" htmlFor="tag-rename-alt">
-            Bestehender Tag
+            {t.bestehenderTag}
           </label>
           <select
             id="tag-rename-alt"
@@ -1121,7 +1108,7 @@ function TagRenameDialog(props: {
         </div>
         <div className="field">
           <label className="field-label" htmlFor="tag-rename-neu">
-            Neuer Name <span className="req">*</span>
+            {t.neuerName} <span className="req">*</span>
           </label>
           <input
             id="tag-rename-neu"
@@ -1166,7 +1153,7 @@ function TagRenameDialog(props: {
             data-testid="tag-rename-submit"
             onClick={() => void rename()}
           >
-            {busy ? 'Benennt um ...' : 'Umbenennen'}
+            {busy ? t.benenntUm : t.umbenennen}
           </button>
           <button
             type="button"
@@ -1174,7 +1161,7 @@ function TagRenameDialog(props: {
             onClick={props.onClose}
             data-testid="tag-rename-close"
           >
-            Schließen
+            {t.schliessen}
           </button>
         </div>
       </div>
@@ -1190,6 +1177,7 @@ function NoteDialog(props: {
   readonly onClose: () => void;
   readonly onCreated: () => void;
 }): ReactElement {
+  const t = useTexte().register.notiz;
   const [titel, setTitel] = useState('');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1227,10 +1215,10 @@ function NoteDialog(props: {
           event.stopPropagation();
         }}
       >
-        <h3 id="note-title">Neue Notiz</h3>
+        <h3 id="note-title">{t.titel}</h3>
         <div className="field">
           <label className="field-label" htmlFor="note-titel">
-            Titel <span className="req">*</span>
+            {t.titelLabel} <span className="req">*</span>
           </label>
           <input
             id="note-titel"
@@ -1246,7 +1234,7 @@ function NoteDialog(props: {
         </div>
         <div className="field">
           <label className="field-label" htmlFor="note-body">
-            Text
+            {t.textLabel}
           </label>
           <textarea
             id="note-body"
@@ -1271,10 +1259,10 @@ function NoteDialog(props: {
             data-testid="note-save"
             onClick={() => void create()}
           >
-            {busy ? 'Speichert ...' : 'Notiz anlegen'}
+            {busy ? t.speichert : t.anlegen}
           </button>
           <button type="button" disabled={busy} onClick={props.onClose}>
-            Abbrechen
+            {t.abbrechen}
           </button>
         </div>
       </div>
@@ -1289,6 +1277,7 @@ export function ConfirmDialog(props: {
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
 }): ReactElement {
+  const texte = useTexte();
   const confirmRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     confirmRef.current?.focus();
@@ -1318,7 +1307,7 @@ export function ConfirmDialog(props: {
             {props.bestaetigenText}
           </button>
           <button type="button" data-testid="confirm-no" onClick={props.onCancel}>
-            Abbrechen
+            {texte.register.detail.abbrechen}
           </button>
         </div>
       </div>

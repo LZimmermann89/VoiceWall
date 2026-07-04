@@ -104,6 +104,39 @@ describe('globalConfigSchema', () => {
   });
 });
 
+describe('globalConfigSchema: UI-Sprache (Paket B2)', () => {
+  it('hat den Default de', () => {
+    expect(defaultGlobalConfig().uiSprache).toBe('de');
+  });
+
+  it('ergaenzt fehlendes uiSprache mit de (Alt-Konfig bleibt gueltig)', () => {
+    const alt = { ...defaultGlobalConfig() } as Record<string, unknown>;
+    delete alt['uiSprache'];
+    const parsed = globalConfigSchema.safeParse(alt);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.uiSprache).toBe('de');
+    }
+  });
+
+  it('faellt bei fremden Werten kontrolliert auf de zurueck (catch)', () => {
+    const kaputt = { ...defaultGlobalConfig(), uiSprache: 'fr' };
+    const parsed = globalConfigSchema.safeParse(kaputt);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.uiSprache).toBe('de');
+    }
+  });
+
+  it('uebernimmt en unveraendert', () => {
+    const parsed = globalConfigSchema.safeParse({ ...defaultGlobalConfig(), uiSprache: 'en' });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.uiSprache).toBe('en');
+    }
+  });
+});
+
 describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
   it('hat die Default-Schalter Fuellwoerter AN, Sprachkommandos AUS', () => {
     const config = defaultGlobalConfig();

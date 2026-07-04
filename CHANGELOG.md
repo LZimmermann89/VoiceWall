@@ -8,6 +8,31 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- Zweisprachige Oberfläche Deutsch/Englisch (Paket B2, Entscheidung
+  E40). Eigene, typisierte Text-Kataloge in `src/shared/i18n/` ohne
+  neue Abhängigkeit: `de.ts` ist die Quelle der Wahrheit, der Typ
+  `Uebersetzung = typeof de` erzwingt die Vollständigkeit von `en.ts`
+  beim Kompilieren (Laufzeit-Doppelnetz in tests/unit/i18n.test.ts,
+  inklusive "kein EN-Wert leer" und "EN != DE außer dokumentierter
+  Allowlist"). Die UI-Sprache liegt global in der config.json
+  (`uiSprache`, Default Deutsch, zod mit catch) und ist unabhängig von
+  der Diktatsprache der Firmen; gesetzt über den neuen IPC-Kanal
+  `config:set-ui-language`. Der First-Run-Wizard beginnt mit einem
+  echten Schritt 0 "Sprache / Language" (zweisprachig beschriftet,
+  wirkt sofort und schlägt die Diktatsprache entsprechend vor,
+  überschreibbar); in der Verwaltung wechselt ein Umschalter in der
+  Kopfzeile die Sprache live ohne Reload und persistiert sie. Das
+  Diktat-Overlay zeigt seine Texte ("Ich höre zu ..." / "I am
+  listening ...") in der UI-Sprache (Sprache reist im
+  Overlay-Zustands-Payload mit). Datums- und Zahlformate folgen der
+  UI-Sprache (Intl, de-DE/en-GB; deutsche Anzeige unverändert).
+  Rechtstexte (Anbieterkennzeichnung, rechtstexte/) bleiben bewusst
+  deutsch (deutsches Recht); die englische Oberfläche trägt darüber
+  eine kurze Einordnungszeile. Meldungen aus dem Main-Prozess
+  (Fehlertexte, Engine-Hinweise, Tray) bleiben in diesem Paket deutsch
+  (Paket B3). Neue E2E-Beweise: Wizard-Schritt 0 mit Live-Umschaltung,
+  Verwaltungs-Umschalter mit Persistenz über einen Neustart.
+
 - Diktatsprache Englisch als wählbare Sprache pro Firma (Paket B1,
   Entscheidung E39; die Oberfläche bleibt deutsch). Neue Firmen wählen
   im Wizard-Schritt "Sprache" zwischen Deutsch (empfohlen, Standard,

@@ -94,6 +94,10 @@ export const IpcChannel = {
   VocabSave: 'vocab:save',
   SetAufbereitung: 'config:set-aufbereitung',
 
+  // Sprache der Oberflaeche (Paket B2): global, unabhaengig von der
+  // Diktatsprache der Firmen. Persistiert in der globalen config.json.
+  SetUiLanguage: 'config:set-ui-language',
+
   // App kontrolliert neu starten (macOS: frisch erteilte TCC-Freigaben
   // werden einem laufenden Prozess oft erst nach Neustart gemeldet).
   SystemRelaunch: 'system:relaunch',

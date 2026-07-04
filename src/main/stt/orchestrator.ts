@@ -25,6 +25,7 @@ import {
   type DictationLanguage,
   type HotkeyStatus,
   type MicrophoneState,
+  type UiLanguage,
 } from '../../shared/schema';
 import { createCaptureWindow } from '../audio/capture-window';
 import { DEFAULT_MAX_SAMPLES, PcmRingBuffer } from '../audio/ring-buffer';
@@ -76,6 +77,8 @@ export interface FlowStatus {
   readonly clipboardRestoreEnabled: boolean;
   /** Schalter der Textaufbereitung (Stufe 1, globale Konfig). */
   readonly aufbereitung: AufbereitungConfig;
+  /** Sprache der Oberflaeche (globale Konfig, Paket B2). */
+  readonly uiLanguage: UiLanguage;
 }
 
 const DEFAULT_FLOW_STATUS: FlowStatus = {
@@ -85,6 +88,7 @@ const DEFAULT_FLOW_STATUS: FlowStatus = {
   lastTranscript: null,
   clipboardRestoreEnabled: true,
   aufbereitung: { fuellwoerterEntfernen: true, sprachkommandos: false },
+  uiLanguage: 'de',
 };
 
 /** Timeout fuer das Warten auf das letzte Segment beim Hotkey-Stop. */
@@ -356,6 +360,7 @@ export class DictationOrchestrator {
       lastTranscript: flow.lastTranscript,
       clipboardRestoreEnabled: flow.clipboardRestoreEnabled,
       aufbereitung: flow.aufbereitung,
+      uiLanguage: flow.uiLanguage,
     };
   }
 

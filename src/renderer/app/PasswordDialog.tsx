@@ -11,6 +11,7 @@
  * (IPC an den Main-Prozess); es wird nie gespeichert und nie geloggt.
  */
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useTexte } from './i18n';
 
 interface PasswordDialogProps {
   readonly titel: string;
@@ -28,6 +29,7 @@ interface PasswordDialogProps {
 }
 
 export function PasswordDialog(props: PasswordDialogProps): ReactElement {
+  const t = useTexte().passwortDialog;
   const [passwort, setPasswort] = useState('');
   const [wiederholung, setWiederholung] = useState('');
   const [fehler, setFehler] = useState<string | null>(null);
@@ -39,15 +41,11 @@ export function PasswordDialog(props: PasswordDialogProps): ReactElement {
 
   const submit = (): void => {
     if (passwort.length < props.minLength) {
-      setFehler(
-        props.minLength > 1
-          ? `Das Passwort muss mindestens ${String(props.minLength)} Zeichen lang sein.`
-          : 'Bitte das Passwort eingeben.',
-      );
+      setFehler(props.minLength > 1 ? t.fehlerZuKurz(props.minLength) : t.fehlerLeer);
       return;
     }
     if (props.mitWiederholung && passwort !== wiederholung) {
-      setFehler('Die beiden Passwörter stimmen nicht überein.');
+      setFehler(t.fehlerUngleich);
       return;
     }
     setFehler(null);
@@ -75,7 +73,7 @@ export function PasswordDialog(props: PasswordDialogProps): ReactElement {
         )}
         <div className="field">
           <label className="field-label" htmlFor="pw-eingabe">
-            Passwort {props.minLength > 1 ? `(mindestens ${String(props.minLength)} Zeichen)` : ''}
+            {t.passwortLabel} {props.minLength > 1 ? t.passwortMindestlaenge(props.minLength) : ''}
             <span className="req">*</span>
           </label>
           <input
@@ -99,7 +97,7 @@ export function PasswordDialog(props: PasswordDialogProps): ReactElement {
         {props.mitWiederholung && (
           <div className="field">
             <label className="field-label" htmlFor="pw-wiederholung">
-              Passwort wiederholen <span className="req">*</span>
+              {t.wiederholenLabel} <span className="req">*</span>
             </label>
             <input
               id="pw-wiederholung"
@@ -132,10 +130,10 @@ export function PasswordDialog(props: PasswordDialogProps): ReactElement {
             data-testid="password-submit"
             onClick={submit}
           >
-            {props.busy ? 'Bitte warten ...' : props.bestaetigenText}
+            {props.busy ? t.bitteWarten : props.bestaetigenText}
           </button>
           <button type="button" disabled={props.busy} onClick={props.onCancel}>
-            Abbrechen
+            {t.abbrechen}
           </button>
         </div>
       </div>

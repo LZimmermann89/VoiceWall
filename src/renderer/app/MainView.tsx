@@ -13,17 +13,11 @@ import type { CompanyListView } from '../../shared/company';
 import type { AppStatus, ModelProgress, SystemInfo } from '../../shared/schema';
 import { BelegView } from './BelegView';
 import { DiktatView } from './DiktatView';
+import { useTexte } from './i18n';
 import { RegisterView } from './RegisterView';
 import { TrashView } from './TrashView';
 
 type ManageTab = 'diktat' | 'register' | 'papierkorb' | 'beleg';
-
-const TAB_LABELS: Record<ManageTab, string> = {
-  diktat: 'Diktat',
-  register: 'Register',
-  papierkorb: 'Papierkorb',
-  beleg: 'Beleg',
-};
 
 const TAB_ORDER: readonly ManageTab[] = ['diktat', 'register', 'papierkorb', 'beleg'];
 
@@ -39,6 +33,14 @@ interface MainViewProps {
 
 export function MainView(props: MainViewProps): ReactElement {
   const { status, companies, progress, systemInfo, onRefreshStatus, onRefreshCompanies } = props;
+  const texte = useTexte();
+
+  const tabLabels: Record<ManageTab, string> = {
+    diktat: texte.verwaltung.tabDiktat,
+    register: texte.verwaltung.tabRegister,
+    papierkorb: texte.verwaltung.tabPapierkorb,
+    beleg: texte.verwaltung.tabBeleg,
+  };
 
   const [tab, setTab] = useState<ManageTab>('diktat');
   const [busy, setBusy] = useState(false);
@@ -88,11 +90,9 @@ export function MainView(props: MainViewProps): ReactElement {
         if (!result.ok) {
           setCompanyNotice(result.message);
         } else if (sprache === 'en') {
-          setCompanyNotice(
-            'Diktatsprache auf Englisch umgestellt (mehrsprachiges Originalmodell). Falls das Modell noch fehlt, startet beim nächsten Diktat bzw. über "Modelle laden und Engine starten" ein einmaliger Download von ca. 574 MB.',
-          );
+          setCompanyNotice(texte.verwaltung.diktatspracheUmgestelltEn);
         } else {
-          setCompanyNotice('Diktatsprache auf Deutsch umgestellt (deutsch-optimiertes Modell).');
+          setCompanyNotice(texte.verwaltung.diktatspracheUmgestelltDe);
         }
         await onRefreshCompanies();
         await onRefreshStatus();
@@ -100,17 +100,17 @@ export function MainView(props: MainViewProps): ReactElement {
         setBusy(false);
       }
     },
-    [onRefreshCompanies, onRefreshStatus],
+    [onRefreshCompanies, onRefreshStatus, texte],
   );
 
   return (
     <div className="manage-layout">
       {/* Firmen-Umschalter (prominent, oben) ---------------------------- */}
-      <div className="company-switcher" aria-label="Firma wählen">
-        <span className="company-switcher-label">Firma</span>
+      <div className="company-switcher" aria-label={texte.verwaltung.firmaWaehlenAria}>
+        <span className="company-switcher-label">{texte.verwaltung.firmaLabel}</span>
         {firmen.length === 0 ? (
           <span className="placeholder" data-testid="company-list-empty">
-            Noch keine Firma angelegt.
+            {texte.verwaltung.keineFirma}
           </span>
         ) : (
           <ul className="company-tabs" data-testid="company-list">
@@ -138,15 +138,15 @@ export function MainView(props: MainViewProps): ReactElement {
         )}
         {aktiveFirma !== null && (
           <label className="switch-row company-language">
-            Diktatsprache{' '}
+            {texte.verwaltung.diktatspracheLabel}{' '}
             <select
               value={aktiveFirma.sprache}
               disabled={busy}
               data-testid="company-language-select"
               onChange={(event) => void setLanguage(event.target.value === 'en' ? 'en' : 'de')}
             >
-              <option value="de">Deutsch</option>
-              <option value="en">Englisch</option>
+              <option value="de">{texte.verwaltung.diktatspracheDeutsch}</option>
+              <option value="en">{texte.verwaltung.diktatspracheEnglisch}</option>
             </select>
           </label>
         )}
@@ -169,7 +169,7 @@ export function MainView(props: MainViewProps): ReactElement {
               })()
             }
           />{' '}
-          Diktate automatisch speichern
+          {texte.verwaltung.autoSpeichern}
         </label>
         <button
           type="button"
@@ -177,7 +177,7 @@ export function MainView(props: MainViewProps): ReactElement {
           onClick={props.onAddCompany}
           data-testid="add-company"
         >
-          Neue Firma einrichten
+          {texte.verwaltung.neueFirma}
         </button>
       </div>
       {companyNotice !== null && (
@@ -187,7 +187,7 @@ export function MainView(props: MainViewProps): ReactElement {
       )}
 
       {/* Ansichts-Navigation ------------------------------------------- */}
-      <nav className="manage-nav" aria-label="Verwaltungsbereiche">
+      <nav className="manage-nav" aria-label={texte.verwaltung.navAria}>
         {TAB_ORDER.map((entry) => (
           <button
             type="button"
@@ -199,7 +199,7 @@ export function MainView(props: MainViewProps): ReactElement {
               setTab(entry);
             }}
           >
-            {TAB_LABELS[entry]}
+            {tabLabels[entry]}
           </button>
         ))}
       </nav>

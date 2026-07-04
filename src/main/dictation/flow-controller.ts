@@ -33,10 +33,12 @@ import {
 import {
   aufbereitungConfigSchema,
   modelChoiceSchema,
+  uiLanguageSchema,
   type ActionResult,
   type DeliveryResult,
   type DevDictateResult,
   type DictationLanguage,
+  type UiLanguage,
 } from '../../shared/schema';
 import { aufbereitenText } from '../../shared/textaufbereitung';
 import { applyErsetzungen } from '../../shared/vokabular';
@@ -589,6 +591,26 @@ export class DictationFlowController {
     return { ok: true };
   }
 
+  /**
+   * Sprache der Oberflaeche setzen (Paket B2; global, unabhaengig von der
+   * Diktatsprache der Firmen). Persistiert in der globalen Konfig; der
+   * Renderer wechselt live (Status-Broadcast), das Overlay erhaelt die
+   * Sprache mit dem naechsten Anzeige-Zustand.
+   *
+   * WICHTIG: die Konfiguration wird vor dem Schreiben frisch gelesen
+   * (Lesen-Aendern-Schreiben). Der Sprachwechsel passiert im Gegensatz zu
+   * Hotkey/Modellwahl auch NACH der Firmen-Anlage; ein Schreiben des beim
+   * App-Start eingelesenen Standes wuerde die vom CompanyManager
+   * nachgetragenen Felder (firmen, aktiveFirma) verlieren.
+   */
+  private async setUiSprache(sprache: UiLanguage): Promise<ActionResult> {
+    const aktuell = await readGlobalConfig(this.deps.userDataPath, this.deps.logger);
+    this.config = { ...aktuell, uiSprache: sprache };
+    await writeGlobalConfig(this.deps.userDataPath, this.config);
+    this.deps.orchestrator.notifyStatusChanged();
+    return { ok: true };
+  }
+
   // ---------------------------------------------------------------------
   // Resilienz: Kopieren-Knopf
   // ---------------------------------------------------------------------
@@ -614,8 +636,11 @@ export class DictationFlowController {
     if (overlay === null || overlay.isDestroyed()) {
       return;
     }
+    // Sprache der Oberflaeche anhaengen (Paket B2): das Overlay waehlt damit
+    // seine eigenen Texte; Meldungen aus dem Main-Prozess bleiben unveraendert.
+    const payload: OverlayStatePayload = { ...state, uiSprache: this.config.uiSprache };
     const sendState = (): void => {
-      overlay.webContents.send(IpcChannel.OverlayState, state);
+      overlay.webContents.send(IpcChannel.OverlayState, payload);
     };
     if (overlay.webContents.isLoading()) {
       overlay.webContents.once('did-finish-load', sendState);
@@ -663,6 +688,7 @@ export class DictationFlowController {
         fuellwoerterEntfernen: this.config.aufbereitung.fuellwoerterEntfernen,
         sprachkommandos: this.config.aufbereitung.sprachkommandos,
       },
+      uiLanguage: this.config.uiSprache,
     };
   }
 
@@ -694,6 +720,18 @@ export class DictationFlowController {
           return { ok: false, message: 'Ungültige Eingabe für die Aufbereitungs-Schalter.' };
         }
         return this.setAufbereitung(parsed.data);
+      },
+    );
+
+    // Paket B2: Sprache der Oberflaeche (global) setzen und persistieren.
+    ipcMain.handle(
+      IpcChannel.SetUiLanguage,
+      async (_event, raw: unknown): Promise<ActionResult> => {
+        const parsed = uiLanguageSchema.safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, message: 'Ungültige Eingabe für die Sprache der Oberfläche.' };
+        }
+        return this.setUiSprache(parsed.data);
       },
     );
 

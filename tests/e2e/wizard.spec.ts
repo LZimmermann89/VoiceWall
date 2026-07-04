@@ -8,7 +8,8 @@
  * blockierenden macOS-Mikrofon-Systemdialog ausloest.
  *
  * Belegt werden:
- * 1. Kompletter Wizard-Durchlauf: Consent-Gate, Firmendaten mit Umlauten
+ * 1. Kompletter Wizard-Durchlauf: Sprachwahl (Schritt 0, Paket B2),
+ *    Consent-Gate, Firmendaten mit Umlauten
  *    und Live-Ordnernamen-Vorschau, E-Mail-Validierung, Speicherort mit
  *    Sync-Ergebnis, Sprache, Modell (vorhanden), Hotkey-Livetest,
  *    Bedienungshilfen (macOS), Zusammenfassung, Einrichten. Danach:
@@ -47,7 +48,13 @@ test('Wizard: kompletter Durchlauf legt Firma an, zweiter Start zeigt die Verwal
     await expect(window.getByTestId('wizard-page')).toBeVisible();
     await expect(window.locator('h1')).toHaveCount(1);
 
-    // Schritt 1: ohne Einwilligung ist Weiter gesperrt.
+    // Schritt 0 (Paket B2): Sprache / Language, Deutsch ist vorgewaehlt.
+    await expect(window.getByTestId('wizard-page')).toHaveAttribute('data-step', 'sprachwahl');
+    await expect(window.getByTestId('wizard-ui-language-de')).toBeChecked();
+    await window.getByTestId('wizard-next').click();
+
+    // Schritt 1 (Willkommen): ohne Einwilligung ist Weiter gesperrt.
+    await expect(window.getByTestId('wizard-page')).toHaveAttribute('data-step', 'willkommen');
     const next = window.getByTestId('wizard-next');
     await expect(next).toBeDisabled();
     await expect(window.getByTestId('wizard-ai-act')).toContainText('Transparenzhinweis');
@@ -178,6 +185,9 @@ test('Wizard-A11y: Tab-Reihenfolge erreicht alle Controls des Firmendaten-Schrit
   const { app, window } = await launchApp({ withConsent: true });
   try {
     await expect(window.getByTestId('wizard-page')).toBeVisible();
+    // Schritt 0 (Sprache / Language) passieren, dann Einwilligung.
+    await expect(window.getByTestId('wizard-page')).toHaveAttribute('data-step', 'sprachwahl');
+    await window.getByTestId('wizard-next').click();
     await window.getByTestId('wizard-consent').check();
     await window.getByTestId('wizard-next').click();
     await expect(window.getByTestId('wizard-page')).toHaveAttribute('data-step', 'firma');
