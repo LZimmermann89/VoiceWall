@@ -71,7 +71,9 @@ import {
 import { collectBelegInfo } from '../beleg/beleg-info';
 import type { DictationContext } from '../whisper/engine-manager';
 import type { GlobalConfig } from '../../shared/config';
-import { readGlobalConfig, writeGlobalConfig } from '../config/config-store';
+import { readGlobalConfig } from '../config/config-store';
+import { GlobalConfigWriter, type GlobalConfigMutator } from '../config/config-writer';
+import { texte } from '../i18n';
 import { IpcChannel } from '../ipc/channels';
 import type { Logger } from '../log/logger';
 import { migrateCompanyFolder } from './migration';
@@ -150,6 +152,12 @@ export interface CompanyManagerDeps {
    * (Paket B1): der Orchestrator aktualisiert damit Status/Modellbedarf.
    */
   readonly onCompanyChanged?: () => void;
+  /**
+   * Zentraler, serialisierter Konfig-Schreibpfad (E42). Im App-Bootstrap
+   * wird DIESELBE Instanz wie beim FlowController injiziert; ohne Injektion
+   * (Unit-Tests) entsteht eine eigene Instanz mit demselben Verhalten.
+   */
+  readonly configWriter?: GlobalConfigWriter;
 }
 
 export interface SaveDictateInput {
@@ -179,7 +187,7 @@ export function titleFromText(text: string): string {
     .split(/\s+/)
     .filter((word) => word.length > 0);
   if (words.length === 0) {
-    return 'Diktat';
+    return texte().diktate.titelFallback;
   }
   let title = '';
   for (const word of words) {
@@ -189,15 +197,25 @@ export function titleFromText(text: string): string {
     }
     title = candidate;
   }
-  return title.length === 0 ? 'Diktat' : title;
+  return title.length === 0 ? texte().diktate.titelFallback : title;
 }
 
 export class CompanyManager {
   private config: GlobalConfig | null = null;
   /** Laufender Erst-Ladevorgang der Konfig (genau EIN Disk-Read, geteilt). */
   private configLoading: Promise<GlobalConfig> | null = null;
+  /** Serialisierter Schreibpfad (E42): injiziert oder eigene Instanz. */
+  private readonly writer: GlobalConfigWriter;
 
-  constructor(private readonly deps: CompanyManagerDeps) {}
+  constructor(private readonly deps: CompanyManagerDeps) {
+    this.writer =
+      deps.configWriter ??
+      new GlobalConfigWriter({
+        userDataPath: deps.userDataPath,
+        logger: deps.logger,
+        ...(deps.readConfig === undefined ? {} : { readConfig: deps.readConfig }),
+      });
+  }
 
   /**
    * Laedt die globale Konfiguration (einmalig, weitere Zugriffe gecacht).
@@ -230,9 +248,15 @@ export class CompanyManager {
     return this.config;
   }
 
-  private async persistConfig(next: GlobalConfig): Promise<void> {
-    this.config = next;
-    await writeGlobalConfig(this.deps.userDataPath, next);
+  /**
+   * Persistiert eine DELTA-Aenderung ueber den zentralen, serialisierten
+   * Writer (E42): frisch lesen, Mutator anwenden, atomar schreiben. Der
+   * geschriebene Stand wird als neuer in-memory-Cache uebernommen; ein
+   * veralteter Zwischenstand kann fremde Aenderungen (z. B. UI-Sprache,
+   * Aufbereitungs-Schalter) damit nie mehr ueberschreiben.
+   */
+  private async persistConfig(mutate: GlobalConfigMutator): Promise<void> {
+    this.config = await this.writer.update(mutate);
   }
 
   private localBase(): string {
@@ -333,8 +357,8 @@ export class CompanyManager {
   }
 
   async setAutoSave(enabled: boolean): Promise<void> {
-    const config = await this.loadConfig();
-    await this.persistConfig({ ...config, diktatAutoSpeichern: enabled });
+    await this.loadConfig();
+    await this.persistConfig((current) => ({ ...current, diktatAutoSpeichern: enabled }));
   }
 
   /** Vorschau des sanitisierten Ordnernamens (Wizard: Name -> bestaetigen). */
@@ -380,12 +404,7 @@ export class CompanyManager {
 
     if (strategie === 'desktop') {
       if (desktop === null) {
-        return {
-          ok: false,
-          message:
-            'Der Desktop-Ordner wurde nicht gefunden. Bitte die Strategie "lokal-mit-verknuepfung" verwenden.',
-          vorschlag: null,
-        };
+        return { ok: false, message: texte().firmen.desktopFehltStrategie, vorschlag: null };
       }
       baseDir = desktop;
       const sync = await checkSyncExposure(desktop);
@@ -397,7 +416,9 @@ export class CompanyManager {
       } catch (error) {
         return {
           ok: false,
-          message: `Der lokale VoiceWall-Ordner konnte nicht angelegt werden: ${error instanceof Error ? error.message : String(error)}`,
+          message: texte().firmen.lokalerOrdnerFehler(
+            error instanceof Error ? error.message : String(error),
+          ),
           vorschlag: null,
         };
       }
@@ -436,17 +457,20 @@ export class CompanyManager {
         linkName: created.value.ordnername,
       });
       verknuepfungHinweis = link.ok
-        ? `Auf dem Desktop liegt eine Verknüpfung "${created.value.ordnername}"; die Diktate selbst bleiben im lokalen Ordner ${created.value.dirPath}.`
-        : `Hinweis: ${link.error}`;
+        ? texte().firmen.verknuepfungAngelegt(created.value.ordnername, created.value.dirPath)
+        : texte().firmen.verknuepfungHinweis(link.error);
     }
 
     // Globale Konfig ergaenzen (dedupliziert) und Firma aktivieren.
-    const config = await this.loadConfig();
+    await this.loadConfig();
     const pfad = created.value.dirPath.normalize('NFC');
-    const firmen = config.firmen.map((entry) => entry.normalize('NFC')).includes(pfad)
-      ? config.firmen
-      : [...config.firmen, pfad];
-    await this.persistConfig({ ...config, firmen, aktiveFirma: pfad });
+    await this.persistConfig((current) => ({
+      ...current,
+      firmen: current.firmen.map((entry) => entry.normalize('NFC')).includes(pfad)
+        ? current.firmen
+        : [...current.firmen, pfad],
+      aktiveFirma: pfad,
+    }));
 
     this.deps.logger.info('Firma angelegt bzw. uebernommen und aktiviert.', {
       outcome: created.value.uebernommen ? 'uebernommen' : 'neu',
@@ -467,14 +491,10 @@ export class CompanyManager {
     const list = await this.listCompanies();
     const normalized = pfad.normalize('NFC');
     if (!list.firmen.some((firma) => firma.pfad === normalized)) {
-      return {
-        ok: false,
-        message:
-          'Diese Firma ist nicht in der Liste der gültigen Firmenordner. Bitte die Firma zuerst anlegen oder öffnen.',
-      };
+      return { ok: false, message: texte().firmen.nichtInListe };
     }
-    const config = await this.loadConfig();
-    await this.persistConfig({ ...config, aktiveFirma: normalized });
+    await this.loadConfig();
+    await this.persistConfig((current) => ({ ...current, aktiveFirma: normalized }));
     // Firmenwechsel kann die Diktatsprache wechseln: Status aktualisieren.
     this.deps.onCompanyChanged?.();
     return { ok: true };
@@ -514,18 +534,10 @@ export class CompanyManager {
     try {
       parsed = companyConfigSchema.safeParse(JSON.parse(await readFile(configPath, 'utf8')));
     } catch {
-      return {
-        ok: false,
-        message:
-          'Die Firmen-Konfiguration ist nicht lesbar (.voicewall/config.json). Bitte den Firmenordner prüfen.',
-      };
+      return { ok: false, message: texte().firmen.konfigNichtLesbar };
     }
     if (!parsed.success) {
-      return {
-        ok: false,
-        message:
-          'Die Firmen-Konfiguration ist ungültig (.voicewall/config.json). Bitte den Firmenordner prüfen.',
-      };
+      return { ok: false, message: texte().firmen.konfigUngueltig };
     }
     const next: CompanyConfig = { ...parsed.data, sprache };
     try {
@@ -533,7 +545,9 @@ export class CompanyManager {
     } catch (error) {
       return {
         ok: false,
-        message: `Die Firmen-Konfiguration konnte nicht geschrieben werden: ${error instanceof Error ? error.message : String(error)}`,
+        message: texte().firmen.konfigSchreibFehler(
+          error instanceof Error ? error.message : String(error),
+        ),
       };
     }
     this.deps.logger.info('Diktatsprache der aktiven Firma geändert.', { sprache });
@@ -551,11 +565,7 @@ export class CompanyManager {
     const bases = await this.allowedBases();
     const normalized = pfad.normalize('NFC');
     if (!(await this.isValidCompanyPath(normalized, bases))) {
-      return {
-        ok: false,
-        message:
-          'Dieser Ordner ist kein gültiger VoiceWall-Firmenordner an einem erlaubten Ort (Desktop oder ~/VoiceWall).',
-      };
+      return { ok: false, message: texte().firmen.keinGueltigerOrdner };
     }
     const migration = await migrateCompanyFolder(normalized);
     if (!migration.ok) {
@@ -565,11 +575,14 @@ export class CompanyManager {
     if (!manifest.ok) {
       return { ok: false, message: manifest.error };
     }
-    const config = await this.loadConfig();
-    const firmen = config.firmen.map((entry) => entry.normalize('NFC')).includes(normalized)
-      ? config.firmen
-      : [...config.firmen, normalized];
-    await this.persistConfig({ ...config, firmen, aktiveFirma: normalized });
+    await this.loadConfig();
+    await this.persistConfig((current) => ({
+      ...current,
+      firmen: current.firmen.map((entry) => entry.normalize('NFC')).includes(normalized)
+        ? current.firmen
+        : [...current.firmen, normalized],
+      aktiveFirma: normalized,
+    }));
     this.deps.onCompanyChanged?.();
     return { ok: true };
   }
@@ -578,10 +591,7 @@ export class CompanyManager {
   async saveDictate(input: SaveDictateInput): Promise<SaveDictateResult> {
     const companyDir = await this.activeCompanyDir();
     if (companyDir === null) {
-      return {
-        ok: false,
-        message: 'Keine aktive Firma. Bitte zuerst eine Firma anlegen oder aktivieren.',
-      };
+      return { ok: false, message: texte().firmen.keineAktiveFirma };
     }
     const titel = input.titel ?? titleFromText(input.text);
     const created = await createTranscript(companyDir, {
@@ -621,10 +631,7 @@ export class CompanyManager {
   async listDictates(filter: DictateSearchFilter): Promise<DictateListResult> {
     const companyDir = await this.activeCompanyDir();
     if (companyDir === null) {
-      return {
-        ok: false,
-        message: 'Keine aktive Firma. Bitte zuerst eine Firma anlegen oder aktivieren.',
-      };
+      return { ok: false, message: texte().firmen.keineAktiveFirma };
     }
     const manifest = await readManifestWithHealing(companyDir, this.deps.logger);
     if (!manifest.ok) {
@@ -657,7 +664,7 @@ export class CompanyManager {
   ): Promise<{ ok: true; body: string } | { ok: false; message: string }> {
     const companyDir = await this.activeCompanyDir();
     if (companyDir === null) {
-      return { ok: false, message: 'Keine aktive Firma.' };
+      return { ok: false, message: texte().firmen.keineAktiveFirmaKurz };
     }
     const result = await readTranscript(companyDir, relPfad);
     return result.ok ? { ok: true, body: result.value.body } : { ok: false, message: result.error };
@@ -675,10 +682,7 @@ export class CompanyManager {
   > {
     const companyDir = await this.activeCompanyDir();
     if (companyDir === null) {
-      return {
-        ok: false,
-        message: 'Keine aktive Firma. Bitte zuerst eine Firma anlegen oder aktivieren.',
-      };
+      return { ok: false, message: texte().firmen.keineAktiveFirma };
     }
     return { ok: true, dir: companyDir };
   }
@@ -957,31 +961,28 @@ export class CompanyManager {
    */
   async decryptVwencFile(passwort: string): Promise<DecryptFileResult> {
     const chosen = await dialog.showOpenDialog({
-      title: 'VoiceWall-verschlüsselte Datei entschlüsseln',
-      buttonLabel: 'Entschlüsseln',
-      filters: [{ name: 'VoiceWall verschlüsselt (.vwenc)', extensions: ['vwenc'] }],
+      title: texte().vwenc.dialogTitel,
+      buttonLabel: texte().vwenc.dialogKnopf,
+      filters: [{ name: texte().vwenc.dialogFilter, extensions: ['vwenc'] }],
       properties: ['openFile'],
     });
     const sourcePath = chosen.filePaths[0];
     if (chosen.canceled || sourcePath === undefined) {
-      return { ok: false, message: 'Es wurde keine Datei ausgewählt.' };
+      return { ok: false, message: texte().vwenc.keineDatei };
     }
     try {
       const info = await stat(sourcePath);
       if (info.size > 64 * 1024 * 1024) {
-        return {
-          ok: false,
-          message: 'Die Datei ist zu groß für eine VoiceWall-.vwenc-Datei (Limit 64 MB).',
-        };
+        return { ok: false, message: texte().vwenc.zuGross };
       }
     } catch {
-      return { ok: false, message: 'Die ausgewählte Datei ist nicht lesbar.' };
+      return { ok: false, message: texte().vwenc.nichtLesbar };
     }
     let container: Buffer;
     try {
       container = await readFile(sourcePath);
     } catch {
-      return { ok: false, message: 'Die ausgewählte Datei ist nicht lesbar.' };
+      return { ok: false, message: texte().vwenc.nichtLesbar };
     }
     const plain = decryptFromVwenc(container, passwort);
     if (!plain.ok) {
@@ -1007,16 +1008,15 @@ export class CompanyManager {
       } catch (error) {
         return {
           ok: false,
-          message: `Die entschlüsselte Datei konnte nicht geschrieben werden: ${error instanceof Error ? error.message : String(error)}`,
+          message: texte().vwenc.schreibFehler(
+            error instanceof Error ? error.message : String(error),
+          ),
         };
       }
       this.deps.logger.info('.vwenc-Datei entschluesselt.');
       return { ok: true, zielPfad: target };
     }
-    return {
-      ok: false,
-      message: 'Die entschlüsselte Datei konnte nicht angelegt werden (Namenskollision).',
-    };
+    return { ok: false, message: texte().vwenc.namenskollision };
   }
 
   /**
@@ -1032,7 +1032,7 @@ export class CompanyManager {
     }
     const normalized = relPfad.normalize('NFC');
     if (normalized !== EXPORTE_DIR && !normalized.startsWith(`${EXPORTE_DIR}/`)) {
-      return { ok: false, message: 'Ungültiger Exportpfad.' };
+      return { ok: false, message: texte().export.exportpfadUngueltig };
     }
     const resolved = resolveInsideDir(active.dir, normalized);
     if (!resolved.ok) {
@@ -1174,7 +1174,7 @@ export class CompanyManager {
     ipcMain.handle(IpcChannel.CompanyPreviewName, (_event, raw: unknown): CompanyNamePreview => {
       const parsed = z.string().min(1).max(300).safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungültige Eingabe für den Firmennamen.' };
+        return { ok: false, message: texte().firmen.eingabeFirmenname };
       }
       return this.previewName(parsed.data);
     });
@@ -1193,16 +1193,12 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<CreateCompanyResult>({
           ok: false,
-          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für die Firmen-Anlage.',
+          message: texte().firmen.eingabeFirmenAnlage,
           vorschlag: null,
         });
       }
       return guard<CreateCompanyResult>(
-        {
-          ok: false,
-          message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
-          vorschlag: null,
-        },
+        { ok: false, message: texte().generisch.internerFehler, vorschlag: null },
         () =>
           this.createCompany(
             parsed.data.name,
@@ -1219,27 +1215,26 @@ export class CompanyManager {
     ipcMain.handle(IpcChannel.CompanySetLanguage, (_event, raw: unknown) => {
       const parsed = dictationLanguageSchema.safeParse(raw);
       if (!parsed.success) {
-        return Promise.resolve<ActionResult>({ ok: false, message: 'Ungültige Diktatsprache.' });
-      }
-      return guard<ActionResult>(
-        {
+        return Promise.resolve<ActionResult>({
           ok: false,
-          message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
-        },
-        () => this.setCompanyLanguage(parsed.data),
+          message: texte().stt.ungueltigeDiktatsprache,
+        });
+      }
+      return guard<ActionResult>({ ok: false, message: texte().generisch.internerFehler }, () =>
+        this.setCompanyLanguage(parsed.data),
       );
     });
 
     ipcMain.handle(IpcChannel.CompanySetActive, (_event, raw: unknown) => {
       const parsed = z.string().min(1).max(2048).safeParse(raw);
       if (!parsed.success) {
-        return Promise.resolve({ ok: false as const, message: 'Ungültiger Firmenpfad.' });
+        return Promise.resolve({
+          ok: false as const,
+          message: texte().firmen.ungueltigerFirmenpfad,
+        });
       }
       return guard<{ ok: true } | { ok: false; message: string }>(
-        {
-          ok: false,
-          message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
-        },
+        { ok: false, message: texte().generisch.internerFehler },
         () => this.setActiveCompany(parsed.data),
       );
     });
@@ -1255,14 +1250,11 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<DictateListResult>({
           ok: false,
-          message: 'Ungültiger Suchfilter.',
+          message: texte().diktate.suchfilterUngueltig,
         });
       }
       return guard<DictateListResult>(
-        {
-          ok: false,
-          message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
-        },
+        { ok: false, message: texte().generisch.internerFehler },
         () => this.listDictates(parsed.data),
       );
     });
@@ -1272,14 +1264,11 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve({
           ok: false as const,
-          message: 'Ungültige Eingabe für den Auto-Speichern-Schalter.',
+          message: texte().firmen.eingabeAutoSpeichern,
         });
       }
       return guard<{ ok: true } | { ok: false; message: string }>(
-        {
-          ok: false,
-          message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
-        },
+        { ok: false, message: texte().generisch.internerFehler },
         async () => {
           await this.setAutoSave(parsed.data);
           return { ok: true as const };
@@ -1287,35 +1276,39 @@ export class CompanyManager {
       );
     });
 
-    const internalError =
-      'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.';
+    // Katalog-Meldungen an der IPC-Grenze: bewusst FUNKTIONEN (nicht beim
+    // Registrieren eingefroren), damit ein Sprachwechsel sofort wirkt.
+    const internalError = (): string => texte().generisch.internerFehler;
     const relPathHandler = <T>(
       channel: string,
-      badInput: T,
-      internal: T,
+      badInput: () => T,
+      internal: () => T,
       action: (relPfad: string) => Promise<T>,
     ): void => {
       ipcMain.handle(channel, (_event, raw: unknown) => {
         const parsed = safeRelativePathSchema.safeParse(raw);
         if (!parsed.success) {
-          return Promise.resolve(badInput);
+          return Promise.resolve(badInput());
         }
-        return guard<T>(internal, () => action(parsed.data));
+        return guard<T>(internal(), () => action(parsed.data));
       });
     };
 
-    const actionBadInput: ActionResult = { ok: false, message: 'Ungültige Eingabe.' };
-    const actionInternal: ActionResult = { ok: false, message: internalError };
+    const actionBadInput = (): ActionResult => ({
+      ok: false,
+      message: texte().diktate.eingabeUngueltig,
+    });
+    const actionInternal = (): ActionResult => ({ ok: false, message: internalError() });
 
     ipcMain.handle(IpcChannel.DictateGet, (_event, raw: unknown) => {
       const parsed = safeRelativePathSchema.safeParse(raw);
       if (!parsed.success) {
         return Promise.resolve<DictateDetailResult>({
           ok: false,
-          message: 'Ungültiger Diktat-Pfad.',
+          message: texte().diktate.pfadUngueltig,
         });
       }
-      return guard<DictateDetailResult>({ ok: false, message: internalError }, () =>
+      return guard<DictateDetailResult>({ ok: false, message: internalError() }, () =>
         this.getDictate(parsed.data),
       );
     });
@@ -1325,10 +1318,10 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<DictateMutationResult>({
           ok: false,
-          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für die Bearbeitung.',
+          message: texte().diktate.eingabeBearbeitung,
         });
       }
-      return guard<DictateMutationResult>({ ok: false, message: internalError }, () =>
+      return guard<DictateMutationResult>({ ok: false, message: internalError() }, () =>
         this.updateDictate(parsed.data),
       );
     });
@@ -1338,10 +1331,10 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<SaveDictateResult>({
           ok: false,
-          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für die Notiz.',
+          message: texte().diktate.eingabeNotiz,
         });
       }
-      return guard<SaveDictateResult>({ ok: false, message: internalError }, () =>
+      return guard<SaveDictateResult>({ ok: false, message: internalError() }, () =>
         this.createManualNote(parsed.data),
       );
     });
@@ -1376,10 +1369,10 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<ExportResult>({
           ok: false,
-          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für den Export.',
+          message: texte().export.eingabe,
         });
       }
-      return guard<ExportResult>({ ok: false, message: internalError }, () =>
+      return guard<ExportResult>({ ok: false, message: internalError() }, () =>
         this.exportDictate(parsed.data),
       );
     });
@@ -1389,10 +1382,10 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<BatchExportResult>({
           ok: false,
-          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für den Stapel-Export.',
+          message: texte().export.eingabeStapel,
         });
       }
-      return guard<BatchExportResult>({ ok: false, message: internalError }, () =>
+      return guard<BatchExportResult>({ ok: false, message: internalError() }, () =>
         this.exportDictatesBatch(parsed.data, (fertig, gesamt) => {
           // Fortschritt an den auslösenden Renderer (aria-live-Anzeige).
           if (!event.sender.isDestroyed()) {
@@ -1408,10 +1401,10 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<TagRenameResult>({
           ok: false,
-          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für die Tag-Umbenennung.',
+          message: texte().tagRename.eingabe,
         });
       }
-      return guard<TagRenameResult>({ ok: false, message: internalError }, () =>
+      return guard<TagRenameResult>({ ok: false, message: internalError() }, () =>
         this.renameTag(parsed.data),
       );
     });
@@ -1421,12 +1414,10 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<ExportResult>({
           ok: false,
-          message:
-            parsed.error.issues[0]?.message ??
-            'Ungültige Eingabe für den verschlüsselten Export (Passwort mindestens 12 Zeichen).',
+          message: texte().vwenc.eingabeVerschluesselt,
         });
       }
-      return guard<ExportResult>({ ok: false, message: internalError }, () =>
+      return guard<ExportResult>({ ok: false, message: internalError() }, () =>
         this.exportDictateEncrypted(parsed.data),
       );
     });
@@ -1436,16 +1427,16 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<DecryptFileResult>({
           ok: false,
-          message: 'Ungültige Eingabe für das Entschlüsseln.',
+          message: texte().vwenc.eingabeEntschluesseln,
         });
       }
-      return guard<DecryptFileResult>({ ok: false, message: internalError }, () =>
+      return guard<DecryptFileResult>({ ok: false, message: internalError() }, () =>
         this.decryptVwencFile(parsed.data.passwort),
       );
     });
 
     ipcMain.handle(IpcChannel.DictateTrashList, () =>
-      guard<TrashListResult>({ ok: false, message: internalError }, () => this.listTrash()),
+      guard<TrashListResult>({ ok: false, message: internalError() }, () => this.listTrash()),
     );
 
     ipcMain.handle(IpcChannel.DictateTagsList, () =>
@@ -1453,12 +1444,12 @@ export class CompanyManager {
     );
 
     ipcMain.handle(IpcChannel.BelegInfo, () =>
-      guard<BelegInfoResult>({ ok: false, message: internalError }, () => this.belegInfo()),
+      guard<BelegInfoResult>({ ok: false, message: internalError() }, () => this.belegInfo()),
     );
 
     // Fach-Woerterbuch (Stufe 1): vokabular.json der aktiven Firma.
     ipcMain.handle(IpcChannel.VocabGet, () =>
-      guard<VokabularGetResult>({ ok: false, message: internalError }, () => this.getVokabular()),
+      guard<VokabularGetResult>({ ok: false, message: internalError() }, () => this.getVokabular()),
     );
 
     ipcMain.handle(IpcChannel.VocabSave, (_event, raw: unknown) => {
@@ -1466,10 +1457,10 @@ export class CompanyManager {
       if (!parsed.success) {
         return Promise.resolve<ActionResult>({
           ok: false,
-          message: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe für das Fach-Wörterbuch.',
+          message: texte().woerterbuch.eingabe,
         });
       }
-      return guard<ActionResult>({ ok: false, message: internalError }, () =>
+      return guard<ActionResult>({ ok: false, message: internalError() }, () =>
         this.saveVokabular(parsed.data),
       );
     });

@@ -9,6 +9,7 @@
  * Beenden erreichbar.
  */
 import { Menu, nativeImage, Tray } from 'electron';
+import { texte } from '../i18n';
 import { createTrayIconPng, type TrayIconVariant } from './tray-icon';
 
 export interface TrayHandlers {
@@ -23,6 +24,8 @@ export interface TrayHandlers {
 export interface TrayController {
   /** Aufnahme-Zustand sichtbar machen (Icon-Wechsel + Menue-Text). */
   readonly setRecording: (recording: boolean) => void;
+  /** Menue/Tooltip mit der aktuellen UI-Sprache neu aufbauen (B3). */
+  readonly refreshLanguage: () => void;
   readonly destroy: () => void;
 }
 
@@ -40,28 +43,35 @@ export function createTrayController(handlers: TrayHandlers): TrayController {
   const idleIcon = buildIcon('idle');
   const recordingIcon = buildIcon('recording');
   const tray = new Tray(idleIcon);
+  // Der Tooltip im Ruhezustand ist der Produktname (Eigenname, sprachneutral).
   tray.setToolTip('VoiceWall');
+  let isRecording = false;
 
-  const applyMenu = (recording: boolean): void => {
+  const applyState = (): void => {
+    const t = texte().tray;
     tray.setContextMenu(
       Menu.buildFromTemplate([
         {
-          label: recording ? 'Diktat stoppen' : 'Diktat starten',
+          label: isRecording ? t.diktatStoppen : t.diktatStarten,
           click: handlers.onToggleDictation,
         },
-        { label: 'VoiceWall öffnen', click: handlers.onOpenWindow },
+        { label: t.fensterOeffnen, click: handlers.onOpenWindow },
         { type: 'separator' },
-        { label: 'VoiceWall beenden', click: handlers.onQuit },
+        { label: t.beenden, click: handlers.onQuit },
       ]),
     );
+    tray.setImage(isRecording ? recordingIcon : idleIcon);
+    tray.setToolTip(isRecording ? t.tooltipAufnahme : 'VoiceWall');
   };
-  applyMenu(false);
+  applyState();
 
   return {
     setRecording: (recording) => {
-      tray.setImage(recording ? recordingIcon : idleIcon);
-      tray.setToolTip(recording ? 'VoiceWall: Aufnahme läuft' : 'VoiceWall');
-      applyMenu(recording);
+      isRecording = recording;
+      applyState();
+    },
+    refreshLanguage: () => {
+      applyState();
     },
     destroy: () => {
       tray.destroy();

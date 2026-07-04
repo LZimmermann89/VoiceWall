@@ -7,7 +7,11 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, globalShortcut, session } from 'electron';
+import { APP_VERSION } from './app-version';
+import { readGlobalConfig } from './config/config-store';
+import { GlobalConfigWriter } from './config/config-writer';
 import { DictationFlowController } from './dictation/flow-controller';
+import { setUiLanguage } from './i18n';
 import { registerIpcHandlers } from './ipc/handlers';
 import { createLogger, type Logger } from './log/logger';
 import { CompanyManager } from './storage/companies';
@@ -202,8 +206,12 @@ if (!hasSingleInstanceLock) {
   });
 
   void app.whenReady().then(async () => {
-    registerIpcHandlers();
     const logger = createLogger(app.getPath('userData'));
+    // UI-Sprache des Main-Katalogs VOR jeder weiteren Registrierung setzen
+    // (Paket B3, E41): eine zentrale Stelle beim Start; danach aktualisiert
+    // nur noch der config:set-ui-language-Handler (FlowController).
+    setUiLanguage((await readGlobalConfig(app.getPath('userData'), logger)).uiSprache);
+    registerIpcHandlers();
     hardenPermissions(logger);
     orchestrator = new DictationOrchestrator({
       userDataPath: app.getPath('userData'),
@@ -227,10 +235,19 @@ if (!hasSingleInstanceLock) {
     // Test ersetzt VOICEWALL_TEST_BASE_DIR den Desktop vollstaendig.
     const testBase = testBaseDir();
     const activeOrchestrator = orchestrator;
+    // EIN zentraler, serialisierter Konfig-Schreibpfad fuer ALLE globalen
+    // Konfig-Schreiber (E42): FlowController UND CompanyManager teilen sich
+    // dieselbe Instanz, ein Lost-Update zwischen ihnen ist ausgeschlossen.
+    const configWriter = new GlobalConfigWriter({
+      userDataPath: app.getPath('userData'),
+      logger,
+    });
+
     companyManager = new CompanyManager({
       userDataPath: app.getPath('userData'),
       logger,
-      appVersion: `VoiceWall ${app.getVersion()}`,
+      configWriter,
+      appVersion: `VoiceWall ${APP_VERSION}`,
       resolveDesktop: async () => {
         if (testBase !== null) {
           return testBase;
@@ -256,6 +273,7 @@ if (!hasSingleInstanceLock) {
     flowController = new DictationFlowController({
       userDataPath: app.getPath('userData'),
       logger,
+      configWriter,
       orchestrator,
       companies: companyManager,
       openMainWindow,
@@ -282,7 +300,7 @@ function writeReadyMarker(): void {
     writeFileSync(
       join(app.getPath('userData'), 'app-ready.json'),
       JSON.stringify(
-        { pid: process.pid, version: app.getVersion(), startedAtIso: new Date().toISOString() },
+        { pid: process.pid, version: APP_VERSION, startedAtIso: new Date().toISOString() },
         null,
         2,
       ),

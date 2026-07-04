@@ -86,6 +86,12 @@ export function App(): ReactElement {
     };
   }, []);
 
+  // A11y (Paket B3, Pflicht-Fix): die Dokumentsprache folgt der UI-Sprache,
+  // damit Screenreader die korrekte Aussprache waehlen.
+  useEffect(() => {
+    document.documentElement.lang = sprache;
+  }, [sprache]);
+
   const setSprache = useCallback((next: UiLanguage) => {
     spracheAdopted.current = true;
     setSpracheState(next);

@@ -10,8 +10,11 @@
  *   (reine Extraktion, keine Umformulierung; einzige dokumentierte Ausnahme:
  *   der Sprache-Schritt-Hinweis, der die feste Oberflächensprache behauptete).
  * - Parametrisierte Texte sind Funktionen `(n) => string` (kein Templating).
- * - Meldungen aus dem MAIN-Prozess (Result-Fehler, engineHinweis, Tray)
- *   erreichen die UI über IPC und sind NICHT Teil dieses Katalogs (Paket B3).
+ * - Meldungen aus dem MAIN-Prozess (Result-Fehler, engineHinweis, Tray,
+ *   Modell-Anzeigenamen, PDF-Vorlage) stehen seit Paket B3 im Bereich `main`
+ *   (Entscheidung E41); der Main-Prozess adressiert sie über
+ *   src/main/i18n.ts (texte()). Die deutschen Texte sind 1:1 aus den
+ *   Main-Modulen extrahiert. LOGS bleiben bewusst deutsch (E41).
  * - Rechtstexte (Impressum, shared/impressum.ts) bleiben deutsch (deutsches
  *   Recht); die EN-Oberfläche zeigt eine kurze Einordnungszeile.
  *
@@ -606,5 +609,352 @@ export const de = {
     noSpeech: 'Keine Sprache erkannt.',
     error: 'Fehler beim Einfügen.',
     kopieren: 'Kopieren',
+  },
+
+  /**
+   * Nutzersichtbare Texte des MAIN-Prozesses (Paket B3, Entscheidung E41):
+   * Result-Fehlermeldungen, Tray, Overlay-Zustellmeldungen, PDF-Vorlage und
+   * Modell-Anzeigenamen. Gegliedert nach Herkunftsmodul. Die deutschen Texte
+   * sind 1:1 aus den Main-Modulen extrahiert (prüfbarer Diff).
+   */
+  main: {
+    generisch: {
+      internerFehler: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
+      statusFehler: 'Interner Fehler beim Statusabruf. Details stehen im lokalen Log.',
+      unbekannt: 'unbekannt',
+      unbekannterFehler: 'unbekannter Fehler',
+    },
+
+    // stt/orchestrator.ts
+    stt: {
+      ungueltigeDiktatsprache: 'Ungültige Diktatsprache.',
+      keinPcmPuffer: 'Kein gültiger PCM-Puffer.',
+      einwilligungZuerst: 'Bitte zuerst die Mikrofon-Einwilligung erteilen.',
+      sprachwechselEnglisch:
+        'Sprachwechsel: die Spracherkennung startet mit dem mehrsprachigen Modell (Englisch) neu ...',
+      sprachwechselDeutsch:
+        'Sprachwechsel: die Spracherkennung startet mit dem deutschen Modell neu ...',
+      modelleFehlenEnglisch:
+        'Das mehrsprachige Erkennungsmodell für Englisch fehlt. Bitte den einmaligen Modell-Download starten (Knopf "Modelle laden und Engine starten" bzw. Einrichtungs-Assistent, ca. 574 MB).',
+      modelleFehlenDeutsch:
+        'Die Modelle fehlen. Bitte zuerst den einmaligen Modell-Download im Einrichtungs-Assistenten ausführen.',
+      engineNichtVerfuegbar: 'Engine nicht verfügbar.',
+      /** Fehlertext des Capture-Fensters; das Detail liefert getUserMedia. */
+      mikrofonZugriffFehler: (detail: string): string =>
+        `Der Mikrofonzugriff ist fehlgeschlagen (${detail}). Bitte prüfen, ob ein Mikrofon angeschlossen ist und VoiceWall Zugriff hat.`,
+    },
+
+    // whisper/engine-manager.ts und whisper/engine.worker.ts
+    engine: {
+      beendetVorErgebnis: 'Engine wurde beendet, bevor ein Ergebnis vorlag.',
+      mehrfachAbgestuerzt:
+        'Die Spracherkennung ist mehrfach abgestürzt und konnte nicht neu gestartet werden. Bitte VoiceWall neu starten; bleibt der Fehler, das Log unter userData prüfen.',
+      nochNichtBereit: 'Die Spracherkennung ist noch nicht bereit.',
+      nichtBereit: 'Engine nicht bereit.',
+      ungueltigeNachricht: (detail: string): string => `Ungültige Worker-Nachricht: ${detail}`,
+    },
+
+    // dictation/flow-controller.ts
+    flow: {
+      overlayTextEingefuegt: 'Text eingefügt (und in der Zwischenablage).',
+      overlayTextInZwischenablage: 'Text liegt in der Zwischenablage.',
+      hotkeyBelegt: (accelerator: string): string =>
+        `Die Tastenkombination ${accelerator} ist bereits von einer anderen App oder vom System belegt. Bitte im VoiceWall-Fenster unter "Systemweites Diktat" eine andere Kombination wählen, z. B. CommandOrControl+Alt+D.`,
+      hotkeyWechselBelegt: (neu: string, bisher: string): string =>
+        `Die Tastenkombination ${neu} ist bereits systemweit belegt. Der bisherige Hotkey ${bisher} bleibt aktiv. Bitte eine andere Kombination versuchen.`,
+      hotkeyTestBelegt: (accelerator: string): string =>
+        `Die Tastenkombination ${accelerator} ist bereits von einer anderen App oder vom System belegt. Bitte eine andere Kombination wählen.`,
+      /** Ersetzt die zod-Meldung des hotkeyAcceleratorSchema an der IPC-Grenze. */
+      ungueltigeTastenkombination:
+        'Ungültige Tastenkombination. Bitte mindestens eine Modifier-Taste (z. B. CommandOrControl, Alt, Shift) und genau eine Taste angeben, etwa "CommandOrControl+Shift+D".',
+      eingabeTastenkombination: 'Ungültige Eingabe für die Tastenkombination.',
+      eingabeZwischenablage: 'Ungültige Eingabe für den Zwischenablage-Schalter.',
+      eingabeAufbereitung: 'Ungültige Eingabe für die Aufbereitungs-Schalter.',
+      eingabeUiSprache: 'Ungültige Eingabe für die Sprache der Oberfläche.',
+      ungueltigeModellwahl: 'Ungültige Modellwahl.',
+      keinDiktatVorhanden:
+        'Es gibt noch kein Diktat. Bitte zuerst per Hotkey oder Testaufnahme diktieren.',
+      firmenverwaltungFehlt: 'Die Firmenverwaltung ist nicht verfügbar.',
+      // Dev-/Test-IPC (nie im ausgelieferten Produkt, aber nutzersichtbar im Test).
+      eingabePasteMock: 'Ungültige Eingabe für den Paste-Mock.',
+      eingabeAccessibilityOverride: 'Ungültige Eingabe für den Accessibility-Override.',
+      ungueltigerText: 'Ungültiger Text.',
+      aufbereiteterTextLeer: 'Der aufbereitete Text ist leer (nur Füllwörter/Leerraum).',
+      vadStille: 'VAD meldete Stille, kein Text erzeugt.',
+    },
+
+    // paste/index.ts, paste/macos.ts, paste/windows.ts
+    paste: {
+      fehlgeschlagenMacos: (detail: string): string =>
+        `Automatisches Einfügen fehlgeschlagen${detail}. Der Text liegt in der Zwischenablage, bitte mit Cmd+V manuell einfügen. Bleibt der Fehler, in den Systemeinstellungen unter Datenschutz und Sicherheit, Bedienungshilfen die Freigabe für VoiceWall prüfen.`,
+      fehlgeschlagenWindows: (detail: string): string =>
+        `Automatisches Einfügen fehlgeschlagen${detail}. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfügen. Hinweis: Läuft die Ziel-App als Administrator, blockiert Windows simulierte Eingaben (UIPI); dann bitte immer den Kopieren-Knopf verwenden.`,
+      nichtUnterstuetzt:
+        'Automatisches Einfügen wird auf diesem Betriebssystem nicht unterstützt. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfügen.',
+    },
+
+    // permission/accessibility.ts und permission/microphone.ts
+    freigaben: {
+      accessibilityFehlt:
+        'Automatisches Einfügen ist noch nicht möglich: VoiceWall hat keine Bedienungshilfen-Freigabe. Der Text liegt in der Zwischenablage, bitte mit Cmd+V manuell einfügen. So erteilen Sie die Freigabe: 1. Knopf "Systemeinstellungen öffnen" drücken (oder Systemeinstellungen, Datenschutz und Sicherheit, Bedienungshilfen). 2. VoiceWall in der Liste aktivieren (ggf. über das Plus-Symbol hinzufügen). 3. Diktat erneut ausführen.',
+      accessibilityDialogAngezeigt:
+        'macOS hat den Freigabe-Dialog angezeigt. Bitte dort "Systemeinstellungen öffnen" wählen, den Schalter für VoiceWall aktivieren und danach VoiceWall über den Knopf neu starten. Wichtig nach einem Update: einen bereits vorhandenen alten VoiceWall-Eintrag vorher mit dem Minus-Symbol entfernen, er gehört zur alten Programmversion.',
+      nurMacos: 'Dieser Einstellungs-Link existiert nur auf macOS.',
+      einstellungenFehler: (detail: string): string =>
+        `Die Systemeinstellungen konnten nicht geöffnet werden (${detail}). Bitte manuell öffnen: Systemeinstellungen, Datenschutz und Sicherheit, Bedienungshilfen.`,
+      mikrofonAbgelehnt:
+        'Der Mikrofonzugriff wurde abgelehnt. Bitte in den Systemeinstellungen unter Datenschutz und Sicherheit, Mikrofon, VoiceWall erlauben und die App neu starten.',
+      mikrofonGesperrt:
+        'Der Mikrofonzugriff ist gesperrt. Bitte in den Systemeinstellungen unter Datenschutz und Sicherheit, Mikrofon, VoiceWall aktivieren und die App neu starten.',
+      mikrofonEingeschraenkt:
+        'Der Mikrofonzugriff ist auf diesem Rechner eingeschränkt (z. B. durch eine Geräteverwaltung). Bitte die Systemadministration kontaktieren.',
+    },
+
+    // model/model-catalog.ts (Anzeigenamen), model/downloader.ts, model/model-store.ts
+    modelle: {
+      labels: {
+        'whisper-q5': 'Deutsches Whisper-Modell (large-v3-turbo, Q5_0)',
+        'whisper-fp16': 'Deutsches Whisper-Modell (large-v3-turbo, fp16, maximale Genauigkeit)',
+        'turbo-q5_0-multilingual': 'Englisch / mehrsprachig (large-v3-turbo, Q5_0)',
+        'silero-vad': 'Silero-VAD-Modell (v5.1.2)',
+      },
+      downloadNetzwerkfehler: (detail: string): string =>
+        `Der Modell-Download ist fehlgeschlagen (Netzwerkfehler: ${detail}). Bitte die Internetverbindung prüfen und erneut versuchen. Nach dem einmaligen Download läuft VoiceWall vollständig offline.`,
+      downloadAbgelehnt: (status: string): string =>
+        `Der Server hat den Modell-Download abgelehnt (HTTP ${status}). Bitte später erneut versuchen oder die Modell-Quelle prüfen.`,
+      downloadNichtGespeichert: (detail: string): string =>
+        `Der Modell-Download konnte nicht gespeichert werden (${detail}). Bitte freien Speicherplatz und Schreibrechte prüfen.`,
+      downloadGroesseFalsch: (ist: string, soll: string): string =>
+        `Die heruntergeladene Datei hat eine unerwartete Größe (${ist} statt ${soll} Bytes). Die Datei wurde gelöscht. Bitte den Download erneut starten.`,
+      downloadPruefsummeFalsch:
+        'Die Prüfsumme der heruntergeladenen Modelldatei stimmt nicht mit dem erwarteten Wert überein. Die Datei wurde aus Sicherheitsgründen gelöscht. Bitte den Download erneut starten; tritt der Fehler wiederholt auf, ist die Quelle nicht vertrauenswürdig.',
+      downloadNichtAbgelegt: (detail: string): string =>
+        `Die verifizierte Modelldatei konnte nicht abgelegt werden (${detail}).`,
+      dateiFehlt: (dateiname: string): string => `Datei fehlt: ${dateiname}`,
+      dateiBeschaedigt: (dateiname: string): string =>
+        `Die Modelldatei ${dateiname} ist beschädigt (Prüfsumme stimmt nicht). Sie muss neu geladen werden.`,
+      modellFehltDownloadNoetig: (label: string): string =>
+        `Das ${label} fehlt. Bitte den einmaligen Modell-Download im Einrichtungs-Assistenten starten.`,
+    },
+
+    // storage/companies.ts, storage/company-folder.ts, storage/sync-detection.ts, storage/paths.ts
+    firmen: {
+      keineAktiveFirma: 'Keine aktive Firma. Bitte zuerst eine Firma anlegen oder aktivieren.',
+      keineAktiveFirmaKurz: 'Keine aktive Firma.',
+      desktopFehltStrategie:
+        'Der Desktop-Ordner wurde nicht gefunden. Bitte die Strategie "lokal-mit-verknuepfung" verwenden.',
+      desktopFehlt:
+        'Der Desktop-Ordner wurde nicht gefunden. Bitte im Einrichtungs-Assistenten einen Zielordner für den Firmenordner auswählen.',
+      lokalerOrdnerFehler: (detail: string): string =>
+        `Der lokale VoiceWall-Ordner konnte nicht angelegt werden: ${detail}`,
+      verknuepfungAngelegt: (ordnername: string, pfad: string): string =>
+        `Auf dem Desktop liegt eine Verknüpfung "${ordnername}"; die Diktate selbst bleiben im lokalen Ordner ${pfad}.`,
+      verknuepfungHinweis: (detail: string): string => `Hinweis: ${detail}`,
+      verknuepfungKollision: (name: string): string =>
+        `Auf dem Desktop existiert bereits ein Eintrag namens "${name}". VoiceWall überschreibt nichts; bitte den Eintrag prüfen oder einen anderen Namen wählen.`,
+      verknuepfungFehler: (detail: string): string =>
+        `Die Desktop-Verknüpfung konnte nicht angelegt werden: ${detail}`,
+      nichtInListe:
+        'Diese Firma ist nicht in der Liste der gültigen Firmenordner. Bitte die Firma zuerst anlegen oder öffnen.',
+      keinGueltigerOrdner:
+        'Dieser Ordner ist kein gültiger VoiceWall-Firmenordner an einem erlaubten Ort (Desktop oder ~/VoiceWall).',
+      konfigNichtLesbar:
+        'Die Firmen-Konfiguration ist nicht lesbar (.voicewall/config.json). Bitte den Firmenordner prüfen.',
+      konfigUngueltig:
+        'Die Firmen-Konfiguration ist ungültig (.voicewall/config.json). Bitte den Firmenordner prüfen.',
+      konfigSchreibFehler: (detail: string): string =>
+        `Die Firmen-Konfiguration konnte nicht geschrieben werden: ${detail}`,
+      zielordnerNichtLesbar: (detail: string): string =>
+        `Der Zielordner ist nicht lesbar: ${detail}`,
+      ordnerFremd: (name: string): string =>
+        `Der Ordner "${name}" existiert bereits und ist kein VoiceWall-Ordner. VoiceWall schreibt nicht in fremde Ordner. Bitte einen anderen Namen wählen, z. B. den Vorschlag übernehmen.`,
+      ordnerAnlageFehler: (detail: string): string =>
+        `Der Firmenordner konnte nicht angelegt werden: ${detail}`,
+      syncWarnung: (anbieter: string): string =>
+        `Achtung: Dieser Speicherort wird von ${anbieter} in die Cloud synchronisiert. ` +
+        'Diktate würden damit das "100 Prozent lokal"-Versprechen verlassen. Empfehlung: Diktate in den ' +
+        'lokalen Ordner ~/VoiceWall legen und auf dem Desktop nur eine Verknüpfung anzeigen. Die Wahl ' +
+        'bleibt bei Ihnen; VoiceWall ändert nichts ohne Bestätigung.',
+      eingabeFirmenname: 'Ungültige Eingabe für den Firmennamen.',
+      eingabeFirmenAnlage: 'Ungültige Eingabe für die Firmen-Anlage.',
+      ungueltigerFirmenpfad: 'Ungültiger Firmenpfad.',
+      eingabeAutoSpeichern: 'Ungültige Eingabe für den Auto-Speichern-Schalter.',
+    },
+
+    // storage/sanitize.ts
+    sanitize: {
+      nameLeer:
+        'Der Firmenname enthält keine für einen Ordnernamen verwendbaren Zeichen. Bitte einen Namen mit Buchstaben oder Ziffern eingeben.',
+      nameReserviert:
+        'Dieser Name ist unter Windows ein reservierter Gerätename und kann nicht als Ordnername verwendet werden. Bitte einen anderen Namen wählen.',
+      containment:
+        'Ungültiger Ordnername: der Pfad liegt außerhalb des Zielordners. Bitte einen anderen Namen wählen.',
+      pfadZuLang: (laenge: string, grenze: string): string =>
+        `Der vollständige Ordnerpfad würde ${laenge} Zeichen lang (Windows-Grenze: ${grenze}). Bitte einen kürzeren Firmennamen wählen.`,
+    },
+
+    // storage/containment.ts
+    containment: {
+      ausserhalb:
+        'Ungültiger Pfad: der Eintrag zeigt außerhalb des Firmenordners und wird abgewiesen.',
+    },
+
+    // storage/transcripts.ts
+    diktate: {
+      titelFallback: 'Diktat',
+      metadatenUngueltig: (detail: string): string => `Diktat-Metadaten sind ungültig: ${detail}`,
+      ordnerAnlageFehler: (detail: string): string =>
+        `Der Diktate-Ordner konnte nicht angelegt werden: ${detail}`,
+      schreibFehler: (detail: string): string =>
+        `Das Diktat konnte nicht geschrieben werden: ${detail}`,
+      anlageKollision: 'Das Diktat konnte nicht angelegt werden (Dateinamens-Kollision).',
+      nichtGefunden: 'Das Diktat wurde nicht gefunden oder ist nicht lesbar.',
+      beschaedigt: (detail: string): string => `Das Diktat ist beschädigt: ${detail}`,
+      schemaVerletzt: (detail: string): string =>
+        `Die Diktat-Metadaten verletzen das Schema: ${detail}`,
+      pfadAusserhalbWurzel: (wurzel: string): string =>
+        `Ungültiger Pfad: erwartet wird ein Eintrag unterhalb von "${wurzel}/". Der Eintrag wird abgewiesen.`,
+      papierkorbFehler: (detail: string): string =>
+        `Das Diktat konnte nicht in den Papierkorb verschoben werden: ${detail}`,
+      papierkorbKollision:
+        'Das Diktat konnte nicht in den Papierkorb verschoben werden (Namenskollision).',
+      wiederherstellenZielBelegt:
+        'Am Zielort existiert bereits eine Datei mit diesem Namen. Bitte zuerst den bestehenden Eintrag prüfen.',
+      wiederherstellenFehler: (detail: string): string =>
+        `Das Diktat konnte nicht wiederhergestellt werden: ${detail}`,
+      endgueltigNurPapierkorb: 'Endgültiges Löschen ist nur direkt aus dem Papierkorb erlaubt.',
+      endgueltigFehler: (detail: string): string =>
+        `Das Diktat konnte nicht endgültig gelöscht werden: ${detail}`,
+      eingabeUngueltig: 'Ungültige Eingabe.',
+      pfadUngueltig: 'Ungültiger Diktat-Pfad.',
+      suchfilterUngueltig: 'Ungültiger Suchfilter.',
+      eingabeBearbeitung: 'Ungültige Eingabe für die Bearbeitung.',
+      eingabeNotiz: 'Ungültige Eingabe für die Notiz.',
+    },
+
+    // storage/manifest.ts
+    manifest: {
+      fehlt: 'Manifest fehlt.',
+      keinJson: 'Manifest ist kein gueltiges JSON.',
+      schemaVerletzt: (detail: string): string => `Manifest verletzt das Schema: ${detail}`,
+      schreibFehler: (detail: string): string =>
+        `Manifest konnte nicht geschrieben werden: ${detail}`,
+    },
+
+    // storage/migration.ts
+    migration: {
+      schrittFehlt: (von: string, nach: string): string =>
+        `Für die Migration von Schema-Version ${von} nach ${nach} ist kein Schritt registriert. Der Firmenordner bleibt unverändert.`,
+      schrittUeberspringt: (beschreibung: string, von: string, nach: string): string =>
+        `Migrationsschritt "${beschreibung}" überspringt Versionen (${von} -> ${nach}). Der Firmenordner bleibt unverändert.`,
+      neuereVersion: (ist: string, verstanden: string): string =>
+        `Der Firmenordner hat Schema-Version ${ist}, diese VoiceWall-Version versteht nur ${verstanden}. Bitte VoiceWall aktualisieren; der Ordner bleibt unverändert.`,
+      abgebrochen: (grund: string): string =>
+        `Migration abgebrochen, der Firmenordner ist unverändert. Grund: ${grund}`,
+      swapFehlgeschlagen: (backup: string, grund: string): string =>
+        `Migration beim Übernehmen fehlgeschlagen; der alte Stand wurde wiederhergestellt (Backup: ${backup}). Grund: ${grund}`,
+    },
+
+    // storage/tag-rename.ts
+    tagRename: {
+      identisch: 'Der neue Tag-Name ist identisch mit dem alten. Bitte einen anderen Namen wählen.',
+      metadatenUngueltig: (detail: string): string =>
+        `Die Metadaten wären nach der Umbenennung ungültig: ${detail}`,
+      schreibFehler: (detail: string): string =>
+        `Die Datei konnte nicht geschrieben werden: ${detail}`,
+      eingabe: 'Ungültige Eingabe für die Tag-Umbenennung.',
+    },
+
+    // storage/vokabular-store.ts + Handler
+    woerterbuch: {
+      nichtLesbar: 'Die Datei vokabular.json ist nicht lesbar. Bitte Dateirechte prüfen.',
+      keinJson:
+        'Die Datei vokabular.json ist kein gültiges JSON. Bitte die Datei korrigieren oder das Wörterbuch in VoiceWall neu speichern.',
+      schemaVerletzt: (detail: string): string =>
+        `Die Datei vokabular.json verletzt das Schema: ${detail}`,
+      speichernFehler: (detail: string): string =>
+        `Das Wörterbuch konnte nicht gespeichert werden: ${detail}`,
+      eingabe: 'Ungültige Eingabe für das Fach-Wörterbuch.',
+    },
+
+    // storage/export.ts, storage/batch-export.ts, storage/pdf-export.ts + Handler
+    export: {
+      ordnerFehler: (detail: string): string =>
+        `Der Exporte-Ordner konnte nicht angelegt werden: ${detail}. Bitte die Schreibrechte im Firmenordner prüfen.`,
+      schreibFehler: (detail: string): string =>
+        `Der Export konnte nicht geschrieben werden: ${detail}. Bitte die Schreibrechte im Firmenordner prüfen.`,
+      kollision:
+        'Der Export konnte nicht angelegt werden (Dateinamens-Kollision). Bitte erneut versuchen.',
+      keineAuswahl: 'Es wurde kein Eintrag für den Export ausgewählt.',
+      pdfNichtVerfuegbar: 'PDF-Export ist in dieser Umgebung nicht verfügbar.',
+      pdfFehler: (detail: string): string => `Das PDF konnte nicht erzeugt werden: ${detail}`,
+      stapelVorbereitungFehler: (detail: string): string =>
+        `Der Stapel-Export konnte nicht vorbereitet werden: ${detail}`,
+      stapelAlleFehlgeschlagen: (ersteMeldung: string): string =>
+        `Keiner der ausgewählten Einträge konnte exportiert werden. Erste Meldung: ${ersteMeldung}`,
+      stapelOrdnerKollision: 'Der Stapel-Ordner konnte nicht angelegt werden (Namenskollision).',
+      stapelFehler: (detail: string): string => `Der Stapel-Export ist fehlgeschlagen: ${detail}`,
+      eingabe: 'Ungültige Eingabe für den Export.',
+      eingabeStapel: 'Ungültige Eingabe für den Stapel-Export.',
+      exportpfadUngueltig: 'Ungültiger Exportpfad.',
+    },
+
+    // storage/encrypted-export.ts + companies.decryptVwencFile + Handler
+    vwenc: {
+      eingabeVerschluesselt:
+        'Ungültige Eingabe für den verschlüsselten Export (Passwort mindestens 12 Zeichen).',
+      eingabeEntschluesseln: 'Ungültige Eingabe für das Entschlüsseln.',
+      dialogTitel: 'VoiceWall-verschlüsselte Datei entschlüsseln',
+      dialogKnopf: 'Entschlüsseln',
+      dialogFilter: 'VoiceWall verschlüsselt (.vwenc)',
+      keineDatei: 'Es wurde keine Datei ausgewählt.',
+      zuGross: 'Die Datei ist zu groß für eine VoiceWall-.vwenc-Datei (Limit 64 MB).',
+      nichtLesbar: 'Die ausgewählte Datei ist nicht lesbar.',
+      keinContainer:
+        'Diese Datei ist keine VoiceWall-verschlüsselte Datei (.vwenc) oder sie ist unvollständig.',
+      neuereVersion:
+        'Diese .vwenc-Datei wurde mit einer neueren VoiceWall-Version erstellt. Bitte VoiceWall aktualisieren.',
+      fehlgeschlagen:
+        'Die Entschlüsselung ist fehlgeschlagen: das Passwort ist falsch oder die Datei wurde verändert. Hinweis: bei Passwortverlust ist der Inhalt unwiederbringlich verloren.',
+      schreibFehler: (detail: string): string =>
+        `Die entschlüsselte Datei konnte nicht geschrieben werden: ${detail}`,
+      namenskollision: 'Die entschlüsselte Datei konnte nicht angelegt werden (Namenskollision).',
+    },
+
+    // storage/pdf-template.ts (PDF folgt der UI-Sprache zum Exportzeitpunkt, E41)
+    pdf: {
+      quelle: {
+        diktat: 'Diktat',
+        import: 'Import',
+        manuell: 'Notiz',
+      },
+      dokumentart: 'Diktat-Export · 100 % lokal erstellt',
+      zeileErstellt: 'Erstellt',
+      zeileGeaendert: 'Geändert',
+      zeileQuelle: 'Quelle',
+      zeileModell: 'Modell',
+      zeileWortzahl: 'Wortzahl',
+      zeileTags: 'Tags',
+      volltext: 'Volltext',
+      datumMitZeit: (datum: string, zeit: string): string => `${datum}, ${zeit} Uhr`,
+      fussErstelltMit: 'Erstellt mit VoiceWall, 100 % lokal',
+      fussSeite: 'Seite',
+      fussVon: 'von',
+    },
+
+    // tray/tray.ts (Tooltip "VoiceWall" ist ein Eigenname und bleibt im Code)
+    tray: {
+      diktatStarten: 'Diktat starten',
+      diktatStoppen: 'Diktat stoppen',
+      fensterOeffnen: 'VoiceWall öffnen',
+      beenden: 'VoiceWall beenden',
+      tooltipAufnahme: 'VoiceWall: Aufnahme läuft',
+    },
+
+    // ipc/handlers.ts
+    handlers: {
+      browserFehler: (detail: string, url: string): string =>
+        `Der Browser konnte nicht geöffnet werden (${detail}). Die Quelle ist ${url}; alle Angaben stehen auch direkt hier in der App.`,
+    },
   },
 };

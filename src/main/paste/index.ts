@@ -20,6 +20,7 @@
  *
  * Linux wird in v1 nicht unterstuetzt (siehe docs/ENTSCHEIDUNGEN.md).
  */
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import { createMacosPasteAdapter } from './macos';
 import { createWindowsPasteAdapter } from './windows';
@@ -29,8 +30,8 @@ export interface PasteAdapter {
   readonly id: string;
   /**
    * Loest das Einfuegen (Cmd/Strg+V) in der fokussierten App aus. Erwartbare
-   * Fehler (Exit-Code != 0, fehlendes Werkzeug) kommen als deutsche Meldung
-   * mit naechstem Schritt zurueck, nie als Exception.
+   * Fehler (Exit-Code != 0, fehlendes Werkzeug) kommen als Katalog-Meldung
+   * in der UI-Sprache mit naechstem Schritt zurueck, nie als Exception.
    */
   readonly paste: () => Promise<Result<void, string>>;
 }
@@ -43,8 +44,6 @@ export function createPasteAdapter(platform: NodeJS.Platform): Result<PasteAdapt
     case 'win32':
       return ok(createWindowsPasteAdapter());
     default:
-      return err(
-        'Automatisches Einfügen wird auf diesem Betriebssystem nicht unterstützt. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfügen.',
-      );
+      return err(texte().paste.nichtUnterstuetzt);
   }
 }

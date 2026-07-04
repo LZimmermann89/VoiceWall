@@ -29,6 +29,7 @@
  *   unwiederbringlichen Datenverlust; die UI sagt das ausdruecklich.
  */
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 
 export const VWENC_EXTENSION = '.vwenc';
@@ -84,16 +85,12 @@ export function decryptFromVwenc(container: Uint8Array, passwort: string): Resul
     buffer.length < HEADER_LENGTH ||
     buffer.subarray(0, VWENC_MAGIC.length).toString('ascii') !== VWENC_MAGIC
   ) {
-    return err(
-      'Diese Datei ist keine VoiceWall-verschlüsselte Datei (.vwenc) oder sie ist unvollständig.',
-    );
+    return err(texte().vwenc.keinContainer);
   }
   const version = buffer[VWENC_MAGIC.length];
   const kdf = buffer[VWENC_MAGIC.length + 1];
   if (version !== VWENC_VERSION || kdf !== VWENC_KDF_SCRYPT) {
-    return err(
-      'Diese .vwenc-Datei wurde mit einer neueren VoiceWall-Version erstellt. Bitte VoiceWall aktualisieren.',
-    );
+    return err(texte().vwenc.neuereVersion);
   }
   let offset = VWENC_MAGIC.length + 2;
   const salt = buffer.subarray(offset, offset + SALT_LENGTH);
@@ -111,9 +108,7 @@ export function decryptFromVwenc(container: Uint8Array, passwort: string): Resul
   } catch {
     // GCM-Auth-Fehler: falsches Passwort oder veraenderte Datei. Beides ist
     // von aussen nicht unterscheidbar (und soll es auch nicht sein).
-    return err(
-      'Die Entschlüsselung ist fehlgeschlagen: das Passwort ist falsch oder die Datei wurde verändert. Hinweis: bei Passwortverlust ist der Inhalt unwiederbringlich verloren.',
-    );
+    return err(texte().vwenc.fehlgeschlagen);
   } finally {
     key.fill(0);
   }

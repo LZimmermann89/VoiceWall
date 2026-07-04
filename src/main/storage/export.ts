@@ -21,6 +21,7 @@ import { mkdir, stat } from 'node:fs/promises';
 import { basename } from 'node:path';
 import type { ExportFormat, TranscriptMeta } from '../../shared/company';
 import { normalizeBody, serializeFrontMatter } from '../../shared/front-matter';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import { writeFileAtomic } from './atomic-write';
 import { EXPORTE_DIR } from './company-folder';
@@ -83,9 +84,7 @@ export async function ensureExporteDir(companyDir: string): Promise<Result<strin
   try {
     await mkdir(exporteDirResult.value, { recursive: true, mode: 0o700 });
   } catch (error) {
-    return err(
-      `Der Exporte-Ordner konnte nicht angelegt werden: ${error instanceof Error ? error.message : String(error)}. Bitte die Schreibrechte im Firmenordner prüfen.`,
-    );
+    return err(texte().export.ordnerFehler(error instanceof Error ? error.message : String(error)));
   }
   return ok(exporteDirResult.value);
 }
@@ -124,14 +123,12 @@ export async function writeExportFile(
       await writeFileAtomic(target, content);
     } catch (error) {
       return err(
-        `Der Export konnte nicht geschrieben werden: ${error instanceof Error ? error.message : String(error)}. Bitte die Schreibrechte im Firmenordner prüfen.`,
+        texte().export.schreibFehler(error instanceof Error ? error.message : String(error)),
       );
     }
     return ok({ absPfad: target, relPfad: `${EXPORTE_DIR}/${fileName}` });
   }
-  return err(
-    'Der Export konnte nicht angelegt werden (Dateinamens-Kollision). Bitte erneut versuchen.',
-  );
+  return err(texte().export.kollision);
 }
 
 /**

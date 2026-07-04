@@ -19,13 +19,14 @@
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { err, ok, type Result } from '../../shared/result';
+import { texte } from '../i18n';
 import {
   downloadModel,
   hashFileSha256,
   type DownloadError,
   type DownloadProgress,
 } from './downloader';
-import { MODEL_DESCRIPTORS, type ModelDescriptor } from './model-catalog';
+import { MODEL_DESCRIPTORS, modelLabelFor, type ModelDescriptor } from './model-catalog';
 
 interface IntegrityMarkerEntry {
   sha256: string;
@@ -83,7 +84,7 @@ async function verifyFile(
   try {
     fileStat = await stat(filePath);
   } catch {
-    return err({ kind: 'missing', message: `Datei fehlt: ${descriptor.fileName}` });
+    return err({ kind: 'missing', message: texte().modelle.dateiFehlt(descriptor.fileName) });
   }
 
   const marker = await readMarker(userDataPath);
@@ -103,7 +104,7 @@ async function verifyFile(
   if (actualSha !== descriptor.sha256) {
     return err({
       kind: 'corrupt',
-      message: `Die Modelldatei ${descriptor.fileName} ist beschädigt (Prüfsumme stimmt nicht). Sie muss neu geladen werden.`,
+      message: texte().modelle.dateiBeschaedigt(descriptor.fileName),
     });
   }
   marker[descriptor.fileName] = {
@@ -137,7 +138,7 @@ export async function ensureModel(
       verified.error.kind === 'missing'
         ? {
             kind: 'missing',
-            message: `Das ${descriptor.label} fehlt. Bitte den einmaligen Modell-Download im Einrichtungs-Assistenten starten.`,
+            message: texte().modelle.modellFehltDownloadNoetig(modelLabelFor(descriptor.id)),
           }
         : verified.error,
     );

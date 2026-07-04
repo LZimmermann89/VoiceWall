@@ -15,6 +15,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { defaultVokabular, vokabularSchema, type Vokabular } from '../../shared/vokabular';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import { writeFileAtomic } from './atomic-write';
 import { VOICEWALL_DIR } from './company-folder';
@@ -67,20 +68,20 @@ export async function readVokabular(companyDir: string): Promise<Result<Vokabula
   try {
     raw = await readFile(filePath, 'utf8');
   } catch {
-    return err('Die Datei vokabular.json ist nicht lesbar. Bitte Dateirechte prüfen.');
+    return err(texte().woerterbuch.nichtLesbar);
   }
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(raw);
   } catch {
-    return err(
-      'Die Datei vokabular.json ist kein gültiges JSON. Bitte die Datei korrigieren oder das Wörterbuch in VoiceWall neu speichern.',
-    );
+    return err(texte().woerterbuch.keinJson);
   }
   const parsed = vokabularSchema.safeParse(parsedJson);
   if (!parsed.success) {
     return err(
-      `Die Datei vokabular.json verletzt das Schema: ${parsed.error.issues[0]?.message ?? 'unbekannter Fehler'}`,
+      texte().woerterbuch.schemaVerletzt(
+        parsed.error.issues[0]?.message ?? texte().generisch.unbekannterFehler,
+      ),
     );
   }
   cache.set(filePath, { mtimeMs, size, value: parsed.data });
@@ -101,7 +102,7 @@ export async function writeVokabular(
   } catch (error) {
     cache.delete(filePath);
     return err(
-      `Das Wörterbuch konnte nicht gespeichert werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().woerterbuch.speichernFehler(error instanceof Error ? error.message : String(error)),
     );
   }
 }

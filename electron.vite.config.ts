@@ -1,8 +1,20 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
+// App-Version zur Buildzeit aus package.json einbetten (Paket B3):
+// app.getVersion() liefert im Dev-Modus die Electron-Version, nicht die
+// App-Version; der Pruefstempel-Footer braucht die echte App-Version.
+const packageJson = JSON.parse(readFileSync(join(import.meta.dirname, 'package.json'), 'utf8')) as {
+  version: string;
+};
+
 export default defineConfig({
   main: {
+    define: {
+      __APP_VERSION__: JSON.stringify(packageJson.version),
+    },
     build: {
       // Produktions-Abhaengigkeiten (insb. das native @fugood/whisper.node-
       // Addon) werden automatisch externalisiert (electron-vite-Default

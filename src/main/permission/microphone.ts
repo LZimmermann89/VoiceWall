@@ -11,6 +11,7 @@
  * angenommen und der reale Test erfolgt ueber getUserMedia im Capture-Fenster.
  */
 import { systemPreferences } from 'electron';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import type { Logger } from '../log/logger';
 
@@ -46,20 +47,17 @@ export async function ensureMicrophoneAccess(
       ? ok('granted')
       : err({
           state: 'denied',
-          message:
-            'Der Mikrofonzugriff wurde abgelehnt. Bitte in den Systemeinstellungen unter Datenschutz und Sicherheit, Mikrofon, VoiceWall erlauben und die App neu starten.',
+          message: texte().freigaben.mikrofonAbgelehnt,
         });
   }
   if (status === 'denied') {
     return err({
       state: 'denied',
-      message:
-        'Der Mikrofonzugriff ist gesperrt. Bitte in den Systemeinstellungen unter Datenschutz und Sicherheit, Mikrofon, VoiceWall aktivieren und die App neu starten.',
+      message: texte().freigaben.mikrofonGesperrt,
     });
   }
   return err({
     state: 'restricted',
-    message:
-      'Der Mikrofonzugriff ist auf diesem Rechner eingeschränkt (z. B. durch eine Geräteverwaltung). Bitte die Systemadministration kontaktieren.',
+    message: texte().freigaben.mikrofonEingeschraenkt,
   });
 }

@@ -15,6 +15,7 @@
  * ein Literal, es wird niemals Nutzer- oder Transkript-Text interpoliert.
  */
 import { execFile } from 'node:child_process';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import type { PasteAdapter } from './index';
 
@@ -46,11 +47,7 @@ export function createWindowsPasteAdapter(): PasteAdapter {
               return;
             }
             const detail = stderr.trim().length > 0 ? ` (${stderr.trim()})` : '';
-            resolve(
-              err(
-                `Automatisches Einfügen fehlgeschlagen${detail}. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfügen. Hinweis: Läuft die Ziel-App als Administrator, blockiert Windows simulierte Eingaben (UIPI); dann bitte immer den Kopieren-Knopf verwenden.`,
-              ),
-            );
+            resolve(err(texte().paste.fehlgeschlagenWindows(detail)));
           },
         );
       }),

@@ -32,6 +32,7 @@ import {
   type TagsFile,
 } from '../../shared/company';
 import type { DictationLanguage } from '../../shared/schema';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import { formatIsoWithOffset } from '../../shared/time';
 import { buildCompanyDirPath, findEquivalentDirEntry } from './sanitize';
@@ -220,7 +221,9 @@ export async function createCompanyFolder(
   } catch (error) {
     return err({
       kind: 'io',
-      message: `Der Zielordner ist nicht lesbar: ${error instanceof Error ? error.message : String(error)}`,
+      message: texte().firmen.zielordnerNichtLesbar(
+        error instanceof Error ? error.message : String(error),
+      ),
     });
   }
   const existingName = findEquivalentDirEntry(entries, segment);
@@ -234,7 +237,7 @@ export async function createCompanyFolder(
     // Fremder Ordner: NICHT hineinschreiben, Vorschlag fuer die Rueckfrage.
     return err({
       kind: 'fremder-ordner',
-      message: `Der Ordner "${existingName}" existiert bereits und ist kein VoiceWall-Ordner. VoiceWall schreibt nicht in fremde Ordner. Bitte einen anderen Namen wählen, z. B. den Vorschlag übernehmen.`,
+      message: texte().firmen.ordnerFremd(existingName),
       vorschlag: suggestAlternativeName(entries, segment),
     });
   }
@@ -256,7 +259,9 @@ export async function createCompanyFolder(
     }
     return err({
       kind: 'io',
-      message: `Der Firmenordner konnte nicht angelegt werden: ${error instanceof Error ? error.message : String(error)}`,
+      message: texte().firmen.ordnerAnlageFehler(
+        error instanceof Error ? error.message : String(error),
+      ),
     });
   }
   return ok({ dirPath, ordnername: segment, uebernommen: false });

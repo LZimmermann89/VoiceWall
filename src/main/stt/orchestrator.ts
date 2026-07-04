@@ -37,11 +37,13 @@ import {
   recordConsent,
 } from '../consent/consent-store';
 import { readGlobalConfig } from '../config/config-store';
+import { texte } from '../i18n';
 import { IpcChannel } from '../ipc/channels';
 import type { Logger } from '../log/logger';
 import {
   ALL_MODEL_DESCRIPTORS,
   MODEL_CATALOG,
+  modelLabelFor,
   whisperDescriptorForLanguage,
   type WhisperModelChoice,
 } from '../model/model-catalog';
@@ -94,7 +96,12 @@ const DEFAULT_FLOW_STATUS: FlowStatus = {
 /** Timeout fuer das Warten auf das letzte Segment beim Hotkey-Stop. */
 const FLUSH_TIMEOUT_MS = 30_000;
 
-/** Fehlermeldungen des Capture-Fensters: nur begrenzte Strings. */
+/**
+ * Fehler-DETAILS des Capture-Fensters: nur begrenzte Strings. Das
+ * Capture-Fenster sendet seit Paket B3 nur noch das technische Detail
+ * (getUserMedia-Fehlertext); die nutzersichtbare Meldung baut der Main-
+ * Prozess aus dem Katalog (UI-Sprache), Pflicht-Fix aus dem B2-Review.
+ */
 const captureErrorSchema = z.string().min(1).max(1000);
 
 export class DictationOrchestrator {
@@ -117,7 +124,7 @@ export class DictationOrchestrator {
   private contextProvider: (() => Promise<DictationContext>) | null = null;
   /** Sprache/Modell, mit der die laufende Engine gestartet wurde. */
   private engineLanguage: DictationLanguage | null = null;
-  /** Deutsche Statusmeldung der Engine (z. B. Modellwechsel), sonst null. */
+  /** Statusmeldung der Engine in der UI-Sprache (z. B. Modellwechsel). */
   private engineHinweis: string | null = null;
 
   private engine: WhisperEngineManager | null = null;
@@ -137,8 +144,8 @@ export class DictationOrchestrator {
 
   /**
    * Faengt unerwartete Fehler eines invoke-Handlers ab: geloggt wird lokal,
-   * der Renderer erhaelt NUR eine generische deutsche Meldung, nie einen
-   * rohen Stacktrace oder interne Pfade (ABARBEITUNG 3.5).
+   * der Renderer erhaelt NUR eine generische Katalog-Meldung (UI-Sprache),
+   * nie einen rohen Stacktrace oder interne Pfade (ABARBEITUNG 3.5).
    */
   private async guarded(
     action: () => Promise<{ ok: true } | { ok: false; message: string }>,
@@ -149,10 +156,7 @@ export class DictationOrchestrator {
       this.deps.logger.error(
         `Unerwarteter interner Fehler in einem IPC-Handler: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return {
-        ok: false,
-        message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
-      };
+      return { ok: false, message: texte().generisch.internerFehler };
     }
   }
 
@@ -168,7 +172,7 @@ export class DictationOrchestrator {
         // Nie den rohen Fehler an den Renderer geben: bewusst OHNE cause,
         // damit garantiert nichts Internes ueber IPC serialisiert wird.
         // eslint-disable-next-line preserve-caught-error
-        throw new Error('Interner Fehler beim Statusabruf. Details stehen im lokalen Log.');
+        throw new Error(texte().generisch.statusFehler);
       }
     });
     ipcMain.handle(IpcChannel.GrantConsent, () => this.guarded(() => this.grantConsent()));
@@ -177,7 +181,10 @@ export class DictationOrchestrator {
     ipcMain.handle(IpcChannel.PrepareModels, (_event, raw: unknown) => {
       const parsed = dictationLanguageSchema.optional().safeParse(raw ?? undefined);
       if (!parsed.success) {
-        return Promise.resolve({ ok: false as const, message: 'Ungültige Diktatsprache.' });
+        return Promise.resolve({
+          ok: false as const,
+          message: texte().stt.ungueltigeDiktatsprache,
+        });
       }
       return this.guarded(() => this.prepareModels(parsed.data));
     });
@@ -205,7 +212,7 @@ export class DictationOrchestrator {
       // Zod-Schema an der Vertrauensgrenze: nur begrenzte Strings akzeptieren.
       const parsed = captureErrorSchema.safeParse(message);
       if (parsed.success) {
-        this.setError(parsed.data);
+        this.setError(texte().stt.mikrofonZugriffFehler(parsed.data));
       }
     });
     ipcMain.on(IpcChannel.CaptureStarted, () => {
@@ -220,7 +227,7 @@ export class DictationOrchestrator {
       ipcMain.handle(IpcChannel.DevInjectPcm, async (_event, pcm: unknown) => {
         const buffer = toArrayBuffer(pcm);
         if (buffer === null) {
-          return { ok: false as const, message: 'Kein gültiger PCM-Puffer.' };
+          return { ok: false as const, message: texte().stt.keinPcmPuffer };
         }
         return this.guarded(() => this.injectSegment(buffer));
       });
@@ -331,7 +338,9 @@ export class DictationOrchestrator {
     const statuses = await getModelStatuses(this.deps.userDataPath, ALL_MODEL_DESCRIPTORS);
     const models = statuses.map((status) => ({
       id: status.descriptor.id,
-      label: status.descriptor.label,
+      // Anzeigename in der UI-Sprache (B3); descriptor.label bleibt das
+      // deutsche Log-/Audit-Label (model-manifest.json).
+      label: modelLabelFor(status.descriptor.id),
       present: status.present,
       byteSize: status.descriptor.byteSize,
     }));
@@ -424,7 +433,7 @@ export class DictationOrchestrator {
         onProgress: (progress) => {
           this.sendToMain(IpcChannel.ModelProgress, {
             id: descriptor.id,
-            label: descriptor.label,
+            label: modelLabelFor(descriptor.id),
             receivedBytes: progress.receivedBytes,
             totalBytes: progress.totalBytes,
             percent: progress.percent,
@@ -459,9 +468,7 @@ export class DictationOrchestrator {
     }
     if (this.engine !== null && this.engineLanguage !== language) {
       this.engineHinweis =
-        language === 'en'
-          ? 'Sprachwechsel: die Spracherkennung startet mit dem mehrsprachigen Modell (Englisch) neu ...'
-          : 'Sprachwechsel: die Spracherkennung startet mit dem deutschen Modell neu ...';
+        language === 'en' ? texte().stt.sprachwechselEnglisch : texte().stt.sprachwechselDeutsch;
       this.deps.logger.info(
         `Diktatsprache gewechselt (${this.engineLanguage ?? 'unbekannt'} -> ${language}): Engine wird mit dem passenden Modell neu gestartet.`,
       );
@@ -477,9 +484,7 @@ export class DictationOrchestrator {
     if (whisper === undefined || silero === undefined || !whisper.present || !silero.present) {
       this.engineHinweis = null;
       const message =
-        language === 'en'
-          ? 'Das mehrsprachige Erkennungsmodell für Englisch fehlt. Bitte den einmaligen Modell-Download starten (Knopf "Modelle laden und Engine starten" bzw. Einrichtungs-Assistent, ca. 574 MB).'
-          : 'Die Modelle fehlen. Bitte zuerst den einmaligen Modell-Download im Einrichtungs-Assistenten ausführen.';
+        language === 'en' ? texte().stt.modelleFehlenEnglisch : texte().stt.modelleFehlenDeutsch;
       this.setError(message);
       return { ok: false, message };
     }
@@ -544,8 +549,7 @@ export class DictationOrchestrator {
   /** Testaufnahme starten. */
   async startDictation(): Promise<{ ok: true } | { ok: false; message: string }> {
     if (!this.consentGranted) {
-      const message = 'Bitte zuerst die Mikrofon-Einwilligung erteilen.';
-      return { ok: false, message };
+      return { ok: false, message: texte().stt.einwilligungZuerst };
     }
     // Diktat-Kontext der aktiven Firma: Sprache bestimmt das Modell
     // (Engine-Neustart bei Wechsel), Prompt kommt aus dem Fach-Woerterbuch.
@@ -643,7 +647,7 @@ export class DictationOrchestrator {
       return engineOk;
     }
     if (this.engine === null) {
-      return { ok: false, message: 'Engine nicht verfügbar.' };
+      return { ok: false, message: texte().stt.engineNichtVerfuegbar };
     }
     this.engine.setContext(context);
     const result = await this.engine.transcribeSegment(pcm);

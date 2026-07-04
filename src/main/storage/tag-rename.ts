@@ -23,6 +23,7 @@ import {
   type TranscriptMeta,
 } from '../../shared/company';
 import { serializeFrontMatter } from '../../shared/front-matter';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import { formatIsoWithOffset } from '../../shared/time';
 import { writeFileAtomic } from './atomic-write';
@@ -94,7 +95,9 @@ async function renameTagInFile(
   const checked = transcriptMetaSchema.safeParse(meta);
   if (!checked.success) {
     return err(
-      `Die Metadaten wären nach der Umbenennung ungültig: ${checked.error.issues[0]?.message ?? 'unbekannt'}`,
+      texte().tagRename.metadatenUngueltig(
+        checked.error.issues[0]?.message ?? texte().generisch.unbekannt,
+      ),
     );
   }
   const resolved = resolveInsideDir(companyDir, relPfad);
@@ -108,7 +111,7 @@ async function renameTagInFile(
     );
   } catch (error) {
     return err(
-      `Die Datei konnte nicht geschrieben werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().tagRename.schreibFehler(error instanceof Error ? error.message : String(error)),
     );
   }
   return ok(undefined);
@@ -153,7 +156,7 @@ export async function renameTagEverywhere(
   const altNfc = alt.normalize('NFC');
   const neuNfc = neu.normalize('NFC');
   if (altNfc === neuNfc) {
-    return err('Der neue Tag-Name ist identisch mit dem alten. Bitte einen anderen Namen wählen.');
+    return err(texte().tagRename.identisch);
   }
   const altKey = tagKey(altNfc);
 

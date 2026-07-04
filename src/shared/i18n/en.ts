@@ -632,4 +632,320 @@ export const en: Uebersetzung = {
     error: 'Insertion failed.',
     kopieren: 'Copy',
   },
+
+  /**
+   * User-visible texts of the MAIN process (package B3, decision E41):
+   * Result error messages, tray, overlay delivery messages, PDF template
+   * and model display names. Logs intentionally remain German (E41).
+   */
+  main: {
+    generisch: {
+      internerFehler: 'Unexpected internal error. Details are in the local log under userData.',
+      statusFehler: 'Internal error while fetching the status. Details are in the local log.',
+      unbekannt: 'unknown',
+      unbekannterFehler: 'unknown error',
+    },
+
+    stt: {
+      ungueltigeDiktatsprache: 'Invalid dictation language.',
+      keinPcmPuffer: 'Not a valid PCM buffer.',
+      einwilligungZuerst: 'Please grant the microphone consent first.',
+      sprachwechselEnglisch:
+        'Language switch: the speech recognition is restarting with the multilingual model (English) ...',
+      sprachwechselDeutsch:
+        'Language switch: the speech recognition is restarting with the German model ...',
+      modelleFehlenEnglisch:
+        'The multilingual recognition model for English is missing. Please start the one-time model download (button "Download models and start engine" or the setup assistant, about 574 MB).',
+      modelleFehlenDeutsch:
+        'The models are missing. Please run the one-time model download in the setup assistant first.',
+      engineNichtVerfuegbar: 'Engine not available.',
+      mikrofonZugriffFehler: (detail: string): string =>
+        `Microphone access failed (${detail}). Please check that a microphone is connected and that VoiceWall has access.`,
+    },
+
+    engine: {
+      beendetVorErgebnis: 'The engine was terminated before a result was available.',
+      mehrfachAbgestuerzt:
+        'The speech recognition crashed repeatedly and could not be restarted. Please restart VoiceWall; if the error persists, check the log under userData.',
+      nochNichtBereit: 'The speech recognition is not ready yet.',
+      nichtBereit: 'Engine not ready.',
+      ungueltigeNachricht: (detail: string): string => `Invalid worker message: ${detail}`,
+    },
+
+    flow: {
+      overlayTextEingefuegt: 'Text inserted (and in the clipboard).',
+      overlayTextInZwischenablage: 'The text is in the clipboard.',
+      hotkeyBelegt: (accelerator: string): string =>
+        `The key combination ${accelerator} is already taken by another app or by the system. Please choose a different combination in the VoiceWall window under "System-wide dictation", e.g. CommandOrControl+Alt+D.`,
+      hotkeyWechselBelegt: (neu: string, bisher: string): string =>
+        `The key combination ${neu} is already taken system-wide. The previous hotkey ${bisher} remains active. Please try a different combination.`,
+      hotkeyTestBelegt: (accelerator: string): string =>
+        `The key combination ${accelerator} is already taken by another app or by the system. Please choose a different combination.`,
+      ungueltigeTastenkombination:
+        'Invalid key combination. Please specify at least one modifier key (e.g. CommandOrControl, Alt, Shift) and exactly one key, such as "CommandOrControl+Shift+D".',
+      eingabeTastenkombination: 'Invalid input for the key combination.',
+      eingabeZwischenablage: 'Invalid input for the clipboard switch.',
+      eingabeAufbereitung: 'Invalid input for the text processing switches.',
+      eingabeUiSprache: 'Invalid input for the interface language.',
+      ungueltigeModellwahl: 'Invalid model choice.',
+      keinDiktatVorhanden:
+        'There is no dictation yet. Please dictate first via hotkey or test recording.',
+      firmenverwaltungFehlt: 'The company management is not available.',
+      eingabePasteMock: 'Invalid input for the paste mock.',
+      eingabeAccessibilityOverride: 'Invalid input for the accessibility override.',
+      ungueltigerText: 'Invalid text.',
+      aufbereiteterTextLeer: 'The processed text is empty (only filler words/whitespace).',
+      vadStille: 'The VAD reported silence, no text was produced.',
+    },
+
+    paste: {
+      fehlgeschlagenMacos: (detail: string): string =>
+        `Automatic insertion failed${detail}. The text is in the clipboard, please insert it manually with Cmd+V. If the error persists, check the permission for VoiceWall in the system settings under Privacy & Security, Accessibility.`,
+      fehlgeschlagenWindows: (detail: string): string =>
+        `Automatic insertion failed${detail}. The text is in the clipboard, please insert it manually with Ctrl+V. Note: if the target app runs as administrator, Windows blocks simulated input (UIPI); in that case always use the copy button.`,
+      nichtUnterstuetzt:
+        'Automatic insertion is not supported on this operating system. The text is in the clipboard, please insert it manually with Ctrl+V.',
+    },
+
+    freigaben: {
+      accessibilityFehlt:
+        'Automatic insertion is not yet possible: VoiceWall has no Accessibility permission. The text is in the clipboard, please insert it manually with Cmd+V. How to grant the permission: 1. Press the button "Open system settings" (or System Settings, Privacy & Security, Accessibility). 2. Enable VoiceWall in the list (add it via the plus symbol if needed). 3. Run the dictation again.',
+      accessibilityDialogAngezeigt:
+        'macOS has shown the permission dialog. Please choose "Open System Settings" there, enable the switch for VoiceWall and then restart VoiceWall via the button. Important after an update: remove an already existing old VoiceWall entry with the minus symbol first, it belongs to the old program version.',
+      nurMacos: 'This settings link only exists on macOS.',
+      einstellungenFehler: (detail: string): string =>
+        `The system settings could not be opened (${detail}). Please open them manually: System Settings, Privacy & Security, Accessibility.`,
+      mikrofonAbgelehnt:
+        'Microphone access was denied. Please allow VoiceWall in the system settings under Privacy & Security, Microphone, and restart the app.',
+      mikrofonGesperrt:
+        'Microphone access is blocked. Please enable VoiceWall in the system settings under Privacy & Security, Microphone, and restart the app.',
+      mikrofonEingeschraenkt:
+        'Microphone access is restricted on this computer (e.g. by device management). Please contact your system administration.',
+    },
+
+    modelle: {
+      labels: {
+        'whisper-q5': 'German Whisper model (large-v3-turbo, Q5_0)',
+        'whisper-fp16': 'German Whisper model (large-v3-turbo, fp16, maximum accuracy)',
+        'turbo-q5_0-multilingual': 'English / multilingual (large-v3-turbo, Q5_0)',
+        'silero-vad': 'Silero VAD model (v5.1.2)',
+      },
+      downloadNetzwerkfehler: (detail: string): string =>
+        `The model download failed (network error: ${detail}). Please check the internet connection and try again. After the one-time download, VoiceWall runs completely offline.`,
+      downloadAbgelehnt: (status: string): string =>
+        `The server rejected the model download (HTTP ${status}). Please try again later or check the model source.`,
+      downloadNichtGespeichert: (detail: string): string =>
+        `The model download could not be saved (${detail}). Please check free disk space and write permissions.`,
+      downloadGroesseFalsch: (ist: string, soll: string): string =>
+        `The downloaded file has an unexpected size (${ist} instead of ${soll} bytes). The file has been deleted. Please start the download again.`,
+      downloadPruefsummeFalsch:
+        'The checksum of the downloaded model file does not match the expected value. The file has been deleted for security reasons. Please start the download again; if the error occurs repeatedly, the source is not trustworthy.',
+      downloadNichtAbgelegt: (detail: string): string =>
+        `The verified model file could not be moved into place (${detail}).`,
+      dateiFehlt: (dateiname: string): string => `File missing: ${dateiname}`,
+      dateiBeschaedigt: (dateiname: string): string =>
+        `The model file ${dateiname} is corrupted (checksum mismatch). It must be downloaded again.`,
+      modellFehltDownloadNoetig: (label: string): string =>
+        `The ${label} is missing. Please start the one-time model download in the setup assistant.`,
+    },
+
+    firmen: {
+      keineAktiveFirma: 'No active company. Please create or activate a company first.',
+      keineAktiveFirmaKurz: 'No active company.',
+      desktopFehltStrategie:
+        'The desktop folder was not found. Please use the "local folder with desktop shortcut" strategy.',
+      desktopFehlt:
+        'The desktop folder was not found. Please choose a target folder for the company folder in the setup assistant.',
+      lokalerOrdnerFehler: (detail: string): string =>
+        `The local VoiceWall folder could not be created: ${detail}`,
+      verknuepfungAngelegt: (ordnername: string, pfad: string): string =>
+        `A shortcut "${ordnername}" is on the desktop; the dictations themselves remain in the local folder ${pfad}.`,
+      verknuepfungHinweis: (detail: string): string => `Note: ${detail}`,
+      verknuepfungKollision: (name: string): string =>
+        `An entry named "${name}" already exists on the desktop. VoiceWall never overwrites anything; please check the entry or choose a different name.`,
+      verknuepfungFehler: (detail: string): string =>
+        `The desktop shortcut could not be created: ${detail}`,
+      nichtInListe:
+        'This company is not in the list of valid company folders. Please create or open the company first.',
+      keinGueltigerOrdner:
+        'This folder is not a valid VoiceWall company folder in an allowed location (desktop or ~/VoiceWall).',
+      konfigNichtLesbar:
+        'The company configuration is not readable (.voicewall/config.json). Please check the company folder.',
+      konfigUngueltig:
+        'The company configuration is invalid (.voicewall/config.json). Please check the company folder.',
+      konfigSchreibFehler: (detail: string): string =>
+        `The company configuration could not be written: ${detail}`,
+      zielordnerNichtLesbar: (detail: string): string =>
+        `The target folder is not readable: ${detail}`,
+      ordnerFremd: (name: string): string =>
+        `The folder "${name}" already exists and is not a VoiceWall folder. VoiceWall does not write into foreign folders. Please choose a different name, e.g. adopt the suggestion.`,
+      ordnerAnlageFehler: (detail: string): string =>
+        `The company folder could not be created: ${detail}`,
+      syncWarnung: (anbieter: string): string =>
+        `Caution: this storage location is synchronised to the cloud by ${anbieter}. ` +
+        'Dictations would thereby leave the "100 percent local" promise. Recommendation: keep dictations in the ' +
+        'local folder ~/VoiceWall and show only a shortcut on the desktop. The choice ' +
+        'remains yours; VoiceWall changes nothing without confirmation.',
+      eingabeFirmenname: 'Invalid input for the company name.',
+      eingabeFirmenAnlage: 'Invalid input for creating the company.',
+      ungueltigerFirmenpfad: 'Invalid company path.',
+      eingabeAutoSpeichern: 'Invalid input for the auto-save switch.',
+    },
+
+    sanitize: {
+      nameLeer:
+        'The company name contains no characters usable for a folder name. Please enter a name with letters or digits.',
+      nameReserviert:
+        'This name is a reserved device name on Windows and cannot be used as a folder name. Please choose a different name.',
+      containment:
+        'Invalid folder name: the path points outside the target folder. Please choose a different name.',
+      pfadZuLang: (laenge: string, grenze: string): string =>
+        `The full folder path would be ${laenge} characters long (Windows limit: ${grenze}). Please choose a shorter company name.`,
+    },
+
+    containment: {
+      ausserhalb: 'Invalid path: the entry points outside the company folder and is rejected.',
+    },
+
+    diktate: {
+      titelFallback: 'Dictation',
+      metadatenUngueltig: (detail: string): string => `Dictation metadata is invalid: ${detail}`,
+      ordnerAnlageFehler: (detail: string): string =>
+        `The dictations folder could not be created: ${detail}`,
+      schreibFehler: (detail: string): string => `The dictation could not be written: ${detail}`,
+      anlageKollision: 'The dictation could not be created (file name collision).',
+      nichtGefunden: 'The dictation was not found or is not readable.',
+      beschaedigt: (detail: string): string => `The dictation is corrupted: ${detail}`,
+      schemaVerletzt: (detail: string): string =>
+        `The dictation metadata violates the schema: ${detail}`,
+      pfadAusserhalbWurzel: (wurzel: string): string =>
+        `Invalid path: an entry below "${wurzel}/" is expected. The entry is rejected.`,
+      papierkorbFehler: (detail: string): string =>
+        `The dictation could not be moved to the trash: ${detail}`,
+      papierkorbKollision: 'The dictation could not be moved to the trash (name collision).',
+      wiederherstellenZielBelegt:
+        'A file with this name already exists at the target location. Please check the existing entry first.',
+      wiederherstellenFehler: (detail: string): string =>
+        `The dictation could not be restored: ${detail}`,
+      endgueltigNurPapierkorb: 'Permanent deletion is only allowed directly from the trash.',
+      endgueltigFehler: (detail: string): string =>
+        `The dictation could not be deleted permanently: ${detail}`,
+      eingabeUngueltig: 'Invalid input.',
+      pfadUngueltig: 'Invalid dictation path.',
+      suchfilterUngueltig: 'Invalid search filter.',
+      eingabeBearbeitung: 'Invalid input for the edit.',
+      eingabeNotiz: 'Invalid input for the note.',
+    },
+
+    manifest: {
+      fehlt: 'Manifest missing.',
+      keinJson: 'Manifest is not valid JSON.',
+      schemaVerletzt: (detail: string): string => `Manifest violates the schema: ${detail}`,
+      schreibFehler: (detail: string): string => `Manifest could not be written: ${detail}`,
+    },
+
+    migration: {
+      schrittFehlt: (von: string, nach: string): string =>
+        `No step is registered for the migration from schema version ${von} to ${nach}. The company folder remains unchanged.`,
+      schrittUeberspringt: (beschreibung: string, von: string, nach: string): string =>
+        `Migration step "${beschreibung}" skips versions (${von} -> ${nach}). The company folder remains unchanged.`,
+      neuereVersion: (ist: string, verstanden: string): string =>
+        `The company folder has schema version ${ist}, this VoiceWall version only understands ${verstanden}. Please update VoiceWall; the folder remains unchanged.`,
+      abgebrochen: (grund: string): string =>
+        `Migration aborted, the company folder is unchanged. Reason: ${grund}`,
+      swapFehlgeschlagen: (backup: string, grund: string): string =>
+        `Migration failed while taking over; the old state was restored (backup: ${backup}). Reason: ${grund}`,
+    },
+
+    tagRename: {
+      identisch: 'The new tag name is identical to the old one. Please choose a different name.',
+      metadatenUngueltig: (detail: string): string =>
+        `The metadata would be invalid after the rename: ${detail}`,
+      schreibFehler: (detail: string): string => `The file could not be written: ${detail}`,
+      eingabe: 'Invalid input for the tag rename.',
+    },
+
+    woerterbuch: {
+      nichtLesbar: 'The file vokabular.json is not readable. Please check the file permissions.',
+      keinJson:
+        'The file vokabular.json is not valid JSON. Please correct the file or save the dictionary again in VoiceWall.',
+      schemaVerletzt: (detail: string): string =>
+        `The file vokabular.json violates the schema: ${detail}`,
+      speichernFehler: (detail: string): string => `The dictionary could not be saved: ${detail}`,
+      eingabe: 'Invalid input for the specialist dictionary.',
+    },
+
+    export: {
+      ordnerFehler: (detail: string): string =>
+        `The Exporte folder could not be created: ${detail}. Please check the write permissions in the company folder.`,
+      schreibFehler: (detail: string): string =>
+        `The export could not be written: ${detail}. Please check the write permissions in the company folder.`,
+      kollision: 'The export could not be created (file name collision). Please try again.',
+      keineAuswahl: 'No entry was selected for the export.',
+      pdfNichtVerfuegbar: 'PDF export is not available in this environment.',
+      pdfFehler: (detail: string): string => `The PDF could not be created: ${detail}`,
+      stapelVorbereitungFehler: (detail: string): string =>
+        `The batch export could not be prepared: ${detail}`,
+      stapelAlleFehlgeschlagen: (ersteMeldung: string): string =>
+        `None of the selected entries could be exported. First message: ${ersteMeldung}`,
+      stapelOrdnerKollision: 'The batch folder could not be created (name collision).',
+      stapelFehler: (detail: string): string => `The batch export failed: ${detail}`,
+      eingabe: 'Invalid input for the export.',
+      eingabeStapel: 'Invalid input for the batch export.',
+      exportpfadUngueltig: 'Invalid export path.',
+    },
+
+    vwenc: {
+      eingabeVerschluesselt:
+        'Invalid input for the encrypted export (password at least 12 characters).',
+      eingabeEntschluesseln: 'Invalid input for the decryption.',
+      dialogTitel: 'Decrypt a VoiceWall-encrypted file',
+      dialogKnopf: 'Decrypt',
+      dialogFilter: 'VoiceWall encrypted (.vwenc)',
+      keineDatei: 'No file was selected.',
+      zuGross: 'The file is too large for a VoiceWall .vwenc file (limit 64 MB).',
+      nichtLesbar: 'The selected file is not readable.',
+      keinContainer: 'This file is not a VoiceWall-encrypted file (.vwenc) or it is incomplete.',
+      neuereVersion:
+        'This .vwenc file was created with a newer VoiceWall version. Please update VoiceWall.',
+      fehlgeschlagen:
+        'The decryption failed: the password is wrong or the file has been modified. Note: if the password is lost, the content is irrecoverably lost.',
+      schreibFehler: (detail: string): string =>
+        `The decrypted file could not be written: ${detail}`,
+      namenskollision: 'The decrypted file could not be created (name collision).',
+    },
+
+    pdf: {
+      quelle: {
+        diktat: 'Dictation',
+        import: 'Import',
+        manuell: 'Note',
+      },
+      dokumentart: 'Dictation export · created 100 % locally',
+      zeileErstellt: 'Created',
+      zeileGeaendert: 'Modified',
+      zeileQuelle: 'Source',
+      zeileModell: 'Model',
+      zeileWortzahl: 'Word count',
+      zeileTags: 'Tags',
+      volltext: 'Full text',
+      datumMitZeit: (datum: string, zeit: string): string => `${datum}, ${zeit}`,
+      fussErstelltMit: 'Created with VoiceWall, 100 % local',
+      fussSeite: 'Page',
+      fussVon: 'of',
+    },
+
+    tray: {
+      diktatStarten: 'Start dictation',
+      diktatStoppen: 'Stop dictation',
+      fensterOeffnen: 'Open VoiceWall',
+      beenden: 'Quit VoiceWall',
+      tooltipAufnahme: 'VoiceWall: recording',
+    },
+
+    handlers: {
+      browserFehler: (detail: string, url: string): string =>
+        `The browser could not be opened (${detail}). The source is ${url}; all details are also available directly here in the app.`,
+    },
+  },
 };

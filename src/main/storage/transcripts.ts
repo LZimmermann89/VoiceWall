@@ -33,6 +33,7 @@ import {
   serializeFrontMatter,
   type FlatFrontMatter,
 } from '../../shared/front-matter';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import {
   formatDateStamp,
@@ -149,9 +150,7 @@ function resolveInExpectedRoot(
   }
   const normalized = relPfad.normalize('NFC');
   if (normalized !== expectedRoot && !normalized.startsWith(`${expectedRoot}/`)) {
-    return err(
-      `Ungültiger Pfad: erwartet wird ein Eintrag unterhalb von "${expectedRoot}/". Der Eintrag wird abgewiesen.`,
-    );
+    return err(texte().diktate.pfadAusserhalbWurzel(expectedRoot));
   }
   return resolved;
 }
@@ -195,7 +194,9 @@ export async function createTranscript(
   const checked = transcriptMetaSchema.safeParse(meta);
   if (!checked.success) {
     return err(
-      `Diktat-Metadaten sind ungültig: ${checked.error.issues[0]?.message ?? 'unbekannt'}`,
+      texte().diktate.metadatenUngueltig(
+        checked.error.issues[0]?.message ?? texte().generisch.unbekannt,
+      ),
     );
   }
 
@@ -209,7 +210,7 @@ export async function createTranscript(
     await mkdir(monthDir, { recursive: true });
   } catch (error) {
     return err(
-      `Der Diktate-Ordner konnte nicht angelegt werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().diktate.ordnerAnlageFehler(error instanceof Error ? error.message : String(error)),
     );
   }
 
@@ -240,12 +241,12 @@ export async function createTranscript(
       );
     } catch (error) {
       return err(
-        `Das Diktat konnte nicht geschrieben werden: ${error instanceof Error ? error.message : String(error)}`,
+        texte().diktate.schreibFehler(error instanceof Error ? error.message : String(error)),
       );
     }
     return ok({ meta: checked.data, relPfad: toRelPfad(companyDir, filePath) });
   }
-  return err('Das Diktat konnte nicht angelegt werden (Dateinamens-Kollision).');
+  return err(texte().diktate.anlageKollision);
 }
 
 /**
@@ -299,16 +300,16 @@ export async function readTranscript(
   try {
     content = await readFile(resolved.value, 'utf8');
   } catch {
-    return err('Das Diktat wurde nicht gefunden oder ist nicht lesbar.');
+    return err(texte().diktate.nichtGefunden);
   }
   const parsed = parseFrontMatter(content);
   if (!parsed.ok) {
-    return err(`Das Diktat ist beschädigt: ${parsed.error}`);
+    return err(texte().diktate.beschaedigt(parsed.error));
   }
   const meta = transcriptMetaSchema.safeParse(parsed.value.meta);
   if (!meta.success) {
     return err(
-      `Die Diktat-Metadaten verletzen das Schema: ${meta.error.issues[0]?.message ?? 'unbekannt'}`,
+      texte().diktate.schemaVerletzt(meta.error.issues[0]?.message ?? texte().generisch.unbekannt),
     );
   }
   return ok({
@@ -355,7 +356,9 @@ export async function updateTranscript(
   const checked = transcriptMetaSchema.safeParse(meta);
   if (!checked.success) {
     return err(
-      `Diktat-Metadaten sind ungültig: ${checked.error.issues[0]?.message ?? 'unbekannt'}`,
+      texte().diktate.metadatenUngueltig(
+        checked.error.issues[0]?.message ?? texte().generisch.unbekannt,
+      ),
     );
   }
   const resolved = resolveInExpectedRoot(companyDir, relPfad, DIKTATE_DIR);
@@ -369,7 +372,7 @@ export async function updateTranscript(
     );
   } catch (error) {
     return err(
-      `Das Diktat konnte nicht geschrieben werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().diktate.schreibFehler(error instanceof Error ? error.message : String(error)),
     );
   }
   return ok({ meta: checked.data, body, relPfad: relPfad.normalize('NFC') });
@@ -413,12 +416,12 @@ export async function softDeleteTranscript(
       await rename(sourceResolved.value, target);
     } catch (error) {
       return err(
-        `Das Diktat konnte nicht in den Papierkorb verschoben werden: ${error instanceof Error ? error.message : String(error)}`,
+        texte().diktate.papierkorbFehler(error instanceof Error ? error.message : String(error)),
       );
     }
     return ok({ papierkorbRelPfad: toRelPfad(companyDir, target) });
   }
-  return err('Das Diktat konnte nicht in den Papierkorb verschoben werden (Namenskollision).');
+  return err(texte().diktate.papierkorbKollision);
 }
 
 /**
@@ -452,9 +455,7 @@ export async function restoreTranscript(
   }
   try {
     await stat(targetResult.value);
-    return err(
-      'Am Zielort existiert bereits eine Datei mit diesem Namen. Bitte zuerst den bestehenden Eintrag prüfen.',
-    );
+    return err(texte().diktate.wiederherstellenZielBelegt);
   } catch {
     // Ziel frei: gut.
   }
@@ -463,7 +464,9 @@ export async function restoreTranscript(
     await rename(sourceResolved.value, targetResult.value);
   } catch (error) {
     return err(
-      `Das Diktat konnte nicht wiederhergestellt werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().diktate.wiederherstellenFehler(
+        error instanceof Error ? error.message : String(error),
+      ),
     );
   }
   return ok({ meta: source.value.meta, relPfad: toRelPfad(companyDir, targetResult.value) });
@@ -482,13 +485,13 @@ export async function hardDeleteTranscript(
     return resolved;
   }
   if (dirname(resolved.value) !== resolve(companyDir, PAPIERKORB_DIR)) {
-    return err('Endgültiges Löschen ist nur direkt aus dem Papierkorb erlaubt.');
+    return err(texte().diktate.endgueltigNurPapierkorb);
   }
   try {
     await rm(resolved.value);
   } catch (error) {
     return err(
-      `Das Diktat konnte nicht endgültig gelöscht werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().diktate.endgueltigFehler(error instanceof Error ? error.message : String(error)),
     );
   }
   return ok(undefined);

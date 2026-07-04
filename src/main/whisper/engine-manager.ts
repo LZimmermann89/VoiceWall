@@ -6,12 +6,13 @@
  *   damit native whisper.cpp-/ggml-Ausgaben ins Main-Log wandern.
  * - Absturz-Isolation: das `exit`-Event wird ueberwacht; bei unerwartetem
  *   Ende wird die Engine automatisch neu gestartet (max. 3 Versuche), danach
- *   eine deutsche Fehlermeldung an die UI.
+ *   eine Katalog-Fehlermeldung (UI-Sprache) an die UI.
  * - Getypte, zod-validierte Nachrichten in beide Richtungen. PCM wird als
  *   ArrayBuffer transferiert (zero-copy, aktiver Handoff).
  */
 import { join } from 'node:path';
 import { utilityProcess, type UtilityProcess } from 'electron';
+import { getUiLanguage, texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import type { DictationLanguage } from '../../shared/schema';
 import type { Logger } from '../log/logger';
@@ -45,7 +46,7 @@ export interface EngineCallbacks {
   readonly onTranscript: (event: TranscriptEvent) => void;
   /** VAD hat keine Sprache erkannt (kontinuierlicher Modus). */
   readonly onSilence: () => void;
-  /** Fataler, nicht mehr behebbarer Engine-Fehler (deutsche UI-Meldung). */
+  /** Fataler, nicht mehr behebbarer Engine-Fehler (Katalog-UI-Meldung). */
   readonly onFatal: (message: string) => void;
 }
 
@@ -146,6 +147,8 @@ export class WhisperEngineManager {
         minSilenceDurationMs: this.config.minSilenceDurationMs,
         maxSpeechDurationS: this.config.maxSpeechDurationS,
         vadThreshold: this.config.vadThreshold,
+        // UI-Sprache fuer die wenigen nutzersichtbaren Worker-Texte (B3).
+        uiLanguage: getUiLanguage(),
       });
     });
   }
@@ -165,6 +168,7 @@ export class WhisperEngineManager {
             type: 'set-context',
             language: this.lastContext.language,
             prompt: this.lastContext.prompt,
+            uiLanguage: getUiLanguage(),
           });
         }
         settleStart(ok(undefined));
@@ -218,7 +222,7 @@ export class WhisperEngineManager {
     this.ready = false;
     // Alle offenen Einmal-Transkriptionen scheitern lassen, nie haengen.
     for (const [requestId] of this.pending) {
-      this.resolvePending(requestId, err('Engine wurde beendet, bevor ein Ergebnis vorlag.'));
+      this.resolvePending(requestId, err(texte().engine.beendetVorErgebnis));
     }
     // Wartende Flushes aufloesen (der Aufrufer arbeitet mit dem bis dahin
     // eingegangenen Text weiter; haengen darf er nie).
@@ -237,8 +241,7 @@ export class WhisperEngineManager {
       suppressedLines: this.nativeLogBuffer.size,
     });
     if (this.restarts >= MAX_RESTARTS) {
-      const message =
-        'Die Spracherkennung ist mehrfach abgestürzt und konnte nicht neu gestartet werden. Bitte VoiceWall neu starten; bleibt der Fehler, das Log unter userData prüfen.';
+      const message = texte().engine.mehrfachAbgestuerzt;
       this.logger.error(message);
       this.callbacks.onFatal(message);
       settleStart(err(message));
@@ -328,7 +331,14 @@ export class WhisperEngineManager {
    */
   setContext(context: DictationContext): void {
     this.lastContext = context;
-    this.post({ type: 'set-context', language: context.language, prompt: context.prompt });
+    this.post({
+      type: 'set-context',
+      language: context.language,
+      prompt: context.prompt,
+      // Sprache reist im Kontext mit (B3): der Worker uebersetzt damit
+      // seine eigenen Fehlertexte, auch nach einem Sprachwechsel.
+      uiLanguage: getUiLanguage(),
+    });
   }
 
   /**
@@ -337,7 +347,7 @@ export class WhisperEngineManager {
    */
   transcribeSegment(pcm: ArrayBuffer): Promise<Result<TranscriptEvent | null, string>> {
     if (!this.ready) {
-      return Promise.resolve(err('Die Spracherkennung ist noch nicht bereit.'));
+      return Promise.resolve(err(texte().engine.nochNichtBereit));
     }
     this.requestCounter += 1;
     const requestId = `seg-${String(this.requestCounter)}`;

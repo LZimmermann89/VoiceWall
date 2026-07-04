@@ -17,6 +17,7 @@ import { rename, rm, stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { err, ok, type Result } from '../../shared/result';
+import { texte } from '../i18n';
 
 export interface DownloadProgress {
   readonly receivedBytes: number;
@@ -41,7 +42,7 @@ export type DownloadErrorKind =
 
 export interface DownloadError {
   readonly kind: DownloadErrorKind;
-  /** Deutsche, handlungsleitende Fehlermeldung. */
+  /** Handlungsleitende Fehlermeldung in der UI-Sprache (Katalog, B3). */
   readonly message: string;
 }
 
@@ -68,18 +69,16 @@ export async function downloadModel(
   } catch (error) {
     return err({
       kind: 'network',
-      message: `Der Modell-Download ist fehlgeschlagen (Netzwerkfehler: ${
-        error instanceof Error ? error.message : String(error)
-      }). Bitte die Internetverbindung prüfen und erneut versuchen. Nach dem einmaligen Download läuft VoiceWall vollständig offline.`,
+      message: texte().modelle.downloadNetzwerkfehler(
+        error instanceof Error ? error.message : String(error),
+      ),
     });
   }
 
   if (!response.ok || response.body === null) {
     return err({
       kind: 'http-status',
-      message: `Der Server hat den Modell-Download abgelehnt (HTTP ${String(
-        response.status,
-      )}). Bitte später erneut versuchen oder die Modell-Quelle prüfen.`,
+      message: texte().modelle.downloadAbgelehnt(String(response.status)),
     });
   }
 
@@ -108,9 +107,9 @@ export async function downloadModel(
     await rm(partPath, { force: true });
     return err({
       kind: 'io',
-      message: `Der Modell-Download konnte nicht gespeichert werden (${
-        error instanceof Error ? error.message : String(error)
-      }). Bitte freien Speicherplatz und Schreibrechte prüfen.`,
+      message: texte().modelle.downloadNichtGespeichert(
+        error instanceof Error ? error.message : String(error),
+      ),
     });
   }
 
@@ -120,11 +119,10 @@ export async function downloadModel(
     await rm(partPath, { force: true });
     return err({
       kind: 'size-mismatch',
-      message: `Die heruntergeladene Datei hat eine unerwartete Größe (${String(
-        receivedBytes,
-      )} statt ${String(
-        options.expectedByteSize,
-      )} Bytes). Die Datei wurde gelöscht. Bitte den Download erneut starten.`,
+      message: texte().modelle.downloadGroesseFalsch(
+        String(receivedBytes),
+        String(options.expectedByteSize),
+      ),
     });
   }
 
@@ -132,8 +130,7 @@ export async function downloadModel(
     await rm(partPath, { force: true });
     return err({
       kind: 'checksum-mismatch',
-      message:
-        'Die Prüfsumme der heruntergeladenen Modelldatei stimmt nicht mit dem erwarteten Wert überein. Die Datei wurde aus Sicherheitsgründen gelöscht. Bitte den Download erneut starten; tritt der Fehler wiederholt auf, ist die Quelle nicht vertrauenswürdig.',
+      message: texte().modelle.downloadPruefsummeFalsch,
     });
   }
 
@@ -143,9 +140,9 @@ export async function downloadModel(
     await rm(partPath, { force: true });
     return err({
       kind: 'io',
-      message: `Die verifizierte Modelldatei konnte nicht abgelegt werden (${
-        error instanceof Error ? error.message : String(error)
-      }).`,
+      message: texte().modelle.downloadNichtAbgelegt(
+        error instanceof Error ? error.message : String(error),
+      ),
     });
   }
 

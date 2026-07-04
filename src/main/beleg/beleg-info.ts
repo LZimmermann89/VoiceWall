@@ -12,7 +12,11 @@ import type { BelegInfo, BelegModell } from '../../shared/company';
 import type { DictationLanguage } from '../../shared/schema';
 import { readConsent } from '../consent/consent-store';
 import { logFilePath } from '../log/logger';
-import { ALL_MODEL_DESCRIPTORS, whisperDescriptorForLanguage } from '../model/model-catalog';
+import {
+  ALL_MODEL_DESCRIPTORS,
+  modelLabelFor,
+  whisperDescriptorForLanguage,
+} from '../model/model-catalog';
 import { getModelsDirectory, getModelStatuses } from '../model/model-store';
 
 export interface BelegDeps {
@@ -38,7 +42,9 @@ export async function collectBelegInfo(deps: BelegDeps): Promise<BelegInfo> {
   ).id;
   const modelle: BelegModell[] = statuses.map((status) => ({
     id: status.descriptor.id,
-    label: status.descriptor.label,
+    // Anzeigename in der UI-Sprache (B3); das deutsche descriptor.label
+    // bleibt Log-/Audit-Bezeichnung (model-manifest.json).
+    label: modelLabelFor(status.descriptor.id),
     sha256: status.descriptor.sha256,
     pfad: status.path,
     vorhanden: status.present,

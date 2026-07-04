@@ -34,6 +34,7 @@ import { randomBytes } from 'node:crypto';
 import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { COMPANY_SCHEMA_VERSION, manifestSchema } from '../../shared/company';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import type { Logger } from '../log/logger';
 import { DIKTATE_DIR, MANIFEST_FILE, SCHEMA_VERSION_FILE, VOICEWALL_DIR } from './company-folder';
@@ -170,13 +171,15 @@ export function selectMigrationChain(
   while (current < nach) {
     const step = steps.find((candidate) => candidate.von === current);
     if (step === undefined) {
-      return err(
-        `Für die Migration von Schema-Version ${String(current)} nach ${String(current + 1)} ist kein Schritt registriert. Der Firmenordner bleibt unverändert.`,
-      );
+      return err(texte().migration.schrittFehlt(String(current), String(current + 1)));
     }
     if (step.nach !== current + 1) {
       return err(
-        `Migrationsschritt "${step.beschreibung}" überspringt Versionen (${String(step.von)} -> ${String(step.nach)}). Der Firmenordner bleibt unverändert.`,
+        texte().migration.schrittUeberspringt(
+          step.beschreibung,
+          String(step.von),
+          String(step.nach),
+        ),
       );
     }
     chain.push(step);
@@ -203,9 +206,7 @@ export async function migrateCompanyFolder(
     return ok({ von: currentVersion, nach: targetVersion, durchgefuehrt: false, backupPfad: null });
   }
   if (currentVersion > targetVersion) {
-    return err(
-      `Der Firmenordner hat Schema-Version ${String(currentVersion)}, diese VoiceWall-Version versteht nur ${String(targetVersion)}. Bitte VoiceWall aktualisieren; der Ordner bleibt unverändert.`,
-    );
+    return err(texte().migration.neuereVersion(String(currentVersion), String(targetVersion)));
   }
   const chainResult = selectMigrationChain(steps, currentVersion, targetVersion);
   if (!chainResult.ok) {
@@ -264,7 +265,7 @@ export async function migrateCompanyFolder(
     await rm(stagingDir, { recursive: true, force: true });
     await rm(backupDir, { recursive: true, force: true });
     return err(
-      `Migration abgebrochen, der Firmenordner ist unverändert. Grund: ${error instanceof Error ? error.message : String(error)}`,
+      texte().migration.abgebrochen(error instanceof Error ? error.message : String(error)),
     );
   }
 
@@ -317,7 +318,10 @@ export async function migrateCompanyFolder(
       await rm(stagingDir, { recursive: true, force: true }).catch(() => undefined);
     }
     return err(
-      `Migration beim Übernehmen fehlgeschlagen; der alte Stand wurde wiederhergestellt (Backup: ${basename(backupDir)}). Grund: ${swapError instanceof Error ? swapError.message : String(swapError)}`,
+      texte().migration.swapFehlgeschlagen(
+        basename(backupDir),
+        swapError instanceof Error ? swapError.message : String(swapError),
+      ),
     );
   }
 

@@ -56,6 +56,15 @@ die Windows-Hardware-Abnahme.
   Löschen nach Bestätigung.
 - **Mehrere Firmen:** physisch getrennte Bestände je Firma, prominenter
   Umschalter, getrennte Konfiguration.
+- **Zweisprachige Oberfläche (Deutsch/Englisch):** die UI-Sprache ist
+  global wählbar (Wizard-Schritt 0 "Sprache / Language" beim ersten
+  Start, Umschalter in der Kopfzeile der Verwaltung; wirkt sofort,
+  ohne Neustart) und umfasst seit 1.0.0-rc.2 AUCH alle Meldungen des
+  Main-Prozesses (Fehlertexte, Tray, Overlay, PDF-Export). Sie ist
+  unabhängig von der Diktatsprache der Firmen: ein deutscher Nutzer
+  kann englische Diktate führen und umgekehrt. Rechtstexte bleiben
+  deutsch (deutsches Recht), die englische Oberfläche erklärt das mit
+  einer Einordnungszeile; das Betriebslog bleibt deutsch.
 - **Beleg-Ansicht:** die UI-Seite von "Beleg statt Behauptung": null
   externe Verbindungen, Modellversionen mit SHA-256 und Pfad,
   eingebetteter Netzwerk-Selbsttest, Einwilligungs-Zeitstempel,

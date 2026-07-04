@@ -12,10 +12,14 @@
  */
 
 import type { DictationLanguage } from '../../shared/schema';
+import { texte } from '../i18n';
+
+/** Stabile Modell-Kennungen (Katalog, Manifest, Statusanzeigen). */
+export type ModelId = 'whisper-q5' | 'whisper-fp16' | 'turbo-q5_0-multilingual' | 'silero-vad';
 
 export interface ModelDescriptor {
   /** Interner Schluessel. */
-  readonly id: 'whisper-q5' | 'whisper-fp16' | 'turbo-q5_0-multilingual' | 'silero-vad';
+  readonly id: ModelId;
   /** Dateiname im Modellordner (userData/models). */
   readonly fileName: string;
   /** Stabile Download-URL (resolve/main), niemals die CDN-URL. */
@@ -24,8 +28,17 @@ export interface ModelDescriptor {
   readonly byteSize: number;
   /** Erwarteter SHA-256 in Kleinbuchstaben-Hex. */
   readonly sha256: string;
-  /** Klartext-Bezeichnung fuer UI und Fehlermeldungen. */
+  /**
+   * Deutsche Klartext-Bezeichnung fuer Logs und das Audit-Artefakt
+   * resources/model-manifest.json. Die UI zeigt seit Paket B3 den
+   * sprachabhaengigen Anzeigenamen aus dem Katalog (modelLabelFor).
+   */
   readonly label: string;
+}
+
+/** Sprachabhaengiger Anzeigename eines Modells (UI/Fehlermeldungen, B3). */
+export function modelLabelFor(id: ModelId): string {
+  return texte().modelle.labels[id];
 }
 
 export const MODEL_CATALOG = {

@@ -25,6 +25,7 @@
 import { mkdir, realpath as fsRealpath, lstat, readlink, symlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, posix, resolve, win32 } from 'node:path';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 
 export type SyncProvider = 'icloud' | 'onedrive' | 'dropbox' | 'google-drive';
@@ -106,12 +107,7 @@ function detectProviderByPattern(realPath: string): SyncProvider | null {
 
 /** Baut die deutsche Warnung fuer einen erkannten Sync-Anbieter. */
 function buildHinweis(provider: SyncProvider): string {
-  return (
-    `Achtung: Dieser Speicherort wird von ${PROVIDER_LABELS[provider]} in die Cloud synchronisiert. ` +
-    'Diktate würden damit das "100 Prozent lokal"-Versprechen verlassen. Empfehlung: Diktate in den ' +
-    'lokalen Ordner ~/VoiceWall legen und auf dem Desktop nur eine Verknüpfung anzeigen. Die Wahl ' +
-    'bleibt bei Ihnen; VoiceWall ändert nichts ohne Bestätigung.'
-  );
+  return texte().firmen.syncWarnung(PROVIDER_LABELS[provider]);
 }
 
 /**
@@ -194,7 +190,7 @@ export async function ensureLocalBaseDir(
     return ok(base);
   } catch (error) {
     return err(
-      `Der lokale VoiceWall-Ordner konnte nicht angelegt werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().firmen.lokalerOrdnerFehler(error instanceof Error ? error.message : String(error)),
     );
   }
 }
@@ -234,9 +230,7 @@ export async function createDesktopLink(
         // readlink fehlgeschlagen: unten als Kollision behandeln.
       }
     }
-    return err(
-      `Auf dem Desktop existiert bereits ein Eintrag namens "${options.linkName}". VoiceWall überschreibt nichts; bitte den Eintrag prüfen oder einen anderen Namen wählen.`,
-    );
+    return err(texte().firmen.verknuepfungKollision(options.linkName));
   } catch {
     // lstat fehlgeschlagen: Pfad ist frei, Verknuepfung anlegen.
   }
@@ -246,7 +240,7 @@ export async function createDesktopLink(
     return ok(linkPath);
   } catch (error) {
     return err(
-      `Die Desktop-Verknüpfung konnte nicht angelegt werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().firmen.verknuepfungFehler(error instanceof Error ? error.message : String(error)),
     );
   }
 }

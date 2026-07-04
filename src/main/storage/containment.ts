@@ -10,11 +10,11 @@
  * String-Pruefung vor der Aufloesung).
  */
 import path from 'node:path';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import { isSafeRelativePath } from '../../shared/company';
 
-const CONTAINMENT_MESSAGE =
-  'Ungültiger Pfad: der Eintrag zeigt außerhalb des Firmenordners und wird abgewiesen.';
+const containmentMessage = (): string => texte().containment.ausserhalb;
 
 /**
  * Loest einen relativen Pfad gegen einen Basisordner auf und verifiziert,
@@ -27,13 +27,13 @@ export function resolveInsideDir(baseDir: string, relativePath: string): Result<
   // NFC-normalisiert vergleichen/aufloesen (macOS liefert teils NFD, B4).
   const normalizedRel = relativePath.normalize('NFC');
   if (!isSafeRelativePath(normalizedRel)) {
-    return err(CONTAINMENT_MESSAGE);
+    return err(containmentMessage());
   }
   const basis = path.resolve(baseDir);
   const ziel = path.resolve(basis, normalizedRel);
   const rel = path.relative(basis, ziel);
   if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
-    return err(CONTAINMENT_MESSAGE);
+    return err(containmentMessage());
   }
   return ok(ziel);
 }

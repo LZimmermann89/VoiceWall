@@ -30,6 +30,7 @@ import {
   type TranscriptMeta,
 } from '../../shared/company';
 import { buildPreview, parseFrontMatter } from '../../shared/front-matter';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import { formatIsoWithOffset } from '../../shared/time';
 import type { Logger } from '../log/logger';
@@ -57,17 +58,21 @@ export async function readManifest(companyDir: string): Promise<Result<Manifest,
   try {
     raw = await readFile(manifestFilePath(companyDir), 'utf8');
   } catch {
-    return err('Manifest fehlt.');
+    return err(texte().manifest.fehlt);
   }
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(raw);
   } catch {
-    return err('Manifest ist kein gueltiges JSON.');
+    return err(texte().manifest.keinJson);
   }
   const parsed = manifestSchema.safeParse(parsedJson);
   if (!parsed.success) {
-    return err(`Manifest verletzt das Schema: ${parsed.error.issues[0]?.message ?? 'unbekannt'}`);
+    return err(
+      texte().manifest.schemaVerletzt(
+        parsed.error.issues[0]?.message ?? texte().generisch.unbekannt,
+      ),
+    );
   }
   return ok(parsed.data);
 }
@@ -227,7 +232,7 @@ export async function rebuildManifest(
     await writeManifest(companyDir, manifest);
   } catch (error) {
     return err(
-      `Manifest konnte nicht geschrieben werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().manifest.schreibFehler(error instanceof Error ? error.message : String(error)),
     );
   }
   return ok(manifest);

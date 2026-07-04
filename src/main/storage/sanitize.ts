@@ -40,6 +40,7 @@
  * (Ordner-Anlage, Wizard) verwendet.
  */
 import path from 'node:path';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 
 /** Maximale Laenge eines Ordnernamens-Segments (in Unicode-Codepoints). */
@@ -51,7 +52,7 @@ export type SanitizeErrorKind = 'leer' | 'reserviert' | 'containment' | 'pfad-zu
 
 export interface SanitizeError {
   readonly kind: SanitizeErrorKind;
-  /** Deutsche, wizard-taugliche Meldung mit naechstem Schritt. */
+  /** Wizard-taugliche Katalog-Meldung (UI-Sprache) mit naechstem Schritt. */
   readonly message: string;
 }
 
@@ -67,10 +68,8 @@ const TRAILING_DOTS_AND_SPACES = /[. ]+$/;
 /** Windows-reservierte Geraetenamen, case-insensitiv (Schritt 4). */
 const WINDOWS_RESERVED_NAMES = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
 
-const EMPTY_MESSAGE =
-  'Der Firmenname enthält keine für einen Ordnernamen verwendbaren Zeichen. Bitte einen Namen mit Buchstaben oder Ziffern eingeben.';
-const RESERVED_MESSAGE =
-  'Dieser Name ist unter Windows ein reservierter Gerätename und kann nicht als Ordnername verwendet werden. Bitte einen anderen Namen wählen.';
+const emptyMessage = (): string => texte().sanitize.nameLeer;
+const reservedMessage = (): string => texte().sanitize.nameReserviert;
 
 /**
  * Sanitisiert einen rohen Firmennamen zu genau einem sicheren Pfadsegment
@@ -102,7 +101,7 @@ export function sanitizeCompanyName(raw: string): Result<string, SanitizeError> 
 
   // Schritt 6: Leerergebnis ist ein Fehler, keine stille Ersetzung.
   if (name.length === 0) {
-    return err({ kind: 'leer', message: EMPTY_MESSAGE });
+    return err({ kind: 'leer', message: emptyMessage() });
   }
 
   // Schritt 4: Windows-reservierte Namen, auch mit Endung (`NUL.txt` == `NUL`).
@@ -110,7 +109,7 @@ export function sanitizeCompanyName(raw: string): Result<string, SanitizeError> 
   // entstandener Treffer nie durchrutscht.
   const beforeFirstDot = name.split('.', 1)[0] ?? '';
   if (WINDOWS_RESERVED_NAMES.test(beforeFirstDot.trim())) {
-    return err({ kind: 'reserviert', message: RESERVED_MESSAGE });
+    return err({ kind: 'reserviert', message: reservedMessage() });
   }
 
   return ok(name);
@@ -132,11 +131,7 @@ export function resolveContainedChildPath(
   // Grund 2 (Portabilitaet): ein unter POSIX technisch gueltiger Dateiname wie
   // "a\..\b" wuerde beim Kopieren des Firmenordners auf Windows zur Traversal.
   if (segment.includes('/') || segment.includes('\\') || segment.split('.').join('') === '') {
-    return err({
-      kind: 'containment',
-      message:
-        'Ungültiger Ordnername: der Pfad liegt außerhalb des Zielordners. Bitte einen anderen Namen wählen.',
-    });
+    return err({ kind: 'containment', message: texte().sanitize.containment });
   }
   const basis = path.resolve(baseDir);
   const ziel = path.resolve(basis, segment);
@@ -148,11 +143,7 @@ export function resolveContainedChildPath(
     rel.includes(path.sep) ||
     rel.includes('/')
   ) {
-    return err({
-      kind: 'containment',
-      message:
-        'Ungültiger Ordnername: der Pfad liegt außerhalb des Zielordners. Bitte einen anderen Namen wählen.',
-    });
+    return err({ kind: 'containment', message: texte().sanitize.containment });
   }
   return ok(ziel);
 }
@@ -183,7 +174,10 @@ export function buildCompanyDirPath(
   if (contained.value.length > MAX_TOTAL_PATH_LENGTH) {
     return err({
       kind: 'pfad-zu-lang',
-      message: `Der vollständige Ordnerpfad würde ${String(contained.value.length)} Zeichen lang (Windows-Grenze: ${String(MAX_TOTAL_PATH_LENGTH)}). Bitte einen kürzeren Firmennamen wählen.`,
+      message: texte().sanitize.pfadZuLang(
+        String(contained.value.length),
+        String(MAX_TOTAL_PATH_LENGTH),
+      ),
     });
   }
   return ok({ segment: segment.value, dirPath: contained.value });

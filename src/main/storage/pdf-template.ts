@@ -6,6 +6,9 @@
  * Escaping, echte Umlaute, kein Skript, CSP-Zeile. Das eigentliche Rendering
  * (verstecktes BrowserWindow, printToPDF) macht pdf-export.ts.
  *
+ * Sprache (Paket B3, E41): die PDF-Beschriftungen folgen der UI-Sprache
+ * zum Exportzeitpunkt (Katalog via src/main/i18n.ts, ohne Electron-Import).
+ *
  * Sicherheit (Stored-XSS-Regel ABARBEITUNG 3.5): Titel, Metadaten und Body
  * werden VOR dem Einsetzen in die Vorlage HTML-escaped. Der Body wird als
  * vorformatierter TEXT gerendert (white-space: pre-wrap), niemals als HTML
@@ -14,6 +17,7 @@
  */
 import type { TranscriptMeta } from '../../shared/company';
 import { normalizeBody } from '../../shared/front-matter';
+import { getUiLanguage, texte } from '../i18n';
 
 /** HTML-Escaping fuer Textknoten und Attributwerte (Output-Encoding, 3.5). */
 export function escapeHtml(value: string): string {
@@ -25,21 +29,20 @@ export function escapeHtml(value: string): string {
     .replaceAll("'", '&#39;');
 }
 
-/** Deutsches Datum (TT.MM.JJJJ, HH:MM Uhr) aus einem ISO-Zeitstempel. */
+/**
+ * Datum/Uhrzeit (TT.MM.JJJJ, HH:MM) aus einem ISO-Zeitstempel; der Rahmen
+ * ("... Uhr" auf Deutsch) kommt aus dem Katalog der UI-Sprache (B3/E41).
+ */
 export function formatPrintDateTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
     return iso;
   }
   const pad = (n: number): string => String(n).padStart(2, '0');
-  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${String(date.getFullYear())}, ${pad(date.getHours())}:${pad(date.getMinutes())} Uhr`;
+  const datum = `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${String(date.getFullYear())}`;
+  const zeit = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return texte().pdf.datumMitZeit(datum, zeit);
 }
-
-const QUELLE_LABELS: Record<TranscriptMeta['quelle'], string> = {
-  diktat: 'Diktat',
-  import: 'Import',
-  manuell: 'Notiz',
-};
 
 /**
  * Baut die vollstaendige Druck-HTML-Vorlage: schlichtes Pruefdokument-Layout
@@ -48,13 +51,15 @@ const QUELLE_LABELS: Record<TranscriptMeta['quelle'], string> = {
  * vorformatierter Text.
  */
 export function buildPrintHtml(meta: TranscriptMeta, body: string): string {
+  // PDF-Sprache = UI-Sprache zum EXPORTZEITPUNKT (Entscheidung E41).
+  const t = texte().pdf;
   const rows: readonly (readonly [string, string])[] = [
-    ['Erstellt', formatPrintDateTime(meta.erstellt)],
-    ['Geändert', formatPrintDateTime(meta.geaendert)],
-    ['Quelle', QUELLE_LABELS[meta.quelle]],
-    ['Modell', meta.modell],
-    ['Wortzahl', String(meta.wortzahl)],
-    ['Tags', meta.tags.length === 0 ? '—' : meta.tags.join(', ')],
+    [t.zeileErstellt, formatPrintDateTime(meta.erstellt)],
+    [t.zeileGeaendert, formatPrintDateTime(meta.geaendert)],
+    [t.zeileQuelle, t.quelle[meta.quelle]],
+    [t.zeileModell, meta.modell],
+    [t.zeileWortzahl, String(meta.wortzahl)],
+    [t.zeileTags, meta.tags.length === 0 ? '—' : meta.tags.join(', ')],
   ];
   const metaRows = rows
     .map(
@@ -63,7 +68,7 @@ export function buildPrintHtml(meta: TranscriptMeta, body: string): string {
     )
     .join('\n        ');
   return `<!doctype html>
-<html lang="de">
+<html lang="${getUiLanguage()}">
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
@@ -126,7 +131,7 @@ export function buildPrintHtml(meta: TranscriptMeta, body: string): string {
 <body>
   <header class="kopf">
     <span class="wortmarke">VoiceWall.</span>
-    <span class="dokumentart">Diktat-Export · 100 % lokal erstellt</span>
+    <span class="dokumentart">${escapeHtml(t.dokumentart)}</span>
   </header>
   <h1>${escapeHtml(meta.titel)}</h1>
   <table class="metadaten">
@@ -134,7 +139,7 @@ export function buildPrintHtml(meta: TranscriptMeta, body: string): string {
         ${metaRows}
     </tbody>
   </table>
-  <p class="volltext-titel">Volltext</p>
+  <p class="volltext-titel">${escapeHtml(t.volltext)}</p>
   <div class="volltext">${escapeHtml(normalizeBody(body))}</div>
 </body>
 </html>
@@ -143,5 +148,6 @@ export function buildPrintHtml(meta: TranscriptMeta, body: string): string {
 
 /** Fusszeile jeder PDF-Seite (Chromium-Template, nur Inline-Stile erlaubt). */
 export function buildPrintFooter(erstelltAm: string): string {
-  return `<div style="width:100%; font-family:Georgia, 'Times New Roman', serif; font-size:8pt; color:#666; text-align:center; padding:0 40px;">Erstellt mit VoiceWall, 100 % lokal · ${escapeHtml(erstelltAm)} · Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>`;
+  const t = texte().pdf;
+  return `<div style="width:100%; font-family:Georgia, 'Times New Roman', serif; font-size:8pt; color:#666; text-align:center; padding:0 40px;">${escapeHtml(t.fussErstelltMit)} · ${escapeHtml(erstelltAm)} · ${escapeHtml(t.fussSeite)} <span class="pageNumber"></span> ${escapeHtml(t.fussVon)} <span class="totalPages"></span></div>`;
 }

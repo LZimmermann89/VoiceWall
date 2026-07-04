@@ -1,9 +1,20 @@
 # Testleitfaden für externe Tester
 
-Stand: 03.07.2026, Version 1.0.0-rc.1. Zielgruppe: technisch versierte
+Stand: 04.07.2026, Version 1.0.0-rc.2. Zielgruppe: technisch versierte
 Tester (Entwickler), die VoiceWall auf macOS oder Windows unabhängig
 prüfen. Danke fürs Testen: bitte ehrlich und gnadenlos, genau das
 brauchen wir.
+
+## Neu in 1.0.0-rc.2: zweisprachige Oberfläche
+
+Die Oberfläche kann jetzt Deutsch UND Englisch, inklusive aller
+Fehlermeldungen aus dem Main-Prozess. Der Einrichtungs-Assistent fragt
+als ALLERERSTEN Schritt "Sprache / Language" ab (wirkt sofort); in der
+Verwaltung sitzt der Umschalter in der Kopfzeile. Die UI-Sprache ist
+unabhängig von der Diktatsprache der Firmen (die pro Firma Deutsch oder
+Englisch sein kann). Bitte beim Testen einmal auf English umschalten
+und prüfen, ob dir noch deutsche Texte in der englischen Oberfläche
+begegnen (Ausnahme: Rechtstexte bleiben absichtlich deutsch).
 
 ## Was VoiceWall ist (30 Sekunden)
 

@@ -11,8 +11,9 @@
  *   showInactive; das Hauptfenster wird vom Flow nie geoeffnet/fokussiert).
  * - Kein Text geht verloren: das letzte Transkript bleibt im RAM und ist
  *   jederzeit ueber Kopieren-Knopf (UI und Overlay) erneut kopierbar.
- * - Kein Fehlerpfad loest einen externen Request aus; alle Meldungen sind
- *   deutsch und nennen den naechsten Schritt.
+ * - Kein Fehlerpfad loest einen externen Request aus; alle Meldungen
+ *   kommen aus dem Text-Katalog (UI-Sprache, Paket B3) und nennen den
+ *   naechsten Schritt.
  * - Die Zustandslogik selbst ist die reine Maschine in
  *   shared/dictation-flow.ts (unit-getestet); hier leben nur Seiteneffekte.
  */
@@ -46,7 +47,9 @@ import type { OverlayStatePayload } from '../../shared/types';
 import type { Result } from '../../shared/result';
 import type { SaveDictateResult } from '../../shared/company';
 import { runClipboardSequence, realDelay } from '../clipboard/transcript-clipboard';
-import { readGlobalConfig, writeGlobalConfig } from '../config/config-store';
+import { readGlobalConfig } from '../config/config-store';
+import type { GlobalConfigWriter } from '../config/config-writer';
+import { setUiLanguage, texte } from '../i18n';
 import { IpcChannel } from '../ipc/channels';
 import type { Logger } from '../log/logger';
 import { transcriptModelNameFor } from '../model/model-catalog';
@@ -54,7 +57,7 @@ import type { CompanyManager } from '../storage/companies';
 import { createOverlayWindow, showOverlayInactive } from '../overlay/overlay-window';
 import { createPasteAdapter, type PasteAdapter } from '../paste/index';
 import {
-  ACCESSIBILITY_MISSING_MESSAGE,
+  accessibilityMissingMessage,
   getAccessibilityState,
   openAccessibilitySettings,
   requestAccessibilityGrant,
@@ -65,6 +68,8 @@ import { createTrayController, type TrayController } from '../tray/tray';
 export interface FlowControllerDeps {
   readonly userDataPath: string;
   readonly logger: Logger;
+  /** Zentraler, serialisierter Konfig-Schreibpfad (E42). */
+  readonly configWriter: GlobalConfigWriter;
   readonly orchestrator: DictationOrchestrator;
   /** Firmenverwaltung (M5): Diktate optional in der aktiven Firma speichern. */
   readonly companies: CompanyManager | null;
@@ -109,6 +114,8 @@ export class DictationFlowController {
   /** Initialisiert Konfig, Hotkey, Tray, Overlay, IPC und powerMonitor. */
   async init(): Promise<void> {
     this.config = await readGlobalConfig(this.deps.userDataPath, this.deps.logger);
+    // Main-Katalogsprache aus der persistierten Konfiguration (E41).
+    setUiLanguage(this.config.uiSprache);
 
     const adapter = createPasteAdapter(process.platform);
     if (adapter.ok) {
@@ -262,12 +269,12 @@ export class DictationFlowController {
     const result = await this.deliverText(text, audioMs);
     if (result.pasted) {
       this.showOverlay(
-        { kind: 'done', message: 'Text eingefügt (und in der Zwischenablage).' },
+        { kind: 'done', message: texte().flow.overlayTextEingefuegt },
         OVERLAY_DONE_VISIBLE_MS,
       );
     } else {
       this.showOverlay(
-        { kind: 'error', message: result.message ?? 'Text liegt in der Zwischenablage.' },
+        { kind: 'error', message: result.message ?? texte().flow.overlayTextInZwischenablage },
         OVERLAY_ERROR_VISIBLE_MS,
       );
     }
@@ -401,13 +408,10 @@ export class DictationFlowController {
   /** Letztes Transkript manuell als Diktat speichern (IPC/Test-UI). */
   private async saveLastDictate(): Promise<SaveDictateResult> {
     if (this.deps.companies === null) {
-      return { ok: false, message: 'Die Firmenverwaltung ist nicht verfügbar.' };
+      return { ok: false, message: texte().flow.firmenverwaltungFehlt };
     }
     if (this.lastTranscript === null) {
-      return {
-        ok: false,
-        message: 'Es gibt noch kein Diktat. Bitte zuerst per Hotkey oder Testaufnahme diktieren.',
-      };
+      return { ok: false, message: texte().flow.keinDiktatVorhanden };
     }
     const sprache = await this.activeLanguageLenient();
     return this.deps.companies.saveDictate({
@@ -438,7 +442,7 @@ export class DictationFlowController {
       };
     }
     if (this.effectiveAccessibility() === 'missing') {
-      return { fn: null, blockedMessage: ACCESSIBILITY_MISSING_MESSAGE };
+      return { fn: null, blockedMessage: accessibilityMissingMessage() };
     }
     if (this.pasteAdapter === null) {
       return { fn: null, blockedMessage: this.pasteUnsupportedMessage };
@@ -473,9 +477,7 @@ export class DictationFlowController {
     if (registered) {
       this.deps.logger.info(`Globaler Diktat-Hotkey registriert: ${accelerator}`);
     } else {
-      this.deps.orchestrator.reportFlowError(
-        `Die Tastenkombination ${accelerator} ist bereits von einer anderen App oder vom System belegt. Bitte im VoiceWall-Fenster unter "Systemweites Diktat" eine andere Kombination wählen, z. B. CommandOrControl+Alt+D.`,
-      );
+      this.deps.orchestrator.reportFlowError(texte().flow.hotkeyBelegt(accelerator));
     }
     return registered;
   }
@@ -483,10 +485,9 @@ export class DictationFlowController {
   private async setHotkey(accelerator: string): Promise<ActionResult> {
     const parsed = hotkeyAcceleratorSchema.safeParse(accelerator);
     if (!parsed.success) {
-      return {
-        ok: false,
-        message: parsed.error.issues[0]?.message ?? 'Ungültige Tastenkombination.',
-      };
+      // Katalog-Meldung statt zod-Issue: die Schema-Meldung ist statisch
+      // deutsch, der Nutzer bekommt die Meldung in der UI-Sprache (B3).
+      return { ok: false, message: texte().flow.ungueltigeTastenkombination };
     }
     const previous = this.config.hotkey.accelerator;
     if (this.hotkeyRegistered) {
@@ -500,14 +501,13 @@ export class DictationFlowController {
       this.deps.orchestrator.notifyStatusChanged();
       return {
         ok: false,
-        message: `Die Tastenkombination ${parsed.data} ist bereits systemweit belegt. Der bisherige Hotkey ${previous} bleibt aktiv. Bitte eine andere Kombination versuchen.`,
+        message: texte().flow.hotkeyWechselBelegt(parsed.data, previous),
       };
     }
-    this.config = {
-      ...this.config,
-      hotkey: { ...this.config.hotkey, accelerator: parsed.data },
-    };
-    await writeGlobalConfig(this.deps.userDataPath, this.config);
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      hotkey: { ...current.hotkey, accelerator: parsed.data },
+    }));
     this.deps.orchestrator.notifyStatusChanged();
     return { ok: true };
   }
@@ -522,10 +522,7 @@ export class DictationFlowController {
   private testHotkey(accelerator: string): ActionResult {
     const parsed = hotkeyAcceleratorSchema.safeParse(accelerator);
     if (!parsed.success) {
-      return {
-        ok: false,
-        message: parsed.error.issues[0]?.message ?? 'Ungültige Tastenkombination.',
-      };
+      return { ok: false, message: texte().flow.ungueltigeTastenkombination };
     }
     if (this.hotkeyRegistered && parsed.data === this.config.hotkey.accelerator) {
       return { ok: true };
@@ -541,10 +538,7 @@ export class DictationFlowController {
       );
     }
     if (!registered) {
-      return {
-        ok: false,
-        message: `Die Tastenkombination ${parsed.data} ist bereits von einer anderen App oder vom System belegt. Bitte eine andere Kombination wählen.`,
-      };
+      return { ok: false, message: texte().flow.hotkeyTestBelegt(parsed.data) };
     }
     globalShortcut.unregister(parsed.data);
     return { ok: true };
@@ -557,19 +551,20 @@ export class DictationFlowController {
    * laedt).
    */
   private async setModelChoice(choice: GlobalConfig['modell']): Promise<ActionResult> {
-    this.config = { ...this.config, modell: choice };
-    await writeGlobalConfig(this.deps.userDataPath, this.config);
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      modell: choice,
+    }));
     await this.deps.orchestrator.setModelChoice(choice);
     this.deps.orchestrator.notifyStatusChanged();
     return { ok: true };
   }
 
   private async setClipboardRestore(enabled: boolean): Promise<ActionResult> {
-    this.config = {
-      ...this.config,
-      clipboard: { ...this.config.clipboard, restorePrevious: enabled },
-    };
-    await writeGlobalConfig(this.deps.userDataPath, this.config);
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      clipboard: { ...current.clipboard, restorePrevious: enabled },
+    }));
     this.deps.orchestrator.notifyStatusChanged();
     return { ok: true };
   }
@@ -582,11 +577,10 @@ export class DictationFlowController {
     fuellwoerterEntfernen: boolean;
     sprachkommandos: boolean;
   }): Promise<ActionResult> {
-    this.config = {
-      ...this.config,
-      aufbereitung: { ...this.config.aufbereitung, ...next },
-    };
-    await writeGlobalConfig(this.deps.userDataPath, this.config);
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      aufbereitung: { ...current.aufbereitung, ...next },
+    }));
     this.deps.orchestrator.notifyStatusChanged();
     return { ok: true };
   }
@@ -597,16 +591,22 @@ export class DictationFlowController {
    * Renderer wechselt live (Status-Broadcast), das Overlay erhaelt die
    * Sprache mit dem naechsten Anzeige-Zustand.
    *
-   * WICHTIG: die Konfiguration wird vor dem Schreiben frisch gelesen
-   * (Lesen-Aendern-Schreiben). Der Sprachwechsel passiert im Gegensatz zu
-   * Hotkey/Modellwahl auch NACH der Firmen-Anlage; ein Schreiben des beim
-   * App-Start eingelesenen Standes wuerde die vom CompanyManager
-   * nachgetragenen Felder (firmen, aktiveFirma) verlieren.
+   * Schreiben laeuft wie ALLE Konfig-Schreiber ueber den zentralen,
+   * serialisierten Writer (E42, Lesen-Aendern-Schreiben): der Sprachwechsel
+   * passiert auch NACH der Firmen-Anlage; ein Schreiben eines veralteten
+   * in-memory-Standes wuerde die vom CompanyManager nachgetragenen Felder
+   * (firmen, aktiveFirma) verlieren.
+   *
+   * Zusaetzlich (Paket B3): der Main-Katalog wechselt sofort mit
+   * (setUiLanguage), das Tray-Menue wird neu aufgebaut.
    */
   private async setUiSprache(sprache: UiLanguage): Promise<ActionResult> {
-    const aktuell = await readGlobalConfig(this.deps.userDataPath, this.deps.logger);
-    this.config = { ...aktuell, uiSprache: sprache };
-    await writeGlobalConfig(this.deps.userDataPath, this.config);
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      uiSprache: sprache,
+    }));
+    setUiLanguage(sprache);
+    this.tray?.refreshLanguage();
     this.deps.orchestrator.notifyStatusChanged();
     return { ok: true };
   }
@@ -617,10 +617,7 @@ export class DictationFlowController {
 
   private copyLastTranscript(): ActionResult {
     if (this.lastTranscript === null) {
-      return {
-        ok: false,
-        message: 'Es gibt noch kein Diktat. Bitte zuerst per Hotkey oder Testaufnahme diktieren.',
-      };
+      return { ok: false, message: texte().flow.keinDiktatVorhanden };
     }
     clipboard.writeText(this.lastTranscript);
     return { ok: true };
@@ -696,7 +693,7 @@ export class DictationFlowController {
     ipcMain.handle(IpcChannel.SetHotkey, async (_event, raw: unknown): Promise<ActionResult> => {
       const parsed = z.string().min(1).safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungültige Eingabe für die Tastenkombination.' };
+        return { ok: false, message: texte().flow.eingabeTastenkombination };
       }
       return this.setHotkey(parsed.data);
     });
@@ -706,7 +703,7 @@ export class DictationFlowController {
       async (_event, raw: unknown): Promise<ActionResult> => {
         const parsed = z.boolean().safeParse(raw);
         if (!parsed.success) {
-          return { ok: false, message: 'Ungültige Eingabe für den Zwischenablage-Schalter.' };
+          return { ok: false, message: texte().flow.eingabeZwischenablage };
         }
         return this.setClipboardRestore(parsed.data);
       },
@@ -717,7 +714,7 @@ export class DictationFlowController {
       async (_event, raw: unknown): Promise<ActionResult> => {
         const parsed = aufbereitungConfigSchema.safeParse(raw);
         if (!parsed.success) {
-          return { ok: false, message: 'Ungültige Eingabe für die Aufbereitungs-Schalter.' };
+          return { ok: false, message: texte().flow.eingabeAufbereitung };
         }
         return this.setAufbereitung(parsed.data);
       },
@@ -729,7 +726,7 @@ export class DictationFlowController {
       async (_event, raw: unknown): Promise<ActionResult> => {
         const parsed = uiLanguageSchema.safeParse(raw);
         if (!parsed.success) {
-          return { ok: false, message: 'Ungültige Eingabe für die Sprache der Oberfläche.' };
+          return { ok: false, message: texte().flow.eingabeUiSprache };
         }
         return this.setUiSprache(parsed.data);
       },
@@ -741,7 +738,7 @@ export class DictationFlowController {
     ipcMain.handle(IpcChannel.WizardTestHotkey, (_event, raw: unknown): ActionResult => {
       const parsed = z.string().min(1).max(100).safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungültige Eingabe für die Tastenkombination.' };
+        return { ok: false, message: texte().flow.eingabeTastenkombination };
       }
       return this.testHotkey(parsed.data);
     });
@@ -752,7 +749,7 @@ export class DictationFlowController {
       async (_event, raw: unknown): Promise<ActionResult> => {
         const parsed = modelChoiceSchema.safeParse(raw);
         if (!parsed.success) {
-          return { ok: false, message: 'Ungültige Modellwahl.' };
+          return { ok: false, message: texte().flow.ungueltigeModellwahl };
         }
         return this.setModelChoice(parsed.data);
       },
@@ -768,10 +765,7 @@ export class DictationFlowController {
         this.deps.logger.error(
           `Unerwarteter Fehler beim Diktat-Speichern: ${error instanceof Error ? error.message : String(error)}`,
         );
-        return {
-          ok: false,
-          message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
-        };
+        return { ok: false, message: texte().generisch.internerFehler };
       }
     });
 
@@ -785,11 +779,7 @@ export class DictationFlowController {
       if (state === 'granted') {
         return { ok: true };
       }
-      return {
-        ok: false,
-        message:
-          'macOS hat den Freigabe-Dialog angezeigt. Bitte dort "Systemeinstellungen öffnen" wählen, den Schalter für VoiceWall aktivieren und danach VoiceWall über den Knopf neu starten. Wichtig nach einem Update: einen bereits vorhandenen alten VoiceWall-Eintrag vorher mit dem Minus-Symbol entfernen, er gehört zur alten Programmversion.',
-      };
+      return { ok: false, message: texte().freigaben.accessibilityDialogAngezeigt };
     });
 
     // Kopieren-Knopf des Overlays (fire-and-forget).
@@ -808,7 +798,7 @@ export class DictationFlowController {
     ipcMain.handle(IpcChannel.DevMockPaste, (_event, raw: unknown): ActionResult => {
       const parsed = z.boolean().safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungültige Eingabe für den Paste-Mock.' };
+        return { ok: false, message: texte().flow.eingabePasteMock };
       }
       this.mockPasteEnabled = parsed.data;
       return { ok: true };
@@ -819,7 +809,7 @@ export class DictationFlowController {
     ipcMain.handle(IpcChannel.DevSetAccessibility, (_event, raw: unknown): ActionResult => {
       const parsed = z.boolean().nullable().safeParse(raw);
       if (!parsed.success) {
-        return { ok: false, message: 'Ungültige Eingabe für den Accessibility-Override.' };
+        return { ok: false, message: texte().flow.eingabeAccessibilityOverride };
       }
       this.accessibilityOverride = parsed.data;
       return { ok: true };
@@ -830,7 +820,7 @@ export class DictationFlowController {
       async (_event, raw: unknown): Promise<DeliveryResult> => {
         const parsed = z.string().min(1).safeParse(raw);
         if (!parsed.success) {
-          return { delivered: false, pasted: false, message: 'Ungültiger Text.' };
+          return { delivered: false, pasted: false, message: texte().flow.ungueltigerText };
         }
         // Wie ein echtes Diktat: Ersetzungen + Aufbereitung vor Zustellung.
         const text = await this.processTranscriptText(parsed.data);
@@ -838,7 +828,7 @@ export class DictationFlowController {
           return {
             delivered: false,
             pasted: false,
-            message: 'Der aufbereitete Text ist leer (nur Füllwörter/Leerraum).',
+            message: texte().flow.aufbereiteterTextLeer,
           };
         }
         return this.deliverText(text);
@@ -857,7 +847,7 @@ export class DictationFlowController {
             delivered: false,
             pasted: false,
             text: null,
-            message: 'Kein gültiger PCM-Puffer.',
+            message: texte().stt.keinPcmPuffer,
           };
         }
         const transcribed = await this.deps.orchestrator.transcribeInjectedPcm(pcm);
@@ -869,7 +859,7 @@ export class DictationFlowController {
             delivered: false,
             pasted: false,
             text: null,
-            message: 'VAD meldete Stille, kein Text erzeugt.',
+            message: texte().flow.vadStille,
           };
         }
         const text = await this.processTranscriptText(transcribed.transcript.text);
@@ -878,7 +868,7 @@ export class DictationFlowController {
             delivered: false,
             pasted: false,
             text: null,
-            message: 'Der aufbereitete Text ist leer (nur Füllwörter/Leerraum).',
+            message: texte().flow.aufbereiteterTextLeer,
           };
         }
         const delivery = await this.deliverText(text, transcribed.transcript.audioMs);

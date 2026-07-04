@@ -112,11 +112,10 @@ async function startCapture(): Promise<void> {
     runtime = { stream, context, node, source, blobUrl };
     capture.reportStarted();
   } catch (error) {
-    capture.reportError(
-      `Der Mikrofonzugriff ist fehlgeschlagen (${
-        error instanceof Error ? error.message : String(error)
-      }). Bitte prüfen, ob ein Mikrofon angeschlossen ist und VoiceWall Zugriff hat.`,
-    );
+    // Nur das technische DETAIL senden (Paket B3): die nutzersichtbare
+    // Meldung baut der Main-Prozess aus dem Text-Katalog in der aktuellen
+    // UI-Sprache (orchestrator.ts, Kanal capture:error).
+    capture.reportError(error instanceof Error ? error.message : String(error));
   } finally {
     starting = false;
   }

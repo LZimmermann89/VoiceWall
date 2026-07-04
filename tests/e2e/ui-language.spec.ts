@@ -127,3 +127,85 @@ test('B2: Sprachumschalter in der Verwaltung wechselt live und persistiert', asy
     }
   }
 });
+
+interface B3Bridge {
+  voicewall: {
+    setUiLanguage: (sprache: 'de' | 'en') => Promise<{ ok: boolean; message?: string }>;
+    devSetAccessibility: (trusted: boolean | null) => Promise<{ ok: boolean; message?: string }>;
+    devMockPaste: (enabled: boolean) => Promise<{ ok: boolean; message?: string }>;
+    devRunDictationResult: (
+      text: string,
+    ) => Promise<{ delivered: boolean; pasted: boolean; message: string | null }>;
+  };
+}
+
+test('B3: UI auf Englisch zeigt englische Main-Meldungen (Accessibility-Fehlerpfad, zod-Fehler, Footer-Version)', async () => {
+  const { app, window } = await launchApp({ withCompany: true });
+  try {
+    // Footer zeigt die echte App-Version aus package.json (Pflicht-Fix:
+    // frueher stand hier im Dev-Modus die Electron-Version "43.0.0").
+    const pkg = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8')) as {
+      version: string;
+    };
+    await expect(window.locator('.app-footer')).toContainText(`VoiceWall ${pkg.version}`);
+
+    // Umschalten auf Englisch: UI live, Main-Katalog ueber die Bruecke
+    // EXPLIZIT awaiten (deterministisch, kein Rennen mit dem Hintergrund-
+    // Persist des Umschalters).
+    await window.getByTestId('ui-language-select').selectOption('en');
+    await window.evaluate(() => (globalThis as unknown as B3Bridge).voicewall.setUiLanguage('en'));
+
+    // 1. zod-Eingabefehler eines Main-Handlers ist englisch.
+    const zodFehler = await window.evaluate(() =>
+      (globalThis as unknown as B3Bridge).voicewall.devMockPaste(
+        'kein-boolean' as unknown as boolean,
+      ),
+    );
+    expect(zodFehler.ok).toBe(false);
+    expect(zodFehler.message).toBe('Invalid input for the paste mock.');
+
+    // 2. Diktatfehler-Pfad: fehlende Bedienungshilfen-Freigabe (Dev-
+    //    Override) liefert die englische Accessibility-Meldung, und die
+    //    Fehleranzeige der Diktat-Ansicht zeigt sie an.
+    await window.evaluate(() =>
+      (globalThis as unknown as B3Bridge).voicewall.devSetAccessibility(false),
+    );
+    const result = await window.evaluate(() =>
+      (globalThis as unknown as B3Bridge).voicewall.devRunDictationResult(
+        'English main message proof',
+      ),
+    );
+    expect(result.delivered).toBe(true);
+    expect(result.pasted).toBe(false);
+    expect(result.message).toContain('Automatic insertion is not yet possible');
+    await expect(window.getByTestId('error-box')).toContainText(
+      'Automatic insertion is not yet possible',
+    );
+
+    // 3. Dokumentsprache folgt der UI-Sprache (A11y-Pflicht-Fix).
+    expect(
+      await window.evaluate(
+        () =>
+          (globalThis as unknown as { document: { documentElement: { lang: string } } }).document
+            .documentElement.lang,
+      ),
+    ).toBe('en');
+
+    // Zurueck auf Deutsch: dieselben Pfade melden wieder deutsch.
+    await window.getByTestId('ui-language-select').selectOption('de');
+    await window.evaluate(() => (globalThis as unknown as B3Bridge).voicewall.setUiLanguage('de'));
+    const deutsch = await window.evaluate(() =>
+      (globalThis as unknown as B3Bridge).voicewall.devRunDictationResult('Deutscher Beweis'),
+    );
+    expect(deutsch.message).toContain('Automatisches Einfügen ist noch nicht möglich');
+    expect(
+      await window.evaluate(
+        () =>
+          (globalThis as unknown as { document: { documentElement: { lang: string } } }).document
+            .documentElement.lang,
+      ),
+    ).toBe('de');
+  } finally {
+    await app.close();
+  }
+});

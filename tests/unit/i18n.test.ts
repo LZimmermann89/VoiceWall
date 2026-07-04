@@ -53,6 +53,9 @@ const IDENTISCH_ERLAUBT = new Set<string>([
   // Dokumentpfade (Dateinamen, keine Uebersetzung).
   'beleg.selbsttestDokument',
   'beleg.backupDokument',
+  // Main-Katalog (Paket B3): sprachneutrale Werte.
+  'main.pdf.quelle.import', // "Import"
+  'main.pdf.zeileTags', // "Tags"
 ]);
 
 type Knoten = Record<string, unknown>;

@@ -12,6 +12,7 @@
  * ein Literal, es wird niemals Nutzer- oder Transkript-Text interpoliert.
  */
 import { execFile } from 'node:child_process';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import type { PasteAdapter } from './index';
 
@@ -35,11 +36,7 @@ export function createMacosPasteAdapter(): PasteAdapter {
               return;
             }
             const detail = stderr.trim().length > 0 ? ` (${stderr.trim()})` : '';
-            resolve(
-              err(
-                `Automatisches Einfügen fehlgeschlagen${detail}. Der Text liegt in der Zwischenablage, bitte mit Cmd+V manuell einfügen. Bleibt der Fehler, in den Systemeinstellungen unter Datenschutz und Sicherheit, Bedienungshilfen die Freigabe für VoiceWall prüfen.`,
-              ),
-            );
+            resolve(err(texte().paste.fehlgeschlagenMacos(detail)));
           },
         );
       }),

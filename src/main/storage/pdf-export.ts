@@ -21,6 +21,7 @@ import { randomBytes } from 'node:crypto';
 import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { BrowserWindow } from 'electron';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import { TMP_PREFIX } from './atomic-write';
 import { ensureExporteDir, exportBaseName, writeExportFile, type ExportSuccess } from './export';
@@ -78,9 +79,7 @@ export class PdfRenderer {
       });
       return ok(pdf);
     } catch (error) {
-      return err(
-        `Das PDF konnte nicht erzeugt werden: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      return err(texte().export.pdfFehler(error instanceof Error ? error.message : String(error)));
     } finally {
       await rm(tmpFile, { force: true });
     }

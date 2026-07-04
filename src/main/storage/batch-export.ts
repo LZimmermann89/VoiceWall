@@ -24,6 +24,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ExportFormat, TranscriptMeta } from '../../shared/company';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import { formatDateStamp } from '../../shared/time';
 import { TMP_PREFIX } from './atomic-write';
@@ -56,7 +57,7 @@ export interface BatchExportDeps {
 export interface BatchExportSuccess extends ExportSuccess {
   /** Anzahl erfolgreich exportierter Dateien. */
   readonly exportiert: number;
-  /** Deutsche Meldungen je fehlgeschlagener Datei (Batch laeuft weiter). */
+  /** Katalog-Meldungen je fehlgeschlagener Datei (Batch laeuft weiter). */
   readonly fehler: readonly string[];
 }
 
@@ -75,7 +76,7 @@ async function buildEntryContent(
   }
   if (format === 'pdf') {
     if (deps.renderPdf === undefined) {
-      return err('PDF-Export ist in dieser Umgebung nicht verfügbar.');
+      return err(texte().export.pdfNichtVerfuegbar);
     }
     return deps.renderPdf(source.value.meta, source.value.body, tmpDir);
   }
@@ -95,7 +96,7 @@ export async function exportTranscriptsBatch(
 ): Promise<Result<BatchExportSuccess, string>> {
   const gesamt = pfade.length;
   if (gesamt === 0) {
-    return err('Es wurde kein Eintrag für den Export ausgewählt.');
+    return err(texte().export.keineAuswahl);
   }
 
   // Einzelfall: exakt der bestehende Einzel-Export (keine Ordner-Anlage).
@@ -140,7 +141,9 @@ export async function exportTranscriptsBatch(
     await mkdir(tmpDir, { recursive: true, mode: 0o700 });
   } catch (error) {
     return err(
-      `Der Stapel-Export konnte nicht vorbereitet werden: ${error instanceof Error ? error.message : String(error)}`,
+      texte().export.stapelVorbereitungFehler(
+        error instanceof Error ? error.message : String(error),
+      ),
     );
   }
 
@@ -189,9 +192,7 @@ export async function exportTranscriptsBatch(
 
     if (exportiert === 0) {
       await rm(tmpDir, { recursive: true, force: true });
-      return err(
-        `Keiner der ausgewählten Einträge konnte exportiert werden. Erste Meldung: ${fehler[0] ?? 'unbekannt'}`,
-      );
+      return err(texte().export.stapelAlleFehlgeschlagen(fehler[0] ?? texte().generisch.unbekannt));
     }
 
     // Finalen Stapel-Ordnernamen bestimmen (Kollision: Zaehler-Suffix).
@@ -224,11 +225,9 @@ export async function exportTranscriptsBatch(
       });
     }
     await rm(tmpDir, { recursive: true, force: true });
-    return err('Der Stapel-Ordner konnte nicht angelegt werden (Namenskollision).');
+    return err(texte().export.stapelOrdnerKollision);
   } catch (error) {
     await rm(tmpDir, { recursive: true, force: true });
-    return err(
-      `Der Stapel-Export ist fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return err(texte().export.stapelFehler(error instanceof Error ? error.message : String(error)));
   }
 }

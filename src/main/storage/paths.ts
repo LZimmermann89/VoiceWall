@@ -27,6 +27,7 @@ import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 
 const execFileAsync = promisify(execFile);
@@ -94,8 +95,7 @@ export function parseRegistryDesktopValue(
   );
 }
 
-const DESKTOP_MISSING_MESSAGE =
-  'Der Desktop-Ordner wurde nicht gefunden. Bitte im Einrichtungs-Assistenten einen Zielordner für den Firmenordner auswählen.';
+const desktopMissingMessage = (): string => texte().firmen.desktopFehlt;
 
 /**
  * Liefert den absoluten Pfad des Desktop-Ordners oder ein Fehler-Result,
@@ -124,7 +124,7 @@ export async function resolveDesktopDir(
         return ok(fallback);
       }
     }
-    return err(DESKTOP_MISSING_MESSAGE);
+    return err(desktopMissingMessage());
   }
 
   // macOS (und Linux-Dev-Umgebungen): ~/Desktop mit Existenz-Pruefung.
@@ -132,5 +132,5 @@ export async function resolveDesktopDir(
   if (await deps.isDirectory(desktop)) {
     return ok(desktop);
   }
-  return err(DESKTOP_MISSING_MESSAGE);
+  return err(desktopMissingMessage());
 }

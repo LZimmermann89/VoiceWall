@@ -24,6 +24,12 @@ export const workerCommandSchema = z.discriminatedUnion('type', [
     minSilenceDurationMs: z.number().int().positive(),
     maxSpeechDurationS: z.number().positive(),
     vadThreshold: z.number().min(0).max(1),
+    /**
+     * Sprache der Oberflaeche (Paket B3): der Worker waehlt damit seine
+     * wenigen nutzersichtbaren Fehlertexte aus dem geteilten Katalog.
+     * Optional mit Default 'de' (kompatibles Wire-Protokoll).
+     */
+    uiLanguage: z.enum(['de', 'en']).optional(),
   }),
   /** Kontinuierlicher Aufnahmemodus: PCM-Chunk anhaengen. */
   z.object({ type: z.literal('audio-chunk'), pcm: arrayBufferSchema }),
@@ -51,6 +57,8 @@ export const workerCommandSchema = z.discriminatedUnion('type', [
     type: z.literal('set-context'),
     language: z.enum(['de', 'en']),
     prompt: z.string().max(2000).nullable(),
+    /** Sprache der Oberflaeche (Paket B3), reist mit jedem Kontext mit. */
+    uiLanguage: z.enum(['de', 'en']).optional(),
   }),
   /**
    * Einmal-Transkription eines vollstaendigen PCM-Segments. Genutzt vom

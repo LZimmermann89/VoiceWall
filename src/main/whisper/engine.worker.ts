@@ -25,8 +25,9 @@ import {
   type WhisperContext,
   type WhisperVadContext,
 } from '@fugood/whisper.node';
+import { KATALOGE } from '../../shared/i18n';
 import { TARGET_SAMPLE_RATE } from '../../shared/pcm';
-import type { DictationLanguage } from '../../shared/schema';
+import type { DictationLanguage, UiLanguage } from '../../shared/schema';
 import { workerCommandSchema, type WorkerCommand, type WorkerEvent } from './protocol';
 import {
   detectSpeech,
@@ -64,6 +65,13 @@ let state: EngineState | null = null;
  */
 let initialPrompt: string | null = null;
 let dictationLanguage: DictationLanguage = 'de';
+
+/**
+ * Sprache der Oberflaeche (Paket B3): reist mit `init` und `set-context`
+ * mit und waehlt die wenigen nutzersichtbaren Fehlertexte dieses Workers
+ * aus dem geteilten Katalog. Default Deutsch.
+ */
+let uiLanguage: UiLanguage = 'de';
 
 /** Akkumulierte PCM-Chunks des laufenden (noch offenen) Sprachbereichs. */
 let pendingChunks: Int16Array[] = [];
@@ -210,6 +218,9 @@ async function handleInit(command: Extract<WorkerCommand, { type: 'init' }>): Pr
 function handleCommand(command: WorkerCommand): void {
   switch (command.type) {
     case 'init':
+      if (command.uiLanguage !== undefined) {
+        uiLanguage = command.uiLanguage;
+      }
       enqueue(() => handleInit(command));
       return;
     case 'audio-chunk': {
@@ -257,6 +268,10 @@ function handleCommand(command: WorkerCommand): void {
     case 'set-context':
       // In der Verarbeitungskette setzen, damit ein laufendes Segment noch
       // mit dem bisherigen Kontext abgeschlossen wird (deterministisch).
+      // Die UI-Sprache wirkt sofort (betrifft nur Fehlertexte, B3).
+      if (command.uiLanguage !== undefined) {
+        uiLanguage = command.uiLanguage;
+      }
       enqueue(() => {
         initialPrompt = command.prompt;
         dictationLanguage = command.language;
@@ -268,7 +283,7 @@ function handleCommand(command: WorkerCommand): void {
       if (active === null) {
         send({
           type: 'transcribe-error',
-          message: 'Engine nicht bereit.',
+          message: KATALOGE[uiLanguage].main.engine.nichtBereit,
           requestId: command.requestId,
         });
         return;
@@ -295,7 +310,7 @@ parentPort.on('message', (messageEvent) => {
   if (!parsed.success) {
     send({
       type: 'transcribe-error',
-      message: `Ungültige Worker-Nachricht: ${parsed.error.message}`,
+      message: KATALOGE[uiLanguage].main.engine.ungueltigeNachricht(parsed.error.message),
     });
     return;
   }

@@ -5,9 +5,11 @@
  * Werte an den Renderer zurück, nie rohe Fehler oder Stacktraces.
  */
 import { cpus, totalmem } from 'node:os';
-import { app, ipcMain, shell } from 'electron';
+import { ipcMain, shell } from 'electron';
 import { IMPRESSUM_QUELLE_URL } from '../../shared/impressum';
 import type { ActionResult, PingResponse, SystemInfo } from '../../shared/schema';
+import { APP_VERSION } from '../app-version';
+import { texte } from '../i18n';
 import { MODEL_CATALOG } from '../model/model-catalog';
 import { IpcChannel } from './channels';
 
@@ -32,7 +34,10 @@ export function collectSystemInfo(): SystemInfo {
     cpuKerne,
     ramGb,
     fp16Erlaubt: ramGb >= FP16_MIN_RAM_GB && cpuKerne >= FP16_MIN_CPU_CORES,
-    appVersion: app.getVersion(),
+    // Zur Buildzeit eingebettete App-Version (electron-vite define aus
+    // package.json). BEWUSST nicht app.getVersion(): das liefert im
+    // Dev-Modus die Electron-Version (z. B. "43.0.0") statt der App-Version.
+    appVersion: APP_VERSION,
     modellPruefsumme: MODEL_CATALOG.whisperQ5.sha256.slice(0, 12),
   };
 }
@@ -53,7 +58,10 @@ export function registerIpcHandlers(): void {
     } catch (error) {
       return {
         ok: false,
-        message: `Der Browser konnte nicht geöffnet werden (${error instanceof Error ? error.message : String(error)}). Die Quelle ist ${IMPRESSUM_QUELLE_URL}; alle Angaben stehen auch direkt hier in der App.`,
+        message: texte().handlers.browserFehler(
+          error instanceof Error ? error.message : String(error),
+          IMPRESSUM_QUELLE_URL,
+        ),
       };
     }
   });

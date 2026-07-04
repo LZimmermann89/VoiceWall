@@ -8,6 +8,43 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- Für 1.0.0 vorgesehen: bestandene manuelle Abnahme nach
+  `docs/ABNAHME-CHECKLISTE.md` (Auto-Paste auf macOS und Windows,
+  TCC-Rebuild-Test, Windows-Setup-Trockenlauf, Schwachhardware-Latenz,
+  echter Download-Pfad, SmartScreen/AV-Verhalten, On-Site-Trockenlauf).
+  Begründung des Release-Kandidaten: Entscheidung E33.
+
+## [1.0.0-rc.2] - 2026-07-04
+
+Zweiter Release-Kandidat: VoiceWall ist vollständig zweisprachig
+(Deutsch/Englisch, Oberfläche UND alle Main-Prozess-Meldungen), die
+Diktatsprache Englisch ist pro Firma wählbar, Stufe 1 (Fach-Wörterbuch
+und regelbasierte Textaufbereitung) ist enthalten. Zusätzlich alle vier
+Pflicht-Fixes aus dem B2-Review (u. a. zentral serialisierte
+Konfig-Schreibzugriffe, korrekte Footer-Version).
+
+### Added
+
+- Alle Main-Prozess-Texte zweisprachig (Paket B3, Entscheidung E41):
+  Result-Fehlermeldungen aller IPC-Handler (Diktat-Flow, Firmen,
+  Register, Export, Verschlüsselung, Wörterbuch, Modelle, Freigaben),
+  engineHinweis-Statusmeldungen, Overlay-Zustellmeldungen
+  ("Text eingefügt ..."), Tray-Menü, Modell-Anzeigenamen, die
+  PDF-Vorlage (Beschriftungen und Fußzeile folgen der UI-Sprache zum
+  Exportzeitpunkt) und der Fehlertext des Capture-Fensters stehen im
+  neuen Katalog-Bereich `main` (`src/shared/i18n/de.ts`/`en.ts`,
+  gleiche Typ-Erzwingung wie B2). Der Main-Prozess hält die aktive
+  UI-Sprache zentral in `src/main/i18n.ts` (`setUiLanguage()` beim
+  Start aus der Konfiguration und im `config:set-ui-language`-Handler;
+  `texte()` liefert den aktiven Katalog, keine verstreuten
+  Konfig-Reads pro Meldung). Der Whisper-Worker erhält die UI-Sprache
+  mit `init` und `set-context` und übersetzt seine wenigen
+  nutzersichtbaren Fehlertexte selbst. Logs bleiben bewusst DEUTSCH
+  (interne Betriebssprache, E41). Neue Beweise: EN-Smoke-Unit-Tests
+  für Main-Meldungen (tests/unit/main-i18n.test.ts) und ein
+  E2E-Durchstich "UI auf Englisch + Diktatfehler-Pfad zeigt englische
+  Accessibility-Meldung" (tests/e2e/ui-language.spec.ts).
+
 - Zweisprachige Oberfläche Deutsch/Englisch (Paket B2, Entscheidung
   E40). Eigene, typisierte Text-Kataloge in `src/shared/i18n/` ohne
   neue Abhängigkeit: `de.ts` ist die Quelle der Wahrheit, der Typ
@@ -76,11 +113,39 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   die Aufbereitung ergänzt (Carveout "unterstützende Funktion für die
   Standardbearbeitung").
 
-- Für 1.0.0 vorgesehen: bestandene manuelle Abnahme nach
-  `docs/ABNAHME-CHECKLISTE.md` (Auto-Paste auf macOS und Windows,
-  TCC-Rebuild-Test, Windows-Setup-Trockenlauf, Schwachhardware-Latenz,
-  echter Download-Pfad, SmartScreen/AV-Verhalten, On-Site-Trockenlauf).
-  Begründung des Release-Kandidaten: Entscheidung E33.
+### Fixed
+
+- Lost-Update-Muster in den Konfig-Handlern (Pflicht-Fix aus dem
+  B2-Review, Entscheidung E42): `setAufbereitung`,
+  `setClipboardRestore`, Hotkey- und Modellwahl-Schreiber sowie die
+  CompanyManager-Schreiber (Firmenliste, aktive Firma, Auto-Speichern)
+  schrieben teils einen veralteten in-memory-Gesamtstand zurück und
+  konnten damit fremde Änderungen überschreiben (dasselbe Muster, das
+  in B2 bei `setUiSprache` real frisch angelegte Firmen entfernt
+  hätte). Jetzt läuft JEDER globale Konfig-Schreibzugriff über EINE
+  zentrale, serialisierte Lesen-Ändern-Schreiben-Funktion
+  (`src/main/config/config-writer.ts`, Promise-Kette; FlowController
+  und CompanyManager teilen sich dieselbe Instanz). Deterministischer
+  Regressionstest nach dem Muster des M7-Lost-Update-Tests:
+  tests/unit/config-writer.test.ts.
+
+- Prüfstempel-Footer zeigte im Dev-Modus die Electron-Version
+  ("43.0.0") statt der App-Version: `app.getVersion()` liefert im
+  ungepackten Zustand die Electron-Version. Die App-Version wird jetzt
+  zur Buildzeit aus package.json eingebettet (`__APP_VERSION__` per
+  electron-vite define, `src/main/app-version.ts`) und in SystemInfo,
+  Beleg-Ansicht, `erstelltMit` neuer Firmen-Konfigs und dem
+  Ready-Marker verwendet; im gepackten Build unverändert korrekt.
+  Beleg: Unit-Test (main-i18n.test.ts) plus E2E-Footer-Assertion.
+
+- `document.documentElement.lang` folgt jetzt dynamisch der
+  UI-Sprache (Hauptfenster und Overlay): Screenreader wählen damit die
+  korrekte Aussprache (A11y-Pflicht-Fix aus dem B2-Review).
+
+- Der Fehlertext des Capture-Fensters (Mikrofonzugriff) läuft über den
+  Katalog-Kanal: das Capture-Fenster sendet nur noch das technische
+  Detail, die nutzersichtbare Meldung baut der Main-Prozess in der
+  UI-Sprache (B2-Übergabepunkt).
 
 ## [1.0.0-rc.1] - 2026-07-03
 

@@ -12,6 +12,7 @@
  * docs/M1-SPIKE-ERGEBNIS.md, Abschnitt F4.
  */
 import { shell, systemPreferences } from 'electron';
+import { texte } from '../i18n';
 import { err, ok, type Result } from '../../shared/result';
 import type { AccessibilityState } from '../../shared/schema';
 
@@ -23,9 +24,10 @@ import type { AccessibilityState } from '../../shared/schema';
 const ACCESSIBILITY_SETTINGS_URL =
   'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
 
-/** Deutsche Anleitung, wenn die Freigabe fehlt (Schritt fuer Schritt). */
-export const ACCESSIBILITY_MISSING_MESSAGE =
-  'Automatisches Einfügen ist noch nicht möglich: VoiceWall hat keine Bedienungshilfen-Freigabe. Der Text liegt in der Zwischenablage, bitte mit Cmd+V manuell einfügen. So erteilen Sie die Freigabe: 1. Knopf "Systemeinstellungen öffnen" drücken (oder Systemeinstellungen, Datenschutz und Sicherheit, Bedienungshilfen). 2. VoiceWall in der Liste aktivieren (ggf. über das Plus-Symbol hinzufügen). 3. Diktat erneut ausführen.';
+/** Anleitung in der UI-Sprache, wenn die Freigabe fehlt (Katalog, B3). */
+export function accessibilityMissingMessage(): string {
+  return texte().freigaben.accessibilityFehlt;
+}
 
 /** Aktueller Bedienungshilfen-Status (Windows/Linux: not-applicable). */
 export function getAccessibilityState(): AccessibilityState {
@@ -58,14 +60,14 @@ export function requestAccessibilityGrant(): AccessibilityState {
 /** Oeffnet den Bedienungshilfen-Bereich der macOS-Systemeinstellungen. */
 export async function openAccessibilitySettings(): Promise<Result<void, string>> {
   if (process.platform !== 'darwin') {
-    return err('Dieser Einstellungs-Link existiert nur auf macOS.');
+    return err(texte().freigaben.nurMacos);
   }
   try {
     await shell.openExternal(ACCESSIBILITY_SETTINGS_URL);
     return ok(undefined);
   } catch (error) {
     return err(
-      `Die Systemeinstellungen konnten nicht geöffnet werden (${error instanceof Error ? error.message : String(error)}). Bitte manuell öffnen: Systemeinstellungen, Datenschutz und Sicherheit, Bedienungshilfen.`,
+      texte().freigaben.einstellungenFehler(error instanceof Error ? error.message : String(error)),
     );
   }
 }
