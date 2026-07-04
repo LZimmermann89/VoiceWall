@@ -114,9 +114,14 @@ Diktat-Durchlaufs.
 - **Logging ohne Inhalte:** strukturierte, rotierte Logdateien mit
   restriktiven Rechten; Diktat-Inhalte werden nie geloggt.
 
-Details: `docs/ENTSCHEIDUNGEN.md` (Entscheidungsprotokoll E1 bis E33),
+Details: `docs/ENTSCHEIDUNGEN.md` (Entscheidungsprotokoll E1 bis E47),
 `docs/M1-SPIKE-ERGEBNIS.md` (empirische Architektur-Belege),
 `SECURITY.md` (Meldeweg für Schwachstellen).
+
+Hinweis zu Quellenangaben: Kommentare und Dokumente zitieren
+stellenweise "ABARBEITUNG X.Y". Das ist das interne Bau- und
+Anforderungsdokument des Projekts; es wird nicht mit ausgeliefert, die
+Zitate dienen der internen Nachvollziehbarkeit der Entscheidungen.
 
 ## Systemvoraussetzungen
 
