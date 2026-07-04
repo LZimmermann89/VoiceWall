@@ -13,11 +13,20 @@ import type { AppStatus, ModelProgress, SystemInfo, TranscriptPayload } from '..
 import type { Ersetzung } from '../../shared/vokabular';
 import { formatAccelerator, formatBytes } from './format';
 import { useSprache } from './i18n';
+import { useToast } from './Toasts';
 
 interface TranscriptLine {
   readonly text: string;
   readonly durationMs: number;
   readonly audioMs: number;
+}
+
+/** Deterministischer Vergleichsstand des Wörterbuch-Editors (E45). */
+function vokabularStand(begriffe: readonly string[], ersetzungen: readonly Ersetzung[]): string {
+  return JSON.stringify({
+    begriffe,
+    ersetzungen: ersetzungen.map((regel) => ({ von: regel.von, zu: regel.zu })),
+  });
 }
 
 interface DiktatViewProps {
@@ -33,6 +42,9 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   const { status, companies, progress, systemInfo, onRefreshStatus, onRefreshCompanies } = props;
   const { sprache: uiSprache, texte } = useSprache();
   const t = texte.diktat;
+  // Sofortmeldungen (E44): Fehler jeder Aktion und der Wörterbuch-Ausgang
+  // erscheinen zusätzlich als Toast (die Inline-Anzeigen bleiben erhalten).
+  const { showError, showSuccess } = useToast();
 
   const [transcripts, setTranscripts] = useState<TranscriptLine[]>([]);
   const [level, setLevel] = useState(0);
@@ -50,6 +62,11 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   const [zuInput, setZuInput] = useState('');
   const [vokabularError, setVokabularError] = useState<string | null>(null);
   const [vokabularNotice, setVokabularNotice] = useState<string | null>(null);
+  // Zuletzt geladener/gespeicherter Stand: Grundlage der sichtbaren
+  // "noch nicht gespeichert"-Warnung (Praxistest-Befund E45: Eintraege
+  // WIRKEN nach "Hinzufügen" gespeichert, sind es aber erst nach
+  // "Wörterbuch speichern").
+  const [gespeicherterStand, setGespeicherterStand] = useState<string>(vokabularStand([], []));
 
   useEffect(() => {
     const offTranscript = window.voicewall.onTranscript((payload: TranscriptPayload) => {
@@ -90,6 +107,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
     if (aktiveFirma === null) {
       setBegriffe([]);
       setErsetzungen([]);
+      setGespeicherterStand(vokabularStand([], []));
       return;
     }
     void window.voicewall.getVokabular().then((result) => {
@@ -99,6 +117,9 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
       if (result.ok) {
         setBegriffe([...result.vokabular.begriffe]);
         setErsetzungen([...result.vokabular.ersetzungen]);
+        setGespeicherterStand(
+          vokabularStand(result.vokabular.begriffe, result.vokabular.ersetzungen),
+        );
       } else {
         setVokabularError(result.message);
       }
@@ -116,13 +137,15 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
         const result = await action();
         if (!result.ok && result.message !== undefined) {
           setError(result.message);
+          // Sofort sichtbar, unabhaengig von der Scroll-Position (E44).
+          showError(result.message);
         }
       } finally {
         setBusy(false);
         await onRefreshStatus();
       }
     },
-    [onRefreshStatus],
+    [onRefreshStatus, showError],
   );
 
   const modelsReady = status?.modelsReady ?? false;
@@ -139,6 +162,8 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   const flowState = status?.flowState ?? 'idle';
   const platform = systemInfo?.platform ?? 'darwin';
   const hasCompany = (companies?.firmen.length ?? 0) > 0;
+  // Sichtbare Warnung fuer ungespeicherte Woerterbuch-Aenderungen (E45).
+  const vokabularDirty = vokabularStand(begriffe, ersetzungen) !== gespeicherterStand;
   const levelBucket = Math.min(20, Math.round(Math.min(1, level * 1.4) * 20));
 
   return (
@@ -454,6 +479,9 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
         ) : (
           <>
             <p className="notice">{t.fachwoerterbuchHinweis}</p>
+            <p className="notice" data-testid="vocab-erwartung">
+              {t.fachwoerterbuchErwartung}
+            </p>
             {begriffe.length > 0 && (
               <ul className="status-list" data-testid="vocab-begriffe">
                 {begriffe.map((begriff, index) => (
@@ -569,8 +597,12 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                     });
                     if (result.ok) {
                       setVokabularNotice(t.woerterbuchGespeichert);
+                      setGespeicherterStand(vokabularStand(begriffe, ersetzungen));
+                      // Erfolg sofort sichtbar bestaetigen (E44/E45).
+                      showSuccess(t.woerterbuchGespeichert);
                     } else {
                       setVokabularError(result.message);
+                      showError(result.message);
                     }
                     return { ok: true };
                   })
@@ -578,6 +610,11 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
               >
                 {t.woerterbuchSpeichern}
               </button>
+              {vokabularDirty && (
+                <span className="warn-text" data-testid="vocab-dirty" aria-live="polite">
+                  {t.woerterbuchUngespeichert}
+                </span>
+              )}
             </div>
             {vokabularNotice !== null && (
               <p className="notice" data-testid="vocab-notice">

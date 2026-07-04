@@ -35,8 +35,11 @@ import type {
   AufbereitungConfig,
   DeliveryResult,
   DevDictateResult,
+  DevDictationContext,
   DictationLanguage,
   ModelChoiceView,
+  ModelDetailsResult,
+  ModelIdView,
   ModelProgress,
   PingResponse,
   SystemInfo,
@@ -155,6 +158,14 @@ export interface VoiceWallBridge {
   /** Beleg-Informationen (Modelle, Pruefsummen, Konsent, Log-Pfad). */
   readonly belegInfo: () => Promise<BelegInfoResult>;
 
+  // Modelle-Reiter der Verwaltung (E46).
+  /** Detailstatus aller Katalog-Modelle (Groesse, SHA-256, Loeschbarkeit). */
+  readonly modelDetails: () => Promise<ModelDetailsResult>;
+  /** Einzel-Download eines Modells (seriell; Fortschritt via onModelProgress). */
+  readonly downloadModel: (id: ModelIdView) => Promise<ActionResult>;
+  /** Modelldatei loeschen (nie das aktuell benoetigte Modell). */
+  readonly deleteModel: (id: ModelIdView) => Promise<ActionResult>;
+
   // Stufe 1: Fach-Woerterbuch und regelbasierte Textaufbereitung.
   /** Vokabular (Begriffe, Ersetzungen) der aktiven Firma lesen. */
   readonly getVokabular: () => Promise<VokabularGetResult>;
@@ -207,6 +218,12 @@ export interface VoiceWallBridge {
    * Woerterbuch-Prompt, VAD-Schleuse, Ersetzungen, Aufbereitung, Zustellung).
    */
   readonly devDictatePcm: (pcm: ArrayBuffer) => Promise<DevDictateResult>;
+  /**
+   * Nur Dev/Test (Prompt-Beweis, E45): zuletzt an den Whisper-Worker
+   * gesendeter Diktat-Kontext (language plus prompt); null ohne Engine oder
+   * ohne aktiven Test-IPC-Kanal.
+   */
+  readonly devGetLastContext: () => Promise<DevDictationContext>;
 }
 
 /**

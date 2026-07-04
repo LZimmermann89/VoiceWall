@@ -1490,6 +1490,145 @@ button.danger:hover:not(:disabled) {
   margin: 0;
 }
 
+/* ----------------------------------------------------------------------
+ * Modelle-Reiter (E46): Modellbestand als Karten-Liste im Formular-Stil.
+ * Farben/Kontraste wie im Kopf dokumentiert (--seal, --warn-ink auf Papier).
+ * ---------------------------------------------------------------------- */
+.model-cards {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+}
+
+.model-card {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--paper-raised);
+  padding: 0.85rem 1.05rem;
+  margin-bottom: 0.7rem;
+}
+
+.model-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.model-card-label {
+  font-weight: 700;
+}
+
+.model-card-head .badge {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--seal);
+  border: 1px solid var(--seal);
+  border-radius: 999px;
+  padding: 0.02rem 0.45rem;
+}
+
+.model-card-head .status-ok {
+  color: var(--seal);
+  font-size: 0.78rem;
+  margin-left: auto;
+}
+
+.model-card-head .status-missing {
+  color: var(--warn-ink);
+  font-size: 0.78rem;
+  margin-left: auto;
+}
+
+.model-card-line {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin: 0.3rem 0 0;
+}
+
+/* ----------------------------------------------------------------------
+ * Toast-Stapel (Sofortmeldungen, Entscheidung E44): fixe Schicht unten
+ * rechts, unabhaengig von Ansicht und Scroll-Position. Papier-Karte mit
+ * feiner Linie; Erfolg traegt Siegel-Gruen, Fehler das Fehlerrot.
+ * Kontrast-Nachweis (gegen --paper-raised #F9F6EE, L = 0.918):
+ *   --ink      #1C1A15  Toast-Text        15.9 : 1 (AAA)
+ *   --seal     #1E5C45  Erfolgs-Kicker     7.3 : 1 (AA)
+ *   --error    #9B2C20  Fehler-Kicker      6.9 : 1 (AA)
+ * ---------------------------------------------------------------------- */
+.toast-stack {
+  position: fixed;
+  right: 1.2rem;
+  bottom: 2.6rem;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-width: 24rem;
+  width: calc(100vw - 2.4rem);
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 0.6rem;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: 0.6rem 0.7rem 0.6rem 0.9rem;
+  box-shadow: 0 8px 28px rgb(28 26 21 / 0.22);
+}
+
+.toast-success {
+  border-left: 4px solid var(--seal);
+}
+
+.toast-error {
+  border-left: 4px solid var(--error);
+}
+
+.toast-kicker {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  padding-top: 0.2rem;
+}
+
+.toast-success .toast-kicker {
+  color: var(--seal);
+}
+
+.toast-error .toast-kicker {
+  color: var(--error);
+}
+
+.toast-text {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.toast-close:hover {
+  color: var(--ink);
+  border-color: var(--rule-strong);
+}
+
 /* Screenreader-only (aria-live-Ansagen ohne visuelles Rauschen) */
 .visually-hidden {
   position: absolute;

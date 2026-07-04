@@ -279,7 +279,41 @@ export const en: Uebersetzung = {
     tabDiktat: 'Dictation',
     tabRegister: 'Records',
     tabPapierkorb: 'Trash',
+    tabModelle: 'Models',
     tabBeleg: 'Evidence',
+  },
+
+  /** "Models" view (management, decision E46). */
+  modelleTab: {
+    titel: 'Models',
+    lede: 'All recognition models on this computer at a glance: purpose, size, checksum and status. Missing models can be downloaded individually here, unneeded ones deleted.',
+    zweck: {
+      'whisper-q5': 'German dictation (standard)',
+      'whisper-fp16': 'German dictation, maximum accuracy (optional, powerful hardware)',
+      'turbo-q5_0-multilingual': 'English dictation (multilingual original model)',
+      'silero-vad': 'Speech segmentation (VAD, required for every dictation)',
+    },
+    zweckLabel: 'Purpose:',
+    groesseLabel: 'Size:',
+    pruefsummeLabel: 'SHA-256:',
+    statusVorhanden: 'present and verified',
+    statusFehlt: 'missing',
+    badgeErforderlich: 'currently required',
+    erforderlichHinweis:
+      'This model is required by the dictation language of the active company or for every dictation and cannot be deleted.',
+    laden: 'Download',
+    laedt: 'Downloading ...',
+    loeschen: 'Delete',
+    wirdGeladen: 'Loading ...',
+    downloadFertig: (label: string): string => `Model downloaded and verified: ${label}.`,
+    geloescht: (label: string): string =>
+      `Model deleted: ${label}. It will simply be downloaded again when needed.`,
+    loeschenTitel: 'Delete model?',
+    loeschenText: (label: string, groesse: string): string =>
+      `The model file "${label}" (${groesse}) will be deleted from this computer. No dictations are lost; if the model is needed again later, VoiceWall downloads it once more.`,
+    loeschenBestaetigen: 'Delete model',
+    downloadHinweis:
+      'The model download is the only moment VoiceWall uses the internet (huggingface.co, verified against the hard-coded checksum). Downloads run one at a time.',
   },
 
   diktat: {
@@ -353,12 +387,14 @@ export const en: Uebersetzung = {
     fuellwoerterLabel:
       'Remove filler words: standalone "uh", "um", "erm", "hm" and direct word doublings ("the the"). Conservative; rare legitimate doublings may be affected.',
     sprachkommandosLabel:
-      'Apply voice commands: "period", "comma", "question mark", "exclamation mark", "colon", "new line", "new paragraph". Off by default because the rule may also affect the ordinary use of the word "period".',
+      'Apply voice commands: "period", "comma", "new line", "new paragraph", "paragraph" (German dictation additionally: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz"). Punctuation the speech recognition itself places around a command word is removed as well ("test, period." becomes "test."). Sometimes the recognition turns a spoken "period" directly into punctuation; the command word then never appears in the text and the result is still correct. Off by default because the rule also affects the ordinary use of words like "period" or "paragraph".',
     fachwoerterbuchTitel: 'Specialist dictionary of the active company',
     fachwoerterbuchKeineFirma:
       'No company created yet. The specialist dictionary belongs to the company and is stored auditable in its folder (.voicewall/vokabular.json).',
     fachwoerterbuchHinweis:
       'Terms (proper names, technical terms, file numbers) improve recognition: they are passed to the speech recognition locally as context. Replacements correct frequent mistranscriptions deterministically, only as whole words and exactly in the entered capitalisation.',
+    fachwoerterbuchErwartung:
+      'Honest note: terms make correct recognition of rare names more likely, but they do not guarantee it. For stubborn misrecognitions use the replacement list: if, for example, "Plaud" is recognised as "blaut", create a rule "blaut" to "Plaud".',
     entfernen: 'Remove',
     neuerBegriff: 'New term:',
     begriffPlatzhalter: 'e.g. VoiceWall',
@@ -369,6 +405,7 @@ export const en: Uebersetzung = {
     ersetzungZuPlatzhalter: 'e.g. VoiceWall',
     woerterbuchSpeichern: 'Save dictionary',
     woerterbuchGespeichert: 'Dictionary saved (atomically, in the company folder).',
+    woerterbuchUngespeichert: 'Not saved yet: changes only take effect after "Save dictionary".',
     fehlerTitel: 'Error',
     fehlerAria: 'Error',
   },
@@ -633,6 +670,13 @@ export const en: Uebersetzung = {
     kopieren: 'Copy',
   },
 
+  /** Immediately visible notices (toast system, decision E44). */
+  toast: {
+    fehlerKicker: 'Error',
+    erfolgKicker: 'Confirmed',
+    schliessenAria: 'Dismiss message',
+  },
+
   /**
    * User-visible texts of the MAIN process (package B3, decision E41):
    * Result error messages, tray, overlay delivery messages, PDF template
@@ -747,6 +791,13 @@ export const en: Uebersetzung = {
         `The model file ${dateiname} is corrupted (checksum mismatch). It must be downloaded again.`,
       modellFehltDownloadNoetig: (label: string): string =>
         `The ${label} is missing. Please start the one-time model download in the setup assistant.`,
+      // Models tab (E46).
+      unbekannteKennung: 'Unknown model identifier.',
+      downloadLaeuftBereits:
+        'A model download is already running. Downloads run one at a time; please wait until the current download has finished.',
+      loeschenGesperrt: (label: string): string =>
+        `The model "${label}" is currently required (dictation language of the active company or speech segmentation) and cannot be deleted. Please change the dictation language of the active company first.`,
+      loeschenFehler: (detail: string): string => `The model file could not be deleted: ${detail}`,
     },
 
     firmen: {

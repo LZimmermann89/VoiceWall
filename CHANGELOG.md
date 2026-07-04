@@ -8,6 +8,62 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- Modelle-Reiter in der Verwaltung (Entscheidung E46): alle vier
+  Katalog-Modelle (Deutsch Q5_0, Deutsch fp16, Englisch/mehrsprachig,
+  Silero-VAD) mit Zweck, Größe, Status (vorhanden und verifiziert /
+  fehlt) und gekürzter SHA-256 (voller Wert im title-Attribut).
+  Fehlende Modelle lassen sich einzeln nachladen (seriell, bestehender
+  Fortschritts-Mechanismus, Verifikation gegen die fest hinterlegte
+  Prüfsumme); vorhandene, nicht benötigte Modelle lassen sich nach
+  Bestätigungsdialog löschen (Warnung: wird bei Bedarf erneut geladen).
+  Das Modell der aktiven Firmensprache und das VAD-Modell sind mit
+  erklärender Meldung gesperrt. Neue, zod-validierte IPC-Kanäle
+  `model:details`, `model:download`, `model:delete`; E2E in
+  tests/e2e/modelle.spec.ts.
+
+- Toast-System für sofort sichtbare Meldungen (Entscheidung E44):
+  Fehler (aria-live assertive, 8 s) und wichtige Erfolge (polite, 4 s)
+  erscheinen als Papier-Karte unten rechts, unabhängig von Ansicht und
+  Scroll-Position; manuell per Tastatur schließbar, maximal 3
+  gestapelt, zweisprachig. Verdrahtet für den zentralen Fehlerkanal
+  (Diktat-Flow, Engine, Modell-Download, Mikrofon), die
+  DiktatView-Aktionen, Wörterbuch speichern, Export (Einzel, Stapel,
+  verschlüsselt), Firmen-/Sprachwechsel und den Modelle-Reiter. Die
+  Inline-Anzeigen bleiben als Detail-Ort erhalten. E2E in
+  tests/e2e/toast.spec.ts.
+
+- Sprachkommando-Aliasse (Entscheidung E43): deutsch "Absatz" (allein)
+  und "Zeilenumbruch", englisch "paragraph". Die UI-Erklärung nennt
+  die vollständige Kommandoliste und erklärt ehrlich, dass Whisper ein
+  gesprochenes "Punkt" manchmal selbst in ein Satzzeichen umwandelt
+  (dann greift die Regel nicht und das Ergebnis stimmt trotzdem). Der
+  Schalter bleibt Opt-in (E38).
+
+- Wörterbuch-Bereich: sichtbare "Noch nicht gespeichert"-Warnung bei
+  ungespeicherten Einträgen, sofort sichtbare Speicher-Bestätigung
+  (Toast) und ein ehrlicher Erwartungs-Hinweis (Begriffe machen
+  seltene Namen wahrscheinlicher, garantieren sie nicht; hartnäckige
+  Fehlerkennungen über die Ersetzungsliste lösen, Beispiel "blaut" ->
+  "Plaud"). Neuer deterministischer Prompt-Beweis: der Test-IPC-Kanal
+  `dev:get-last-context` (nur Dev/Test) liest den zuletzt an den
+  Whisper-Worker gesendeten Kontext; E2E in
+  tests/e2e/vokabular-persistenz.spec.ts (Speichern, Ansichtswechsel,
+  App-Neustart, Prompt-Inhalt). Befund: die Persistenz- und
+  Prompt-Kette war technisch intakt, die Lücke war Sichtbarkeit und
+  Erwartung (Entscheidung E45).
+
+### Fixed
+
+- Sprachkommandos erzeugen keinen Interpunktions-Müll mehr, wenn
+  Whisper um das Kommandowort selbst Satzzeichen setzt (Entscheidung
+  E43, Praxistest-Repro): "Das ist ein Test, Punkt." wird jetzt
+  "Das ist ein Test." (bisher "Das ist ein Test,."); ", Komma" wird
+  ","; "Neuer Absatz." mitten im Text hinterlässt keinen Rest-Punkt;
+  "Hallo Absatz und weiter" erzeugt jetzt einen Absatz. 21 neue
+  Unit-Fälle inklusive der vier Repro-Fälle und der EN-Pendants.
+
+### Ausblick
+
 - Für 1.0.0 vorgesehen: bestandene manuelle Abnahme nach
   `docs/ABNAHME-CHECKLISTE.md` (Auto-Paste auf macOS und Windows,
   TCC-Rebuild-Test, Windows-Setup-Trockenlauf, Schwachhardware-Latenz,

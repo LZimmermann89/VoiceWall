@@ -21,6 +21,7 @@ import { basename, join } from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import { ALL_MODEL_DESCRIPTORS } from '../../src/main/model/model-catalog';
 import {
+  fp16ModelPath,
   modelsAvailable,
   multilingualModelPath,
   sileroModelPath,
@@ -50,6 +51,12 @@ export interface LaunchOptions {
    * physisches Mikrofon und ohne TCC-Dialog).
    */
   readonly extraArgs?: readonly string[];
+  /**
+   * Bestehendes Test-Wurzelverzeichnis wiederverwenden (Neustart-Tests:
+   * dieselben userData-/Firmen-Ordner wie ein vorheriger Lauf). Ohne Angabe
+   * wird wie bisher ein frisches Temp-Verzeichnis angelegt.
+   */
+  readonly reuseTestRoot?: string;
 }
 
 export interface LaunchedApp {
@@ -70,10 +77,11 @@ function linkModelsInto(userDataDir: string): void {
   }
   const modelsDir = join(userDataDir, 'models');
   mkdirSync(modelsDir, { recursive: true });
-  // Das multilinguale EN-Modell (Paket B1) ist optional: es wird nur
-  // verlinkt, wenn es lokal vorhanden ist (EN-Tests skippen sonst selbst).
-  const sources = [whisperModelPath, sileroModelPath, multilingualModelPath].filter((source) =>
-    existsSync(source),
+  // Das multilinguale EN-Modell (Paket B1) und das fp16-Modell sind
+  // optional: sie werden nur verlinkt, wenn sie lokal vorhanden sind
+  // (die betroffenen Tests skippen bzw. pruefen den Status sonst selbst).
+  const sources = [whisperModelPath, sileroModelPath, multilingualModelPath, fp16ModelPath].filter(
+    (source) => existsSync(source),
   );
   for (const source of sources) {
     const target = join(modelsDir, basename(source));
@@ -147,7 +155,7 @@ export async function createTestCompany(
 }
 
 export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedApp> {
-  const testRoot = mkdtempSync(join(tmpdir(), 'voicewall-e2e-'));
+  const testRoot = options.reuseTestRoot ?? mkdtempSync(join(tmpdir(), 'voicewall-e2e-'));
   const userDataDir = join(testRoot, 'userdata');
   const baseDir = join(testRoot, 'desktop');
   mkdirSync(userDataDir, { recursive: true });

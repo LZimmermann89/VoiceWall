@@ -31,6 +31,8 @@ import {
   audioLevelSchema,
   deliveryResultSchema,
   devDictateResultSchema,
+  devDictationContextSchema,
+  modelDetailsResultSchema,
   modelProgressSchema,
   pingResponseSchema,
   systemInfoSchema,
@@ -154,6 +156,12 @@ const bridge: VoiceWallBridge = {
   },
   belegInfo: async () =>
     belegInfoResultSchema.parse(await ipcRenderer.invoke(IpcChannel.BelegInfo)),
+  modelDetails: async () =>
+    modelDetailsResultSchema.parse(await ipcRenderer.invoke(IpcChannel.ModelDetails)),
+  downloadModel: async (id) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.ModelDownload, id)),
+  deleteModel: async (id) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.ModelDelete, id)),
   getVokabular: async () =>
     vokabularGetResultSchema.parse(await ipcRenderer.invoke(IpcChannel.VocabGet)),
   saveVokabular: async (input) =>
@@ -211,6 +219,16 @@ const bridge: VoiceWallBridge = {
       return devDictateResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevDictatePcm, pcm));
     } catch (error) {
       return { delivered: false, pasted: false, text: null, message: toDevErrorMessage(error) };
+    }
+  },
+  devGetLastContext: async () => {
+    try {
+      return devDictationContextSchema.parse(
+        await ipcRenderer.invoke(IpcChannel.DevGetLastContext),
+      );
+    } catch {
+      // Kanal nicht aktiv (kein Test-IPC): wie "kein Kontext gesendet".
+      return null;
     }
   },
 };

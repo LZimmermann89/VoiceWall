@@ -30,6 +30,40 @@ export const modelStatusSchema = z.object({
 });
 export type ModelStatusView = z.infer<typeof modelStatusSchema>;
 
+/** Stabile Modell-Kennungen des Katalogs (Modelle-Reiter, E46). */
+export const modelIdSchema = z.enum([
+  'whisper-q5',
+  'whisper-fp16',
+  'turbo-q5_0-multilingual',
+  'silero-vad',
+]);
+export type ModelIdView = z.infer<typeof modelIdSchema>;
+
+/** Detailstatus eines Katalog-Modells fuer den Modelle-Reiter (E46). */
+export const modelDetailSchema = z.object({
+  id: modelIdSchema,
+  /** Anzeigename in der UI-Sprache. */
+  label: z.string(),
+  /** Erwartete Dateigroesse in Bytes (Katalog-Konstante). */
+  byteSize: z.number().int().nonnegative(),
+  /** Erwarteter SHA-256 (Katalog-Konstante, der Integritaetsanker). */
+  sha256: z.string(),
+  /** Datei vorhanden UND gegen die Katalog-Pruefsumme verifiziert. */
+  present: z.boolean(),
+  /**
+   * Modell wird aktuell zwingend benoetigt (Whisper-Modell der aktiven
+   * Diktatsprache/Modellwahl bzw. das VAD-Modell) und ist nicht loeschbar.
+   */
+  erforderlich: z.boolean(),
+});
+export type ModelDetailView = z.infer<typeof modelDetailSchema>;
+
+/** Antwort des Modelle-Reiters: alle Katalog-Modelle. */
+export const modelDetailsResultSchema = z.object({
+  modelle: z.array(modelDetailSchema),
+});
+export type ModelDetailsResult = z.infer<typeof modelDetailsResultSchema>;
+
 /** Whisper-Modellwahl (Wizard Schritt Modell; Q5_0 ist der Standard). */
 export const modelChoiceSchema = z.enum(['q5_0', 'fp16']);
 export type ModelChoiceView = z.infer<typeof modelChoiceSchema>;
@@ -134,6 +168,19 @@ export const devDictateResultSchema = z.object({
   message: z.string().nullable(),
 });
 export type DevDictateResult = z.infer<typeof devDictateResultSchema>;
+
+/**
+ * Nur Dev/Test (Prompt-Beweis, E45): der zuletzt an den Whisper-Worker
+ * gesendete Diktat-Kontext (Sprache plus Initial-Prompt des Woerterbuchs);
+ * null, solange keine Engine laeuft oder kein Kontext gesetzt wurde.
+ */
+export const devDictationContextSchema = z
+  .object({
+    language: dictationLanguageSchema,
+    prompt: z.string().nullable(),
+  })
+  .nullable();
+export type DevDictationContext = z.infer<typeof devDictationContextSchema>;
 
 /** Ein neues Transkript-Segment. */
 export const transcriptPayloadSchema = z.object({

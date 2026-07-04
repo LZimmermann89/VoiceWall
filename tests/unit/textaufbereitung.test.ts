@@ -184,8 +184,10 @@ describe('ersetzeSprachkommandos', () => {
   });
 
   it('ersetzt "neuer Absatz" durch einen Doppelumbruch', () => {
-    expect(ersetzeSprachkommandos('Absatz eins neuer Absatz Absatz zwei')).toBe(
-      'Absatz eins\n\nAbsatz zwei',
+    // Seit E43 ist "Absatz" allein selbst ein Kommando; das Beispiel nutzt
+    // deshalb "Teil" als normales Wort.
+    expect(ersetzeSprachkommandos('Teil eins neuer Absatz Teil zwei')).toBe(
+      'Teil eins\n\nTeil zwei',
     );
   });
 
@@ -203,6 +205,115 @@ describe('ersetzeSprachkommandos', () => {
   it('dokumentierte Unschaerfe: normale Verwendung von "Punkt" wird getroffen', () => {
     // Genau deshalb ist der Schalter standardmaessig AUS (Entscheidung E38).
     expect(ersetzeSprachkommandos('Der Punkt ist wichtig.')).toBe('Der. ist wichtig.');
+  });
+});
+
+describe('Sprachkommandos: Whisper-Interpunktion und Aliasse (E43, Praxistest)', () => {
+  // Die vier Repro-Faelle des Praxistests mit definierten Soll-Ergebnissen.
+  it('Repro 1: "Das ist ein Test Punkt" -> "Das ist ein Test."', () => {
+    expect(aufbereitenText('Das ist ein Test Punkt', ALLES_AN)).toBe('Das ist ein Test.');
+  });
+
+  it('Repro 2: Whisper-Interpunktion um "Punkt" wird geschluckt (", Punkt.")', () => {
+    expect(aufbereitenText('Das ist ein Test, Punkt.', ALLES_AN)).toBe('Das ist ein Test.');
+  });
+
+  it('Repro 3: Alias "Absatz" (allein) erzeugt einen Doppelumbruch', () => {
+    expect(aufbereitenText('Hallo Absatz und weiter', ALLES_AN)).toBe('Hallo\n\nund weiter');
+  });
+
+  it('Repro 4: "Neuer Absatz." mitten im Text, Satzende davor bleibt erhalten', () => {
+    expect(aufbereitenText('Erste Zeile. Neuer Absatz. Zweite Zeile.', ALLES_AN)).toBe(
+      'Erste Zeile.\n\nZweite Zeile.',
+    );
+  });
+
+  it('", Komma" wird zu genau einem Komma', () => {
+    expect(ersetzeSprachkommandos('Erstens, Komma zweitens')).toBe('Erstens, zweitens');
+    expect(ersetzeSprachkommandos('Anfang, Komma')).toBe('Anfang,');
+  });
+
+  it('Satzzeichen-Kommando schluckt auch ein Satzende DAVOR ("Test. Punkt")', () => {
+    expect(ersetzeSprachkommandos('Das ist ein Test. Punkt')).toBe('Das ist ein Test.');
+  });
+
+  it('schluckt hoechstens EIN Satzzeichen je Seite (kein Kahlschlag)', () => {
+    expect(ersetzeSprachkommandos('Wirklich?, Punkt.')).toBe('Wirklich?.');
+  });
+
+  it('Grossschreibung: nach umgesetztem "Punkt." beginnt der Folgesatz gross', () => {
+    expect(aufbereitenText('Das war gut, Punkt. es geht weiter', ALLES_AN)).toBe(
+      'Das war gut. Es geht weiter',
+    );
+  });
+
+  it('Kommando mit Whisper-Interpunktion am Satzanfang des Textes', () => {
+    expect(aufbereitenText('Punkt. Danach beginnt der Text', ALLES_AN)).toBe(
+      '. Danach beginnt der Text',
+    );
+  });
+
+  it('Kommando mit Whisper-Interpunktion am Textende ("Fragezeichen?")', () => {
+    expect(aufbereitenText('Ist das gut, Fragezeichen?', ALLES_AN)).toBe('Ist das gut?');
+    expect(aufbereitenText('Sofort, Ausrufezeichen!', ALLES_AN)).toBe('Sofort!');
+  });
+
+  it('Alias "Zeilenumbruch" erzeugt einen einfachen Umbruch', () => {
+    expect(aufbereitenText('Zeile eins Zeilenumbruch Zeile zwei', ALLES_AN)).toBe(
+      'Zeile eins\nZeile zwei',
+    );
+  });
+
+  it('Alias "Absatz." mit Whisper-Punkt: kein Rest-Punkt nach dem Umbruch', () => {
+    expect(aufbereitenText('Erster Teil, Absatz. Zweiter Teil.', ALLES_AN)).toBe(
+      'Erster Teil,\n\nZweiter Teil.',
+    );
+  });
+
+  it('Umbruch-Kommando laesst ein Satzende DAVOR unangetastet', () => {
+    expect(ersetzeSprachkommandos('Ende. Neuer Absatz Weiter')).toBe('Ende.\n\nWeiter');
+  });
+
+  it('"neuer Absatz" hat Vorrang vor dem Alias "Absatz" (kein Doppel-Treffer)', () => {
+    expect(ersetzeSprachkommandos('Eins neuer Absatz zwei')).toBe('Eins\n\nzwei');
+  });
+
+  it('case-insensitiv auch fuer die Aliasse ("ABSATZ", "zeilenumbruch")', () => {
+    expect(ersetzeSprachkommandos('Eins ABSATZ zwei')).toBe('Eins\n\nzwei');
+    expect(ersetzeSprachkommandos('Eins zeilenumbruch zwei')).toBe('Eins\nzwei');
+  });
+
+  it('keine Teilwort-Treffer der Aliasse ("Absatzformat", "Kleinabsatz")', () => {
+    expect(ersetzeSprachkommandos('Das Absatzformat im Kleinabsatz bleibt.')).toBe(
+      'Das Absatzformat im Kleinabsatz bleibt.',
+    );
+  });
+
+  it('dokumentierte Unschaerfe: normales Wort "Absatz" wird bei AN getroffen', () => {
+    expect(ersetzeSprachkommandos('Der Absatz gefällt mir.')).toBe('Der\n\ngefällt mir.');
+  });
+
+  it('EN: Whisper-Interpunktion um "period" wird geschluckt (", period.")', () => {
+    expect(aufbereitenText('This is a test, period.', ALLES_AN, 'en')).toBe('This is a test.');
+  });
+
+  it('EN: Alias "paragraph" (allein) erzeugt einen Doppelumbruch', () => {
+    expect(aufbereitenText('Hello paragraph more text', ALLES_AN, 'en')).toBe('Hello\n\nmore text');
+  });
+
+  it('EN: "New paragraph." mitten im Text, Satzende davor bleibt erhalten', () => {
+    expect(aufbereitenText('First line. New paragraph. Second line.', ALLES_AN, 'en')).toBe(
+      'First line.\n\nSecond line.',
+    );
+  });
+
+  it('EN: ", comma" wird zu genau einem Komma', () => {
+    expect(ersetzeSprachkommandos('first, comma second', 'en')).toBe('first, second');
+  });
+
+  it('EN: Aliasse wirken nicht bei Sprache de (und umgekehrt)', () => {
+    expect(ersetzeSprachkommandos('Hello paragraph more', 'de')).toBe('Hello paragraph more');
+    expect(ersetzeSprachkommandos('Hallo Absatz weiter', 'en')).toBe('Hallo Absatz weiter');
   });
 });
 
@@ -233,8 +344,9 @@ describe('aufbereitenText (Pipeline)', () => {
   });
 
   it('raeumt Leerraum um eingesetzte Umbrueche auf', () => {
-    expect(aufbereitenText('Absatz eins neue Zeile weiter im Text', ALLES_AN)).toBe(
-      'Absatz eins\nweiter im Text',
+    // "Teil" statt "Absatz": das Wort "Absatz" ist seit E43 selbst Kommando.
+    expect(aufbereitenText('Teil eins neue Zeile weiter im Text', ALLES_AN)).toBe(
+      'Teil eins\nweiter im Text',
     );
   });
 

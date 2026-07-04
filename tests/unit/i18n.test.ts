@@ -56,6 +56,8 @@ const IDENTISCH_ERLAUBT = new Set<string>([
   // Main-Katalog (Paket B3): sprachneutrale Werte.
   'main.pdf.quelle.import', // "Import"
   'main.pdf.zeileTags', // "Tags"
+  // Modelle-Reiter (E46): sprachneutraler Fachbegriff.
+  'modelleTab.pruefsummeLabel', // "SHA-256:"
 ]);
 
 type Knoten = Record<string, unknown>;

@@ -13,13 +13,15 @@ import type { CompanyListView } from '../../shared/company';
 import type { AppStatus, ModelProgress, SystemInfo } from '../../shared/schema';
 import { BelegView } from './BelegView';
 import { DiktatView } from './DiktatView';
+import { ModelleView } from './ModelleView';
 import { useTexte } from './i18n';
 import { RegisterView } from './RegisterView';
+import { useToast } from './Toasts';
 import { TrashView } from './TrashView';
 
-type ManageTab = 'diktat' | 'register' | 'papierkorb' | 'beleg';
+type ManageTab = 'diktat' | 'register' | 'papierkorb' | 'modelle' | 'beleg';
 
-const TAB_ORDER: readonly ManageTab[] = ['diktat', 'register', 'papierkorb', 'beleg'];
+const TAB_ORDER: readonly ManageTab[] = ['diktat', 'register', 'papierkorb', 'modelle', 'beleg'];
 
 interface MainViewProps {
   readonly status: AppStatus | null;
@@ -34,11 +36,15 @@ interface MainViewProps {
 export function MainView(props: MainViewProps): ReactElement {
   const { status, companies, progress, systemInfo, onRefreshStatus, onRefreshCompanies } = props;
   const texte = useTexte();
+  // Sofortmeldungen (E44): Fehler beim Firmen-/Sprachwechsel zusaetzlich
+  // als Toast; die Inline-Notiz bleibt der Detail-Ort.
+  const { showError } = useToast();
 
   const tabLabels: Record<ManageTab, string> = {
     diktat: texte.verwaltung.tabDiktat,
     register: texte.verwaltung.tabRegister,
     papierkorb: texte.verwaltung.tabPapierkorb,
+    modelle: texte.verwaltung.tabModelle,
     beleg: texte.verwaltung.tabBeleg,
   };
 
@@ -69,13 +75,14 @@ export function MainView(props: MainViewProps): ReactElement {
         const result = await window.voicewall.setActiveCompany(pfad);
         if (!result.ok) {
           setCompanyNotice(result.message);
+          showError(result.message);
         }
         await onRefreshCompanies();
       } finally {
         setBusy(false);
       }
     },
-    [onRefreshCompanies],
+    [onRefreshCompanies, showError],
   );
 
   const firmen = companies?.firmen ?? [];
@@ -89,6 +96,7 @@ export function MainView(props: MainViewProps): ReactElement {
         const result = await window.voicewall.setCompanyLanguage(sprache);
         if (!result.ok) {
           setCompanyNotice(result.message);
+          showError(result.message);
         } else if (sprache === 'en') {
           setCompanyNotice(texte.verwaltung.diktatspracheUmgestelltEn);
         } else {
@@ -100,7 +108,7 @@ export function MainView(props: MainViewProps): ReactElement {
         setBusy(false);
       }
     },
-    [onRefreshCompanies, onRefreshStatus, texte],
+    [onRefreshCompanies, onRefreshStatus, texte, showError],
   );
 
   return (
@@ -231,6 +239,7 @@ export function MainView(props: MainViewProps): ReactElement {
             onDataChanged={onDataChanged}
           />
         )}
+        {tab === 'modelle' && <ModelleView progress={progress} onRefreshStatus={onRefreshStatus} />}
         {tab === 'beleg' && <BelegView />}
       </div>
     </div>

@@ -23,10 +23,23 @@ import { KATALOGE } from '../../shared/i18n';
 import type { AppStatus, ModelProgress, SystemInfo, UiLanguage } from '../../shared/schema';
 import { I18nProvider, type I18nContextValue } from './i18n';
 import { MainView } from './MainView';
+import { ToastProvider, useToast } from './Toasts';
 import { Wizard } from './Wizard';
 
 type View = 'loading' | 'wizard' | 'main';
 export type WizardMode = 'first-run' | 'add-company';
+
+/**
+ * Globale Fehler-Sofortmeldungen (E44): abonniert den zentralen
+ * Fehlerkanal des Main-Prozesses (Diktat-Flow, Engine, Modell-Download,
+ * Mikrofon) und zeigt jede Meldung als Toast, egal welche Ansicht offen ist.
+ * Die Detail-Anzeigen der Ansichten (error-box) bleiben unangetastet.
+ */
+function GlobalErrorToasts(): null {
+  const { showError } = useToast();
+  useEffect(() => window.voicewall.onError(showError), [showError]);
+  return null;
+}
 
 export function App(): ReactElement {
   const [view, setView] = useState<View>('loading');
@@ -131,79 +144,84 @@ export function App(): ReactElement {
 
   return (
     <I18nProvider value={i18n}>
-      <div className="app-frame">
-        <header className="app-header">
-          <h1 className="wordmark">
-            VoiceWall<span className="wordmark-dot">.</span>
-          </h1>
-          <span className="context-label">{contextLabel}</span>
-          <span className="header-spacer" />
-          {view === 'main' && (
-            <label className="switch-row ui-language">
-              {texte.app.sprachumschalterLabel}{' '}
-              <select
-                value={sprache}
-                data-testid="ui-language-select"
-                onChange={(event) => {
-                  i18n.setSprache(event.target.value === 'en' ? 'en' : 'de');
+      <ToastProvider>
+        <GlobalErrorToasts />
+        <div className="app-frame">
+          <header className="app-header">
+            <h1 className="wordmark">
+              VoiceWall<span className="wordmark-dot">.</span>
+            </h1>
+            <span className="context-label">{contextLabel}</span>
+            <span className="header-spacer" />
+            {view === 'main' && (
+              <label className="switch-row ui-language">
+                {texte.app.sprachumschalterLabel}{' '}
+                <select
+                  value={sprache}
+                  data-testid="ui-language-select"
+                  onChange={(event) => {
+                    i18n.setSprache(event.target.value === 'en' ? 'en' : 'de');
+                  }}
+                >
+                  <option value="de">{texte.app.sprachumschalterDeutsch}</option>
+                  <option value="en">{texte.app.sprachumschalterEnglisch}</option>
+                </select>
+              </label>
+            )}
+            <span className="local-badge" title={texte.app.lokalBadgeTitel}>
+              {texte.app.lokalBadge}
+            </span>
+          </header>
+
+          <div className="app-content">
+            {view === 'loading' && (
+              <p className="main-layout placeholder">{texte.app.wirdGeladen}</p>
+            )}
+            {view === 'wizard' && (
+              <Wizard
+                mode={wizardMode}
+                status={status}
+                systemInfo={systemInfo}
+                progress={progress}
+                onRefreshStatus={refreshStatus}
+                onFinished={finishWizard}
+                onCancel={wizardMode === 'add-company' ? cancelWizard : null}
+              />
+            )}
+            {view === 'main' && (
+              <MainView
+                status={status}
+                companies={companies}
+                progress={progress}
+                systemInfo={systemInfo}
+                onRefreshStatus={refreshStatus}
+                onRefreshCompanies={async () => {
+                  await refreshCompanies();
                 }}
-              >
-                <option value="de">{texte.app.sprachumschalterDeutsch}</option>
-                <option value="en">{texte.app.sprachumschalterEnglisch}</option>
-              </select>
-            </label>
-          )}
-          <span className="local-badge" title={texte.app.lokalBadgeTitel}>
-            {texte.app.lokalBadge}
-          </span>
-        </header>
+                onAddCompany={openAddCompanyWizard}
+              />
+            )}
+          </div>
 
-        <div className="app-content">
-          {view === 'loading' && <p className="main-layout placeholder">{texte.app.wirdGeladen}</p>}
-          {view === 'wizard' && (
-            <Wizard
-              mode={wizardMode}
-              status={status}
-              systemInfo={systemInfo}
-              progress={progress}
-              onRefreshStatus={refreshStatus}
-              onFinished={finishWizard}
-              onCancel={wizardMode === 'add-company' ? cancelWizard : null}
-            />
-          )}
-          {view === 'main' && (
-            <MainView
-              status={status}
-              companies={companies}
-              progress={progress}
-              systemInfo={systemInfo}
-              onRefreshStatus={refreshStatus}
-              onRefreshCompanies={async () => {
-                await refreshCompanies();
-              }}
-              onAddCompany={openAddCompanyWizard}
-            />
-          )}
+          <footer className="app-footer">
+            <span>VoiceWall {systemInfo?.appVersion ?? ''}</span>
+            <span>
+              {texte.app.fussModellPruefsumme}{' '}
+              <span className="mono">{systemInfo?.modellPruefsumme ?? ''}</span>
+            </span>
+            <span className="stamp-seal">{texte.app.fussNullVerbindungen}</span>
+            <span>
+              {systemInfo !== null
+                ? texte.app.fussHardware(
+                    `${systemInfo.platform}/${systemInfo.arch}`,
+                    systemInfo.cpuKerne,
+                    systemInfo.ramGb,
+                  )
+                : ''}
+            </span>
+          </footer>
         </div>
-
-        <footer className="app-footer">
-          <span>VoiceWall {systemInfo?.appVersion ?? ''}</span>
-          <span>
-            {texte.app.fussModellPruefsumme}{' '}
-            <span className="mono">{systemInfo?.modellPruefsumme ?? ''}</span>
-          </span>
-          <span className="stamp-seal">{texte.app.fussNullVerbindungen}</span>
-          <span>
-            {systemInfo !== null
-              ? texte.app.fussHardware(
-                  `${systemInfo.platform}/${systemInfo.arch}`,
-                  systemInfo.cpuKerne,
-                  systemInfo.ramGb,
-                )
-              : ''}
-          </span>
-        </footer>
-      </div>
+      </ToastProvider>
     </I18nProvider>
   );
 }

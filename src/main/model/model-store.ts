@@ -169,6 +169,36 @@ export async function ensureModel(
 }
 
 /**
+ * Loescht eine Modelldatei kontrolliert (Modelle-Reiter, E46): Datei
+ * entfernen und den Integritaets-Marker-Eintrag mit austragen, damit ein
+ * spaeterer Download wieder sauber voll verifiziert wird. Die fachliche
+ * Regel, WELCHE Modelle loeschbar sind (nie das Modell der aktiven
+ * Firmensprache, nie das VAD), liegt beim Aufrufer (Orchestrator).
+ */
+export async function removeModelFile(
+  userDataPath: string,
+  descriptor: ModelDescriptor,
+): Promise<Result<void, string>> {
+  const filePath = join(getModelsDirectory(userDataPath), descriptor.fileName);
+  try {
+    await rm(filePath, { force: true });
+    const marker = await readMarker(userDataPath);
+    if (marker[descriptor.fileName] !== undefined) {
+      // Bewusst ohne dynamic delete (lint): Marker ohne den Eintrag neu bauen.
+      const bereinigt = Object.fromEntries(
+        Object.entries(marker).filter(([fileName]) => fileName !== descriptor.fileName),
+      );
+      await writeMarker(userDataPath, bereinigt);
+    }
+    return ok(undefined);
+  } catch (error) {
+    return err(
+      texte().modelle.loeschenFehler(error instanceof Error ? error.message : String(error)),
+    );
+  }
+}
+
+/**
  * Praesenz-/Integritaetsstatus der uebergebenen Modelle (ohne Download).
  * Default sind die Pflichtmodelle des Standardbetriebs (Q5_0 plus VAD);
  * der Wizard fragt zusaetzlich das optionale fp16-Modell ab.

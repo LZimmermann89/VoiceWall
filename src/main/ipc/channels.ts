@@ -94,6 +94,13 @@ export const IpcChannel = {
   VocabSave: 'vocab:save',
   SetAufbereitung: 'config:set-aufbereitung',
 
+  // Modelle-Reiter der Verwaltung (E46): Detailstatus aller Katalog-Modelle
+  // (inkl. SHA-256 und Loeschbarkeit), gezielter Einzel-Download (seriell,
+  // nutzt den bestehenden ModelProgress-Kanal) und kontrolliertes Loeschen.
+  ModelDetails: 'model:details',
+  ModelDownload: 'model:download',
+  ModelDelete: 'model:delete',
+
   // Sprache der Oberflaeche (Paket B2): global, unabhaengig von der
   // Diktatsprache der Firmen. Persistiert in der globalen config.json.
   SetUiLanguage: 'config:set-ui-language',
@@ -115,6 +122,13 @@ export const IpcChannel = {
    * Aufbereitung und echte Zustellung (Clipboard/Paste/Auto-Speichern).
    */
   DevDictatePcm: 'dev:dictate-pcm',
+  /**
+   * Nur Dev/Test (Prompt-Beweis, E45): liefert den zuletzt an den
+   * Whisper-Worker gesendeten Diktat-Kontext (language plus prompt), damit
+   * ein E2E-Test beweisen kann, dass gespeicherte Woerterbuch-Begriffe das
+   * naechste Diktat als Initial-Prompt erreichen.
+   */
+  DevGetLastContext: 'dev:get-last-context',
 } as const;
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel];

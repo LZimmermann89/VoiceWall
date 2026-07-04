@@ -18,6 +18,7 @@ import { app, BrowserWindow, ipcMain, type IpcMainEvent } from 'electron';
 import { z } from 'zod';
 import {
   dictationLanguageSchema,
+  modelIdSchema,
   type AccessibilityState,
   type AppStatus,
   type AufbereitungConfig,
@@ -25,6 +26,7 @@ import {
   type DictationLanguage,
   type HotkeyStatus,
   type MicrophoneState,
+  type ModelDetailsResult,
   type UiLanguage,
 } from '../../shared/schema';
 import { createCaptureWindow } from '../audio/capture-window';
@@ -45,9 +47,10 @@ import {
   MODEL_CATALOG,
   modelLabelFor,
   whisperDescriptorForLanguage,
+  type ModelId,
   type WhisperModelChoice,
 } from '../model/model-catalog';
-import { ensureModel, getModelStatuses } from '../model/model-store';
+import { ensureModel, getModelStatuses, removeModelFile } from '../model/model-store';
 import { ensureMicrophoneAccess } from '../permission/microphone';
 import {
   DEFAULT_ENGINE_TUNING,
@@ -130,6 +133,8 @@ export class DictationOrchestrator {
   private engine: WhisperEngineManager | null = null;
   private captureWindow: BrowserWindow | null = null;
   private readonly ringBuffer: PcmRingBuffer;
+  /** Laeuft gerade ein Einzel-Download des Modelle-Reiters (seriell, E46)? */
+  private modelDownloadActive = false;
 
   constructor(private readonly deps: OrchestratorDeps) {
     this.ringBuffer = new PcmRingBuffer({
@@ -190,6 +195,39 @@ export class DictationOrchestrator {
     });
     ipcMain.handle(IpcChannel.StartDictation, () => this.guarded(() => this.startDictation()));
     ipcMain.handle(IpcChannel.StopDictation, () => this.guarded(() => this.stopDictation()));
+
+    // Modelle-Reiter (E46): Detailstatus, Einzel-Download, kontrolliertes
+    // Loeschen. Eingaben werden per zod validiert; Fehler bleiben Results.
+    ipcMain.handle(IpcChannel.ModelDetails, async (): Promise<ModelDetailsResult> => {
+      try {
+        return await this.modelDetails();
+      } catch (error) {
+        this.deps.logger.error(
+          `Modell-Detailstatus fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return { modelle: [] };
+      }
+    });
+    ipcMain.handle(IpcChannel.ModelDownload, (_event, raw: unknown) => {
+      const parsed = modelIdSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve({
+          ok: false as const,
+          message: texte().modelle.unbekannteKennung,
+        });
+      }
+      return this.guarded(() => this.downloadModelById(parsed.data));
+    });
+    ipcMain.handle(IpcChannel.ModelDelete, (_event, raw: unknown) => {
+      const parsed = modelIdSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve({
+          ok: false as const,
+          message: texte().modelle.unbekannteKennung,
+        });
+      }
+      return this.guarded(() => this.deleteModelById(parsed.data));
+    });
     // Kontrollierter Neustart: macOS meldet frisch erteilte TCC-Freigaben
     // (Bedienungshilfen) einem laufenden Prozess oft erst nach Neustart.
     ipcMain.handle(IpcChannel.SystemRelaunch, () => {
@@ -231,6 +269,10 @@ export class DictationOrchestrator {
         }
         return this.guarded(() => this.injectSegment(buffer));
       });
+      // Prompt-Beweis (E45): zuletzt an den Worker gesendeter Diktat-Kontext.
+      // Nur Dev/Test; Prompt-Inhalte verlassen den Rechner nie und werden
+      // weiterhin nie geloggt.
+      ipcMain.handle(IpcChannel.DevGetLastContext, () => this.engine?.lastSentContext ?? null);
     }
   }
 
@@ -450,6 +492,114 @@ export class DictationOrchestrator {
     if (!started.ok) {
       return { ok: false, message: started.message };
     }
+    await this.broadcastStatus();
+    return { ok: true };
+  }
+
+  /**
+   * IDs der aktuell zwingend benoetigten Modelle: das Whisper-Modell der
+   * aktiven Diktatsprache/Modellwahl plus das VAD-Modell. Diese Modelle
+   * sind im Modelle-Reiter nicht loeschbar (E46).
+   */
+  private async requiredModelIds(): Promise<readonly ModelId[]> {
+    const language = (await this.resolveDictationContext()).language;
+    return [
+      whisperDescriptorForLanguage(language, this.modelChoice).id,
+      MODEL_CATALOG.sileroVad.id,
+    ];
+  }
+
+  /**
+   * Detailstatus ALLER Katalog-Modelle fuer den Modelle-Reiter (E46):
+   * Anzeigename (UI-Sprache), Groesse und SHA-256 aus dem Katalog,
+   * Praesenz-/Integritaetsstatus und die Loeschbarkeits-Regel.
+   */
+  async modelDetails(): Promise<ModelDetailsResult> {
+    const statuses = await getModelStatuses(this.deps.userDataPath, ALL_MODEL_DESCRIPTORS);
+    const required = await this.requiredModelIds();
+    return {
+      modelle: statuses.map((status) => ({
+        id: status.descriptor.id,
+        label: modelLabelFor(status.descriptor.id),
+        byteSize: status.descriptor.byteSize,
+        sha256: status.descriptor.sha256,
+        present: status.present,
+        erforderlich: required.includes(status.descriptor.id),
+      })),
+    };
+  }
+
+  /**
+   * Einzel-Download eines Katalog-Modells (Modelle-Reiter, E46). Downloads
+   * laufen bewusst seriell (ein Download zur Zeit); der Fortschritt geht
+   * ueber den bestehenden ModelProgress-Kanal an den Renderer. Verifiziert
+   * wird wie immer gegen die fest hinterlegte SHA-256-Konstante.
+   */
+  async downloadModelById(id: ModelId): Promise<{ ok: true } | { ok: false; message: string }> {
+    const descriptor = ALL_MODEL_DESCRIPTORS.find((entry) => entry.id === id);
+    if (descriptor === undefined) {
+      return { ok: false, message: texte().modelle.unbekannteKennung };
+    }
+    if (this.modelDownloadActive) {
+      return { ok: false, message: texte().modelle.downloadLaeuftBereits };
+    }
+    this.modelDownloadActive = true;
+    try {
+      const result = await ensureModel(this.deps.userDataPath, descriptor, {
+        allowDownload: true,
+        onProgress: (progress) => {
+          this.sendToMain(IpcChannel.ModelProgress, {
+            id: descriptor.id,
+            label: modelLabelFor(descriptor.id),
+            receivedBytes: progress.receivedBytes,
+            totalBytes: progress.totalBytes,
+            percent: progress.percent,
+          });
+        },
+      });
+      if (!result.ok) {
+        this.setError(result.error.message);
+        return { ok: false, message: result.error.message };
+      }
+      this.deps.logger.info(`Modell geladen und verifiziert (Modelle-Reiter): ${descriptor.label}`);
+      await this.broadcastStatus();
+      return { ok: true };
+    } finally {
+      this.modelDownloadActive = false;
+    }
+  }
+
+  /**
+   * Kontrolliertes Loeschen einer Modelldatei (Modelle-Reiter, E46).
+   * Regeln: NIE das Whisper-Modell der aktiven Diktatsprache und NIE das
+   * VAD-Modell (erklaerende Meldung). Laeuft die Engine noch mit dem zu
+   * loeschenden Modell (z. B. nach einem Sprachwechsel), wird sie vorher
+   * geordnet beendet. Der Integritaets-Marker wird mit ausgetragen; ein
+   * spaeterer Download verifiziert wieder voll.
+   */
+  async deleteModelById(id: ModelId): Promise<{ ok: true } | { ok: false; message: string }> {
+    const descriptor = ALL_MODEL_DESCRIPTORS.find((entry) => entry.id === id);
+    if (descriptor === undefined) {
+      return { ok: false, message: texte().modelle.unbekannteKennung };
+    }
+    const required = await this.requiredModelIds();
+    if (required.includes(id)) {
+      return { ok: false, message: texte().modelle.loeschenGesperrt(modelLabelFor(id)) };
+    }
+    if (this.engine !== null && this.engineLanguage !== null) {
+      const engineModelId = whisperDescriptorForLanguage(this.engineLanguage, this.modelChoice).id;
+      if (engineModelId === id) {
+        await this.engine.shutdown();
+        this.engine = null;
+        this.engineReady = false;
+        this.engineLanguage = null;
+      }
+    }
+    const removed = await removeModelFile(this.deps.userDataPath, descriptor);
+    if (!removed.ok) {
+      return { ok: false, message: removed.error };
+    }
+    this.deps.logger.info(`Modelldatei geloescht (Modelle-Reiter): ${descriptor.fileName}`);
     await this.broadcastStatus();
     return { ok: true };
   }

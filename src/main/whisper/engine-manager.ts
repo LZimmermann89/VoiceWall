@@ -342,6 +342,15 @@ export class WhisperEngineManager {
   }
 
   /**
+   * Nur Dev/Test (Prompt-Beweis, E45): der zuletzt an den Worker gesendete
+   * Diktat-Kontext (Sprache plus Initial-Prompt). Wird ausschliesslich ueber
+   * den Test-IPC-Kanal dev:get-last-context abgefragt, nie im Produkt.
+   */
+  get lastSentContext(): DictationContext | null {
+    return this.lastContext;
+  }
+
+  /**
    * Einmal-Transkription eines vollstaendigen PCM-Segments (Dev-/Test-Injekt).
    * Durchlaeuft dieselbe VAD-Schleuse: Stille liefert `ok(null)`.
    */

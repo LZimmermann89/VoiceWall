@@ -309,7 +309,41 @@ export const de = {
     tabDiktat: 'Diktat',
     tabRegister: 'Register',
     tabPapierkorb: 'Papierkorb',
+    tabModelle: 'Modelle',
     tabBeleg: 'Beleg',
+  },
+
+  /** Ansicht "Modelle" (Verwaltung, Entscheidung E46). */
+  modelleTab: {
+    titel: 'Modelle',
+    lede: 'Alle Erkennungsmodelle dieses Rechners im Überblick: Zweck, Größe, Prüfsumme und Status. Fehlende Modelle lassen sich hier einzeln laden, nicht benötigte löschen.',
+    zweck: {
+      'whisper-q5': 'Deutsches Diktat (Standard)',
+      'whisper-fp16': 'Deutsches Diktat, maximale Genauigkeit (optional, starke Hardware)',
+      'turbo-q5_0-multilingual': 'Englisches Diktat (mehrsprachiges Originalmodell)',
+      'silero-vad': 'Spracherkennungs-Segmentierung (VAD, für jedes Diktat nötig)',
+    },
+    zweckLabel: 'Zweck:',
+    groesseLabel: 'Größe:',
+    pruefsummeLabel: 'SHA-256:',
+    statusVorhanden: 'vorhanden und verifiziert',
+    statusFehlt: 'fehlt',
+    badgeErforderlich: 'aktiv benötigt',
+    erforderlichHinweis:
+      'Dieses Modell wird von der Diktatsprache der aktiven Firma bzw. für jedes Diktat benötigt und kann nicht gelöscht werden.',
+    laden: 'Herunterladen',
+    laedt: 'Lädt ...',
+    loeschen: 'Löschen',
+    wirdGeladen: 'Wird geladen ...',
+    downloadFertig: (label: string): string => `Modell geladen und verifiziert: ${label}.`,
+    geloescht: (label: string): string =>
+      `Modell gelöscht: ${label}. Es wird bei Bedarf einfach erneut geladen.`,
+    loeschenTitel: 'Modell löschen?',
+    loeschenText: (label: string, groesse: string): string =>
+      `Die Modelldatei "${label}" (${groesse}) wird von diesem Rechner gelöscht. Es gehen keine Diktate verloren; wird das Modell später wieder gebraucht, lädt VoiceWall es einmalig erneut herunter.`,
+    loeschenBestaetigen: 'Modell löschen',
+    downloadHinweis:
+      'Der Modell-Download ist der einzige Moment, in dem VoiceWall das Internet nutzt (huggingface.co, verifiziert gegen die fest hinterlegte Prüfsumme). Downloads laufen einzeln nacheinander.',
   },
 
   diktat: {
@@ -383,12 +417,14 @@ export const de = {
     fuellwoerterLabel:
       'Füllwörter entfernen: eigenständige "äh", "ähm", "öhm", "hm" und direkte Wortdopplungen ("das das"). Konservativ; seltene legitime Dopplungen können mitgetroffen werden.',
     sprachkommandosLabel:
-      'Sprachkommandos umsetzen: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "neuer Absatz". Standardmäßig aus, weil die Regel auch die normale Verwendung des Wortes "Punkt" treffen kann.',
+      'Sprachkommandos umsetzen: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz" (englisches Diktat: "period", "comma", "new line", "new paragraph", "paragraph"). Satzzeichen, die die Spracherkennung selbst um ein Kommandowort setzt, werden mitentfernt ("Test, Punkt." wird zu "Test."). Manchmal wandelt die Erkennung ein gesprochenes "Punkt" auch direkt in ein Satzzeichen um; dann steht kein Kommandowort im Text und das Ergebnis stimmt trotzdem. Standardmäßig aus, weil die Regel auch die normale Verwendung von Wörtern wie "Punkt" oder "Absatz" trifft.',
     fachwoerterbuchTitel: 'Fach-Wörterbuch der aktiven Firma',
     fachwoerterbuchKeineFirma:
       'Noch keine Firma angelegt. Das Fach-Wörterbuch gehört zur Firma und liegt auditierbar in deren Ordner (.voicewall/vokabular.json).',
     fachwoerterbuchHinweis:
       'Begriffe (Eigennamen, Fachbegriffe, Aktenzeichen) verbessern die Erkennung: sie werden der Spracherkennung lokal als Kontext mitgegeben. Ersetzungen korrigieren häufige Fehltranskriptionen deterministisch, nur als ganze Wörter und exakt in der eingegebenen Groß-/Kleinschreibung.',
+    fachwoerterbuchErwartung:
+      'Ehrliche Einordnung: Begriffe machen die korrekte Erkennung seltener Namen wahrscheinlicher, garantieren sie aber nicht. Für hartnäckige Fehlerkennungen die Ersetzungsliste nutzen: wird zum Beispiel "Plaud" als "blaut" erkannt, eine Regel "blaut" zu "Plaud" anlegen.',
     entfernen: 'Entfernen',
     neuerBegriff: 'Neuer Begriff:',
     begriffPlatzhalter: 'z. B. VoiceWall',
@@ -399,6 +435,8 @@ export const de = {
     ersetzungZuPlatzhalter: 'z. B. VoiceWall',
     woerterbuchSpeichern: 'Wörterbuch speichern',
     woerterbuchGespeichert: 'Wörterbuch gespeichert (atomar, im Firmenordner).',
+    woerterbuchUngespeichert:
+      'Noch nicht gespeichert: Änderungen wirken erst nach "Wörterbuch speichern".',
     fehlerTitel: 'Fehler',
     fehlerAria: 'Fehler',
   },
@@ -611,6 +649,13 @@ export const de = {
     kopieren: 'Kopieren',
   },
 
+  /** Sofort sichtbare Meldungen (Toast-System, Entscheidung E44). */
+  toast: {
+    fehlerKicker: 'Fehler',
+    erfolgKicker: 'Bestätigt',
+    schliessenAria: 'Meldung schließen',
+  },
+
   /**
    * Nutzersichtbare Texte des MAIN-Prozesses (Paket B3, Entscheidung E41):
    * Result-Fehlermeldungen, Tray, Overlay-Zustellmeldungen, PDF-Vorlage und
@@ -735,6 +780,14 @@ export const de = {
         `Die Modelldatei ${dateiname} ist beschädigt (Prüfsumme stimmt nicht). Sie muss neu geladen werden.`,
       modellFehltDownloadNoetig: (label: string): string =>
         `Das ${label} fehlt. Bitte den einmaligen Modell-Download im Einrichtungs-Assistenten starten.`,
+      // Modelle-Reiter (E46).
+      unbekannteKennung: 'Unbekannte Modell-Kennung.',
+      downloadLaeuftBereits:
+        'Es läuft bereits ein Modell-Download. Downloads laufen einzeln nacheinander; bitte warten, bis der laufende Download abgeschlossen ist.',
+      loeschenGesperrt: (label: string): string =>
+        `Das Modell "${label}" wird aktuell benötigt (Diktatsprache der aktiven Firma bzw. Spracherkennungs-Segmentierung) und kann nicht gelöscht werden. Bitte zuerst die Diktatsprache der aktiven Firma umstellen.`,
+      loeschenFehler: (detail: string): string =>
+        `Die Modelldatei konnte nicht gelöscht werden: ${detail}`,
     },
 
     // storage/companies.ts, storage/company-folder.ts, storage/sync-detection.ts, storage/paths.ts

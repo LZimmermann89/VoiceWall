@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ModelDescriptor } from '../../src/main/model/model-catalog';
-import { ensureModel, getModelsDirectory } from '../../src/main/model/model-store';
+import { ensureModel, getModelsDirectory, removeModelFile } from '../../src/main/model/model-store';
 
 const CONTENT = Buffer.from('Fixture-Modell-Inhalt-fuer-model-store-Test', 'utf8');
 const SHA = createHash('sha256').update(CONTENT).digest('hex');
@@ -114,5 +114,35 @@ describe('ensureModel', () => {
     }
     // Fuer Folgetests wieder in Ordnung bringen.
     await ensureModel(userDataDir, descriptor(), { allowDownload: true });
+  });
+});
+
+describe('removeModelFile (Modelle-Reiter, E46)', () => {
+  it('loescht Datei und Marker-Eintrag; erneuter ensureModel laedt und verifiziert voll', async () => {
+    const filePath = join(getModelsDirectory(userDataDir), 'fixture-model.bin');
+    const markerPath = join(getModelsDirectory(userDataDir), '.model-integrity.json');
+    expect(existsSync(filePath)).toBe(true);
+
+    const removed = await removeModelFile(userDataDir, descriptor());
+    expect(removed.ok).toBe(true);
+    expect(existsSync(filePath)).toBe(false);
+    // Der Marker traegt den Eintrag nicht mehr (spaeterer Download wird
+    // wieder voll verifiziert, keine Stale-Optimierung).
+    const marker = JSON.parse(await readFile(markerPath, 'utf8')) as Record<string, unknown>;
+    expect(marker['fixture-model.bin']).toBeUndefined();
+
+    // Wiederherstellen: ensureModel laedt erneut (ein Request) und legt den
+    // Marker-Eintrag frisch an.
+    requestCount = 0;
+    const restored = await ensureModel(userDataDir, descriptor(), { allowDownload: true });
+    expect(restored.ok).toBe(true);
+    expect(requestCount).toBe(1);
+  });
+
+  it('ist idempotent: das Loeschen einer fehlenden Datei ist kein Fehler', async () => {
+    const fresh = await mkdtemp(join(tmpdir(), 'voicewall-store-remove-'));
+    const removed = await removeModelFile(fresh, descriptor());
+    expect(removed.ok).toBe(true);
+    await rm(fresh, { recursive: true, force: true });
   });
 });

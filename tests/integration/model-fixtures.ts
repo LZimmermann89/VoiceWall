@@ -26,6 +26,8 @@ export const modelsDir = join(userDataDir(), 'models');
 export const whisperModelPath = join(modelsDir, 'ggml-model-q5_0.bin');
 export const multilingualModelPath = join(modelsDir, 'ggml-large-v3-turbo-q5_0.bin');
 export const sileroModelPath = join(modelsDir, 'ggml-silero-v5.1.2.bin');
+/** Optionales fp16-Modell (Modelle-Reiter-E2E verlinkt es, wenn vorhanden). */
+export const fp16ModelPath = join(modelsDir, 'ggml-model.bin');
 
 export const modelsAvailable = existsSync(whisperModelPath) && existsSync(sileroModelPath);
 /** EN-Tests brauchen zusaetzlich das mehrsprachige Originalmodell (B1). */

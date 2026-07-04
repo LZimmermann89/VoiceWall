@@ -26,6 +26,7 @@ import {
 import { formatDate, formatDateTime } from './format';
 import { useSprache, useTexte } from './i18n';
 import { PasswordDialog } from './PasswordDialog';
+import { useToast } from './Toasts';
 
 type SortKey = 'datum' | 'titel' | 'wortzahl';
 
@@ -109,6 +110,9 @@ function sortEntries(entries: readonly ManifestEntry[], key: SortKey): ManifestE
 export function RegisterView(props: RegisterViewProps): ReactElement {
   const { sprache: uiSprache, texte } = useSprache();
   const t = texte.register;
+  // Sofortmeldungen (E44): Export-Ausgang zusaetzlich als Toast, die
+  // Inline-Anzeigen unten bleiben der Detail-Ort.
+  const { showError, showSuccess } = useToast();
   const [entries, setEntries] = useState<ManifestEntry[] | null>(null);
   const [knownTags, setKnownTags] = useState<readonly string[]>([]);
   const [filter, setFilter] = useState<Filter>(EMPTY_FILTER);
@@ -166,12 +170,17 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
           mitFrontMatter: mit,
         });
         if (result.ok) {
-          setBatchNotice(
-            t.exportErgebnis(result.exportiert, result.anzeigePfad, result.fehler.length),
+          const meldung = t.exportErgebnis(
+            result.exportiert,
+            result.anzeigePfad,
+            result.fehler.length,
           );
+          setBatchNotice(meldung);
           setBatchRelPfad(result.relPfad);
+          showSuccess(meldung);
         } else {
           setBatchError(result.message);
+          showError(result.message);
         }
       } finally {
         offProgress();
@@ -179,7 +188,7 @@ export function RegisterView(props: RegisterViewProps): ReactElement {
         setBatchBusy(false);
       }
     },
-    [batchBusy, batchFormat, t],
+    [batchBusy, batchFormat, t, showError, showSuccess],
   );
 
   useEffect(() => {
@@ -598,6 +607,8 @@ function DetailPanel(props: {
   const { detail } = props;
   const { sprache: uiSprache, texte } = useSprache();
   const t = texte.register.detail;
+  // Sofortmeldungen (E44): Export-Ausgang zusaetzlich als Toast.
+  const { showError, showSuccess } = useToast();
   const [editing, setEditing] = useState(false);
   const [titel, setTitel] = useState(detail.meta.titel);
   const [body, setBody] = useState(detail.body);
@@ -689,16 +700,19 @@ function DetailPanel(props: {
           mitFrontMatter,
         });
         if (result.ok) {
-          setNotice(t.exportiertNach(result.anzeigePfad));
+          const meldung = t.exportiertNach(result.anzeigePfad);
+          setNotice(meldung);
           setExportRelPfad(result.relPfad);
+          showSuccess(meldung);
         } else {
           setError(result.message);
+          showError(result.message);
         }
       } finally {
         setBusy(false);
       }
     },
-    [detail, t],
+    [detail, t, showError, showSuccess],
   );
 
   /** Verschluesselter Export (.vwenc): Passwort kommt aus dem Dialog. */
@@ -715,17 +729,20 @@ function DetailPanel(props: {
         });
         if (result.ok) {
           setShowEncrypt(false);
-          setNotice(t.verschluesseltExportiert(result.anzeigePfad));
+          const meldung = t.verschluesseltExportiert(result.anzeigePfad);
+          setNotice(meldung);
           setExportRelPfad(result.relPfad);
+          showSuccess(meldung);
         } else {
           setError(result.message);
+          showError(result.message);
           setShowEncrypt(false);
         }
       } finally {
         setBusy(false);
       }
     },
-    [detail, t],
+    [detail, t, showError, showSuccess],
   );
 
   const softDelete = useCallback(async () => {

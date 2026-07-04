@@ -20,9 +20,20 @@
  *   Dopplungen ("..., dass das das Ergebnis ist", "die Frau, die die Blumen
  *   kaufte") werden dabei faelschlich zusammengezogen. Dopplungen mit Komma
  *   ("sehr, sehr gut") bleiben unangetastet. Der Filter ist abschaltbar.
- * - Sprachkommandos: "Punkt"/"Komma" sind auch normale deutsche Woerter
- *   ("Der Punkt ist wichtig" wuerde zu "Der. ist wichtig"). Deshalb ist der
- *   Schalter standardmaessig AUS und ausdruecklich Opt-in (Entscheidung E38).
+ * - Sprachkommandos: "Punkt"/"Komma"/"Absatz" sind auch normale deutsche
+ *   Woerter ("Der Punkt ist wichtig" wuerde zu "Der. ist wichtig"; seit dem
+ *   Alias "Absatz" gilt dasselbe fuer Saetze wie "Der Absatz gefaellt mir").
+ *   Deshalb ist der Schalter standardmaessig AUS und ausdruecklich Opt-in
+ *   (Entscheidung E38).
+ * - Whisper-Interpunktion um Kommandos (Praxistest-Befund, Entscheidung E43):
+ *   Whisper setzt um gesprochene Kommandowoerter oft SELBST Satzzeichen
+ *   ("Das ist ein Test, Punkt."). Das Matching schluckt deshalb Satzzeichen,
+ *   die unmittelbar an der Kommandophrase kleben: bei Satzzeichen-Kommandos
+ *   je EIN Zeichen davor und danach (", Punkt." -> "."), bei Umbruechen nur
+ *   danach ("Neuer Absatz." -> "\n\n"; ein Punkt DAVOR ist das legitime Ende
+ *   des vorigen Satzes und bleibt). Wandelt Whisper das gesprochene "Punkt"
+ *   komplett selbst in ein Satzzeichen um, steht kein Kommandowort im Text;
+ *   die Regel hat dann nichts zu tun und das Ergebnis ist trotzdem richtig.
  *
  * Sprachabhaengigkeit (Paket B1, Entscheidung E39): Fuellwortliste und
  * Kommandoliste sind sprachabhaengig (Deutsch/Englisch, je Firmensprache);
@@ -194,14 +205,19 @@ export interface Sprachkommando {
 
 /**
  * Deutsche Kommandoliste; laengere Phrasen zuerst, damit "neuer Absatz" nie
- * als Teiltreffer eines kuerzeren Kommandos verarbeitet wird.
+ * als Teiltreffer eines kuerzeren Kommandos ("Absatz") verarbeitet wird.
+ * Die Aliasse "Absatz" (allein) und "Zeilenumbruch" stammen aus dem
+ * Praxistest (Entscheidung E43): Nutzer sprechen sie haeufiger als die
+ * formalen Phrasen "neuer Absatz"/"neue Zeile".
  */
 export const SPRACHKOMMANDOS: readonly Sprachkommando[] = [
   { phrase: 'ausrufezeichen', ersatz: '!', art: 'satzzeichen' },
+  { phrase: 'zeilenumbruch', ersatz: '\n', art: 'umbruch' },
   { phrase: 'neuer absatz', ersatz: '\n\n', art: 'umbruch' },
   { phrase: 'fragezeichen', ersatz: '?', art: 'satzzeichen' },
   { phrase: 'doppelpunkt', ersatz: ':', art: 'satzzeichen' },
   { phrase: 'neue zeile', ersatz: '\n', art: 'umbruch' },
+  { phrase: 'absatz', ersatz: '\n\n', art: 'umbruch' },
   { phrase: 'punkt', ersatz: '.', art: 'satzzeichen' },
   { phrase: 'komma', ersatz: ',', art: 'satzzeichen' },
 ];
@@ -214,6 +230,7 @@ export const SPRACHKOMMANDOS: readonly Sprachkommando[] = [
  */
 export const SPRACHKOMMANDOS_EN: readonly Sprachkommando[] = [
   { phrase: 'new paragraph', ersatz: '\n\n', art: 'umbruch' },
+  { phrase: 'paragraph', ersatz: '\n\n', art: 'umbruch' },
   { phrase: 'new line', ersatz: '\n', art: 'umbruch' },
   { phrase: 'period', ersatz: '.', art: 'satzzeichen' },
   { phrase: 'comma', ersatz: ',', art: 'satzzeichen' },
@@ -228,13 +245,20 @@ function istWortzeichen(char: string): boolean {
   return /[\p{L}\p{N}_]/u.test(char);
 }
 
+/** Satzzeichen, die Whisper um gesprochene Kommandowoerter setzt. */
+const WHISPER_SATZZEICHEN = /[.,!?;:]/;
+
 /**
  * Ersetzt EIN Kommando (case-insensitiv, nur als isoliertes Wort/Phrase mit
- * Unicode-Wortgrenzen). Bei Satzzeichen-Kommandos wird das Leerzeichen davor
- * entfernt ("Hallo Punkt" -> "Hallo."); ein von Whisper zusaetzlich gesetztes
- * Satzzeichen direkt nach dem Kommando wird verbraucht ("Hallo Punkt." wird
- * "Hallo.", nie "Hallo.."). Bei Umbruechen werden umgebende Leerzeichen
- * entfernt.
+ * Unicode-Wortgrenzen). Von Whisper um das Kommandowort gesetzte Satzzeichen
+ * gehoeren zum Treffer (Interpunktions-Toleranz, Entscheidung E43):
+ * - Satzzeichen-Kommandos schlucken Leerraum plus je EIN Satzzeichen
+ *   unmittelbar davor und danach ("Hallo, Punkt." -> "Hallo."; nie "Hallo,."
+ *   oder "Hallo..").
+ * - Umbruch-Kommandos schlucken Leerraum davor sowie EIN Satzzeichen plus
+ *   Leerraum danach ("Erste Zeile. Neuer Absatz. Zweite" ->
+ *   "Erste Zeile.\n\nZweite"); ein Satzzeichen DAVOR bleibt stehen, es ist
+ *   das legitime Ende des vorigen Satzes.
  */
 function ersetzeKommando(text: string, kommando: Sprachkommando): string {
   const haystack = text.toLowerCase();
@@ -261,8 +285,22 @@ function ersetzeKommando(text: string, kommando: Sprachkommando): string {
     while (start > cursor && (text.charAt(start - 1) === ' ' || text.charAt(start - 1) === '\t')) {
       start -= 1;
     }
+    // Satzzeichen-Kommandos ersetzen ein von Whisper direkt davor gesetztes
+    // Satzzeichen (", Punkt" -> "."): ein Zeichen schlucken, dann erneut
+    // Leerraum ("Test , Punkt").
+    if (kommando.art === 'satzzeichen') {
+      if (start > cursor && WHISPER_SATZZEICHEN.test(text.charAt(start - 1))) {
+        start -= 1;
+        while (
+          start > cursor &&
+          (text.charAt(start - 1) === ' ' || text.charAt(start - 1) === '\t')
+        ) {
+          start -= 1;
+        }
+      }
+    }
     // Rechte Seite: ein direkt folgendes Whisper-Satzzeichen verbrauchen.
-    if (after < text.length && /[.,!?;:]/.test(text.charAt(after))) {
+    if (after < text.length && WHISPER_SATZZEICHEN.test(text.charAt(after))) {
       after += 1;
     }
     if (kommando.art === 'umbruch') {
@@ -277,11 +315,12 @@ function ersetzeKommando(text: string, kommando: Sprachkommando): string {
 
 /**
  * Sprachkommandos (Regel 3, Schalter, Default AUS, Entscheidung E38):
- * deutsch "neue Zeile", "neuer Absatz", "Punkt", "Komma", "Fragezeichen",
- * "Ausrufezeichen", "Doppelpunkt"; englisch "new line", "new paragraph",
- * "period", "comma" (Paket B1). Bewusst Opt-in: die Kommandowoerter sind
- * auch normale Woerter der jeweiligen Sprache; bei aktiviertem Schalter
- * trifft die Regel auch deren normale Verwendung (siehe Modulkommentar).
+ * deutsch "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz", "Punkt",
+ * "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt"; englisch
+ * "new line", "new paragraph", "paragraph", "period", "comma" (Paket B1,
+ * Aliasse aus E43). Bewusst Opt-in: die Kommandowoerter sind auch normale
+ * Woerter der jeweiligen Sprache; bei aktiviertem Schalter trifft die Regel
+ * auch deren normale Verwendung (siehe Modulkommentar).
  */
 export function ersetzeSprachkommandos(text: string, sprache: DictationLanguage = 'de'): string {
   let result = text;
