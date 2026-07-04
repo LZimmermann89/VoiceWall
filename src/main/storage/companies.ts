@@ -38,6 +38,7 @@ import {
   type BatchExportInput,
   type BatchExportResult,
   type BelegInfoResult,
+  type CompanyConfig,
   type CompanyDetails,
   type CompanyInfo,
   type CompanyListView,
@@ -62,8 +63,13 @@ import {
   type TranscriptQuelle,
   type TrashListResult,
 } from '../../shared/company';
-import type { ActionResult } from '../../shared/schema';
+import {
+  dictationLanguageSchema,
+  type ActionResult,
+  type DictationLanguage,
+} from '../../shared/schema';
 import { collectBelegInfo } from '../beleg/beleg-info';
+import type { DictationContext } from '../whisper/engine-manager';
 import type { GlobalConfig } from '../../shared/config';
 import { readGlobalConfig, writeGlobalConfig } from '../config/config-store';
 import { IpcChannel } from '../ipc/channels';
@@ -139,6 +145,11 @@ export interface CompanyManagerDeps {
    * Lade-Timings der globalen Konfiguration). Default: readGlobalConfig.
    */
   readonly readConfig?: () => Promise<GlobalConfig>;
+  /**
+   * Wird nach Firmenwechsel, Firmen-Anlage und Sprachwechsel aufgerufen
+   * (Paket B1): der Orchestrator aktualisiert damit Status/Modellbedarf.
+   */
+  readonly onCompanyChanged?: () => void;
 }
 
 export interface SaveDictateInput {
@@ -254,18 +265,24 @@ export class CompanyManager {
     return isVoiceWallFolder(pfad);
   }
 
-  /** Liest den Anzeigenamen aus der firmenbezogenen Konfig (Fallback: Ordnername). */
-  private async readCompanyDisplayName(pfad: string, ordnername: string): Promise<string> {
+  /**
+   * Liest Anzeigename und Diktatsprache aus der firmenbezogenen Konfig
+   * (Fallback: Ordnername und Deutsch, wenn die Konfig fehlt/kaputt ist).
+   */
+  private async readCompanyMeta(
+    pfad: string,
+    ordnername: string,
+  ): Promise<{ anzeigename: string; sprache: DictationLanguage }> {
     try {
       const raw = await readFile(join(pfad, VOICEWALL_DIR, CONFIG_FILE), 'utf8');
       const parsed = companyConfigSchema.safeParse(JSON.parse(raw));
       if (parsed.success) {
-        return parsed.data.firma.anzeigename;
+        return { anzeigename: parsed.data.firma.anzeigename, sprache: parsed.data.sprache };
       }
     } catch {
-      // Konfig fehlt/kaputt: Ordnername als Anzeige.
+      // Konfig fehlt/kaputt: Ordnername als Anzeige, Deutsch als Sprache.
     }
-    return ordnername;
+    return { anzeigename: ordnername, sprache: 'de' };
   }
 
   /** Liste aller validierten Firmen plus aktive Firma und Auto-Speichern. */
@@ -287,10 +304,12 @@ export class CompanyManager {
         continue;
       }
       const ordnername = pfad.split(/[\\/]/).pop() ?? pfad;
+      const meta = await this.readCompanyMeta(pfad, ordnername);
       firmen.push({
         pfad,
         ordnername,
-        anzeigename: await this.readCompanyDisplayName(pfad, ordnername),
+        anzeigename: meta.anzeigename,
+        sprache: meta.sprache,
         aktiv: config.aktiveFirma !== null && config.aktiveFirma.normalize('NFC') === pfad,
       });
     }
@@ -352,6 +371,7 @@ export class CompanyManager {
     details?: CompanyDetails,
     modell?: 'q5_0' | 'fp16',
     ordnername?: string,
+    sprache?: DictationLanguage,
   ): Promise<CreateCompanyResult> {
     let baseDir: string;
     let syncWarnung: string | null = null;
@@ -388,6 +408,7 @@ export class CompanyManager {
       erstelltMit: this.deps.appVersion,
       ...(ordnername === undefined || ordnername.trim().length === 0 ? {} : { ordnername }),
       ...(modell === undefined ? {} : { modell }),
+      ...(sprache === undefined ? {} : { sprache }),
       ...(details === undefined
         ? {}
         : {
@@ -430,6 +451,7 @@ export class CompanyManager {
     this.deps.logger.info('Firma angelegt bzw. uebernommen und aktiviert.', {
       outcome: created.value.uebernommen ? 'uebernommen' : 'neu',
     });
+    this.deps.onCompanyChanged?.();
     return {
       ok: true,
       pfad,
@@ -453,6 +475,69 @@ export class CompanyManager {
     }
     const config = await this.loadConfig();
     await this.persistConfig({ ...config, aktiveFirma: normalized });
+    // Firmenwechsel kann die Diktatsprache wechseln: Status aktualisieren.
+    this.deps.onCompanyChanged?.();
+    return { ok: true };
+  }
+
+  /**
+   * Diktatsprache der aktiven Firma (Paket B1): bestimmt Modell und
+   * `language`-Parameter der Transkription. Lese-Fehler fallen bewusst auf
+   * Deutsch zurueck, ein Diktat scheitert nie an einer kaputten Konfig.
+   */
+  async activeSprache(): Promise<DictationLanguage> {
+    const list = await this.listCompanies();
+    return list.firmen.find((firma) => firma.aktiv)?.sprache ?? 'de';
+  }
+
+  /**
+   * Diktat-Kontext fuer den Orchestrator (Paket B1): Sprache der aktiven
+   * Firma plus Initial-Prompt des Fach-Woerterbuchs (Stufe 1).
+   */
+  async activeDictationContext(): Promise<DictationContext> {
+    return { language: await this.activeSprache(), prompt: await this.activePrompt() };
+  }
+
+  /**
+   * Diktatsprache der AKTIVEN Firma nachtraeglich wechseln (Verwaltung):
+   * schreibt das Feld `sprache` atomar in die firmenbezogene Konfig. Das
+   * passende Modell laedt/startet der Orchestrator beim naechsten Diktat
+   * (bzw. ueber den Modell-Download-Knopf), nie hier.
+   */
+  async setCompanyLanguage(sprache: DictationLanguage): Promise<ActionResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const configPath = join(active.dir, VOICEWALL_DIR, CONFIG_FILE);
+    let parsed: ReturnType<typeof companyConfigSchema.safeParse>;
+    try {
+      parsed = companyConfigSchema.safeParse(JSON.parse(await readFile(configPath, 'utf8')));
+    } catch {
+      return {
+        ok: false,
+        message:
+          'Die Firmen-Konfiguration ist nicht lesbar (.voicewall/config.json). Bitte den Firmenordner prüfen.',
+      };
+    }
+    if (!parsed.success) {
+      return {
+        ok: false,
+        message:
+          'Die Firmen-Konfiguration ist ungültig (.voicewall/config.json). Bitte den Firmenordner prüfen.',
+      };
+    }
+    const next: CompanyConfig = { ...parsed.data, sprache };
+    try {
+      await writeFileAtomic(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    } catch (error) {
+      return {
+        ok: false,
+        message: `Die Firmen-Konfiguration konnte nicht geschrieben werden: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+    this.deps.logger.info('Diktatsprache der aktiven Firma geändert.', { sprache });
+    this.deps.onCompanyChanged?.();
     return { ok: true };
   }
 
@@ -485,6 +570,7 @@ export class CompanyManager {
       ? config.firmen
       : [...config.firmen, normalized];
     await this.persistConfig({ ...config, firmen, aktiveFirma: normalized });
+    this.deps.onCompanyChanged?.();
     return { ok: true };
   }
 
@@ -659,7 +745,7 @@ export class CompanyManager {
     const created = await createTranscript(active.dir, {
       titel: input.titel,
       body: input.body,
-      sprache: 'de',
+      sprache: await this.activeSprache(),
       // Kein Erkennungsmodell: manuelle Eingabe. Der Wert dokumentiert die Herkunft.
       modell: 'manuell',
       dauerSekunden: 0,
@@ -1057,6 +1143,7 @@ export class CompanyManager {
       appVersion: this.deps.appVersion,
       platform: process.platform,
       modelChoice: config.modell,
+      dictationLanguage: await this.activeSprache(),
     });
     return { ok: true, beleg };
   }
@@ -1100,6 +1187,7 @@ export class CompanyManager {
           details: companyDetailsSchema.optional(),
           modell: z.enum(['q5_0', 'fp16']).optional(),
           ordnername: z.string().max(300).optional(),
+          sprache: dictationLanguageSchema.optional(),
         })
         .safeParse(raw);
       if (!parsed.success) {
@@ -1122,7 +1210,23 @@ export class CompanyManager {
             parsed.data.details,
             parsed.data.modell,
             parsed.data.ordnername,
+            parsed.data.sprache,
           ),
+      );
+    });
+
+    // Paket B1: Diktatsprache der aktiven Firma nachtraeglich wechseln.
+    ipcMain.handle(IpcChannel.CompanySetLanguage, (_event, raw: unknown) => {
+      const parsed = dictationLanguageSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<ActionResult>({ ok: false, message: 'Ungültige Diktatsprache.' });
+      }
+      return guard<ActionResult>(
+        {
+          ok: false,
+          message: 'Unerwarteter interner Fehler. Details stehen im lokalen Log unter userData.',
+        },
+        () => this.setCompanyLanguage(parsed.data),
       );
     });
 

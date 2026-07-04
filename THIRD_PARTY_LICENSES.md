@@ -39,11 +39,12 @@ App-Bundle mitgeliefert.
 
 ## 2. Modelle (werden bei der Einrichtung geladen oder offline eingespielt)
 
-| Modell                                             | Datei                  | Lizenz     | Quelle                                                         |
-| -------------------------------------------------- | ---------------------- | ---------- | -------------------------------------------------------------- |
-| whisper-large-v3-turbo-german (Q5_0-Quantisierung) | ggml-model-q5_0.bin    | Apache-2.0 | https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml |
-| whisper-large-v3-turbo-german (fp16)               | ggml-model.bin         | Apache-2.0 | https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml |
-| Silero VAD v5.1.2 (GGML-Konvertierung)             | ggml-silero-v5.1.2.bin | MIT        | https://huggingface.co/ggml-org/whisper-vad                    |
+| Modell                                                                 | Datei                        | Lizenz     | Quelle                                                         |
+| ---------------------------------------------------------------------- | ---------------------------- | ---------- | -------------------------------------------------------------- |
+| whisper-large-v3-turbo-german (Q5_0-Quantisierung)                     | ggml-model-q5_0.bin          | Apache-2.0 | https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml |
+| whisper-large-v3-turbo-german (fp16)                                   | ggml-model.bin               | Apache-2.0 | https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml |
+| whisper large-v3-turbo multilingual (Q5_0), für Diktatsprache Englisch | ggml-large-v3-turbo-q5_0.bin | MIT        | https://huggingface.co/ggerganov/whisper.cpp                   |
+| Silero VAD v5.1.2 (GGML-Konvertierung)                                 | ggml-silero-v5.1.2.bin       | MIT        | https://huggingface.co/ggml-org/whisper-vad                    |
 
 Attributions-Kette des deutschen Whisper-Modells (Apache-2.0,
 Änderungshinweis gemäß Ziffer 4(b) der Lizenz):
@@ -58,6 +59,14 @@ Attributions-Kette des deutschen Whisper-Modells (Apache-2.0,
    Diese konvertierten Dateien sind der tatsächlich geladene Stand;
    sie sind gegenüber dem primeline-Original verändert (Formatwandlung
    nach GGML, Quantisierung).
+
+Attributions-Kette des multilingualen Whisper-Modells (Diktatsprache
+Englisch, Paket B1): Modellarchitektur und Ursprungsgewichte OpenAI
+Whisper large-v3-turbo (MIT, https://github.com/openai/whisper); die
+tatsächlich geladene Datei ist die GGML/Q5_0-Konvertierung aus dem
+whisper.cpp-Modellbestand von Georgi Gerganov (MIT,
+https://huggingface.co/ggerganov/whisper.cpp); sie ist gegenüber dem
+OpenAI-Original verändert (Formatwandlung nach GGML, Quantisierung).
 
 Zur Lizenzlage von Silero VAD: MIT gilt für die v5-Serie
 (snakers4/silero-vad); ältere Distributionen hatten abweichende

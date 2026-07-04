@@ -314,6 +314,12 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             Mikrofon (OS): <strong>{status?.microphoneState ?? 'unbekannt'}</strong>
           </li>
           <li>
+            Diktatsprache (aktive Firma):{' '}
+            <strong data-testid="dictation-language">
+              {status?.dictationLanguage === 'en' ? 'Englisch (en)' : 'Deutsch (de)'}
+            </strong>
+          </li>
+          <li>
             Modelle:{' '}
             <strong>{modelsReady ? 'vorhanden und verifiziert' : 'nicht vollständig'}</strong>
           </li>
@@ -321,6 +327,11 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             Engine: <strong>{engineReady ? 'bereit' : 'nicht gestartet'}</strong>
           </li>
         </ul>
+        {status?.engineHinweis != null && (
+          <p className="notice" data-testid="engine-hinweis" aria-live="polite">
+            {status.engineHinweis}
+          </p>
+        )}
         {status?.models.map((model) => (
           <p key={model.id} className="model-line">
             {model.label}: {model.present ? 'vorhanden' : `fehlt (${formatBytes(model.byteSize)})`}

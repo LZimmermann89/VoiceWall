@@ -77,6 +77,31 @@ export function MainView(props: MainViewProps): ReactElement {
   );
 
   const firmen = companies?.firmen ?? [];
+  const aktiveFirma = firmen.find((firma) => firma.aktiv) ?? null;
+
+  const setLanguage = useCallback(
+    async (sprache: 'de' | 'en') => {
+      setBusy(true);
+      setCompanyNotice(null);
+      try {
+        const result = await window.voicewall.setCompanyLanguage(sprache);
+        if (!result.ok) {
+          setCompanyNotice(result.message);
+        } else if (sprache === 'en') {
+          setCompanyNotice(
+            'Diktatsprache auf Englisch umgestellt (mehrsprachiges Originalmodell). Falls das Modell noch fehlt, startet beim nächsten Diktat bzw. über "Modelle laden und Engine starten" ein einmaliger Download von ca. 574 MB.',
+          );
+        } else {
+          setCompanyNotice('Diktatsprache auf Deutsch umgestellt (deutsch-optimiertes Modell).');
+        }
+        await onRefreshCompanies();
+        await onRefreshStatus();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onRefreshCompanies, onRefreshStatus],
+  );
 
   return (
     <div className="manage-layout">
@@ -94,6 +119,7 @@ export function MainView(props: MainViewProps): ReactElement {
                 {firma.aktiv ? (
                   <span className="company-tab company-tab-active" aria-current="true">
                     {firma.anzeigename}
+                    {firma.sprache === 'en' ? ' (EN)' : ''}
                   </span>
                 ) : (
                   <button
@@ -103,11 +129,26 @@ export function MainView(props: MainViewProps): ReactElement {
                     onClick={() => void activate(firma.pfad)}
                   >
                     {firma.anzeigename}
+                    {firma.sprache === 'en' ? ' (EN)' : ''}
                   </button>
                 )}
               </li>
             ))}
           </ul>
+        )}
+        {aktiveFirma !== null && (
+          <label className="switch-row company-language">
+            Diktatsprache{' '}
+            <select
+              value={aktiveFirma.sprache}
+              disabled={busy}
+              data-testid="company-language-select"
+              onChange={(event) => void setLanguage(event.target.value === 'en' ? 'en' : 'de')}
+            >
+              <option value="de">Deutsch</option>
+              <option value="en">Englisch</option>
+            </select>
+          </label>
         )}
         <span className="header-spacer" />
         <label className="switch-row company-autosave">

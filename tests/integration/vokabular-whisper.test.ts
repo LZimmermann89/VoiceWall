@@ -79,7 +79,7 @@ describe.skipIf(!modelsAvailable)('Fach-Woerterbuch (lokal, Modelle vorhanden)',
       vad,
       pcm,
       TUNING,
-      built.prompt ?? undefined,
+      built.prompt === null ? undefined : { prompt: built.prompt },
     );
     console.log(`[Integration Stufe 1] mit Prompt: "${outcome.text}"`);
     expect(outcome.hadSpeech).toBe(true);
@@ -94,7 +94,7 @@ describe.skipIf(!modelsAvailable)('Fach-Woerterbuch (lokal, Modelle vorhanden)',
       vad,
       silence,
       TUNING,
-      built.prompt ?? undefined,
+      built.prompt === null ? undefined : { prompt: built.prompt },
     );
     expect(outcome.hadSpeech).toBe(false);
     expect(outcome.text).toBe('');

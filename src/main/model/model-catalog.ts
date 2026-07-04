@@ -11,9 +11,11 @@
  * die stabile `resolve/main`-URL, Redirects folgt der Downloader selbst.
  */
 
+import type { DictationLanguage } from '../../shared/schema';
+
 export interface ModelDescriptor {
   /** Interner Schluessel. */
-  readonly id: 'whisper-q5' | 'whisper-fp16' | 'silero-vad';
+  readonly id: 'whisper-q5' | 'whisper-fp16' | 'turbo-q5_0-multilingual' | 'silero-vad';
   /** Dateiname im Modellordner (userData/models). */
   readonly fileName: string;
   /** Stabile Download-URL (resolve/main), niemals die CDN-URL. */
@@ -53,6 +55,23 @@ export const MODEL_CATALOG = {
     sha256: '6eb2e025198a6cbac7bdb1e86e278f5de002e583aae7bdfcf5183ef8da16decd',
     label: 'Deutsches Whisper-Modell (large-v3-turbo, fp16, maximale Genauigkeit)',
   },
+  /**
+   * Originales multilinguales large-v3-turbo (Q5_0) fuer die Diktatsprache
+   * Englisch (Paket B1, ABARBEITUNG 2.6). KEIN Auto-Download: geladen wird
+   * erst, wenn eine Firma Englisch waehlt (Entscheidung E39).
+   * SHA-256-Herkunft (04.07.2026, R14-Verfahren wie im M1-Spike): Datei von
+   * der resolve/main-URL geladen, selbst mit `shasum -a 256` gehasht UND
+   * identisch mit dem Hugging-Face-LFS-OID aus
+   * `api/models/ggerganov/whisper.cpp/paths-info/main`.
+   */
+  whisperTurboMultilingual: {
+    id: 'turbo-q5_0-multilingual',
+    fileName: 'ggml-large-v3-turbo-q5_0.bin',
+    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin',
+    byteSize: 574_041_195,
+    sha256: '394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2',
+    label: 'Englisch / mehrsprachig (large-v3-turbo, Q5_0)',
+  },
   sileroVad: {
     id: 'silero-vad',
     fileName: 'ggml-silero-v5.1.2.bin',
@@ -67,6 +86,7 @@ export const MODEL_CATALOG = {
 export const ALL_MODEL_DESCRIPTORS: readonly ModelDescriptor[] = [
   MODEL_CATALOG.whisperQ5,
   MODEL_CATALOG.whisperFp16,
+  MODEL_CATALOG.whisperTurboMultilingual,
   MODEL_CATALOG.sileroVad,
 ];
 
@@ -88,6 +108,18 @@ export function whisperDescriptorFor(choice: WhisperModelChoice): ModelDescripto
 }
 
 /**
+ * Modellwahl-Logik je Diktatsprache (Entscheidung E39): Deutsch nutzt das
+ * DE-optimierte Finetune (q5_0/fp16 gemaess Modellwahl), Englisch immer das
+ * originale multilinguale large-v3-turbo (Q5_0).
+ */
+export function whisperDescriptorForLanguage(
+  language: DictationLanguage,
+  choice: WhisperModelChoice,
+): ModelDescriptor {
+  return language === 'en' ? MODEL_CATALOG.whisperTurboMultilingual : whisperDescriptorFor(choice);
+}
+
+/**
  * Modellkennung fuer Diktat-Metadaten (Front-Matter-Feld `modell`,
  * ABARBEITUNG 4.4.2): benennt Herkunftsmodell und Quantisierung
  * (Beleg-Gedanke: welches Modell hat den Text erzeugt).
@@ -99,6 +131,14 @@ export function transcriptModelName(choice: WhisperModelChoice): string {
   return choice === 'fp16'
     ? 'whisper-large-v3-turbo-german-fp16'
     : 'whisper-large-v3-turbo-german-q5_0';
+}
+
+/** Modellkennung fuer Diktat-Metadaten je Diktatsprache und Modellwahl. */
+export function transcriptModelNameFor(
+  language: DictationLanguage,
+  choice: WhisperModelChoice,
+): string {
+  return language === 'en' ? 'whisper-large-v3-turbo-q5_0' : transcriptModelName(choice);
 }
 
 /** Ein SHA-256-Hex ist genau 64 Zeichen aus [0-9a-f]. */

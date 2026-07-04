@@ -9,9 +9,10 @@
  * auf den Netzwerk-Selbsttest und die Konsent-Dokumentation.
  */
 import type { BelegInfo, BelegModell } from '../../shared/company';
+import type { DictationLanguage } from '../../shared/schema';
 import { readConsent } from '../consent/consent-store';
 import { logFilePath } from '../log/logger';
-import { ALL_MODEL_DESCRIPTORS, whisperDescriptorFor } from '../model/model-catalog';
+import { ALL_MODEL_DESCRIPTORS, whisperDescriptorForLanguage } from '../model/model-catalog';
 import { getModelsDirectory, getModelStatuses } from '../model/model-store';
 
 export interface BelegDeps {
@@ -20,6 +21,8 @@ export interface BelegDeps {
   readonly platform: string;
   /** Aktive Whisper-Modellwahl (globale Konfig). */
   readonly modelChoice: 'q5_0' | 'fp16';
+  /** Diktatsprache der aktiven Firma (bestimmt das aktive Whisper-Modell). */
+  readonly dictationLanguage: DictationLanguage;
 }
 
 /**
@@ -29,7 +32,10 @@ export interface BelegDeps {
  */
 export async function collectBelegInfo(deps: BelegDeps): Promise<BelegInfo> {
   const statuses = await getModelStatuses(deps.userDataPath, ALL_MODEL_DESCRIPTORS);
-  const aktiverWhisperId = whisperDescriptorFor(deps.modelChoice).id;
+  const aktiverWhisperId = whisperDescriptorForLanguage(
+    deps.dictationLanguage,
+    deps.modelChoice,
+  ).id;
   const modelle: BelegModell[] = statuses.map((status) => ({
     id: status.descriptor.id,
     label: status.descriptor.label,

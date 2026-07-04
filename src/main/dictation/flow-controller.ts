@@ -36,6 +36,7 @@ import {
   type ActionResult,
   type DeliveryResult,
   type DevDictateResult,
+  type DictationLanguage,
 } from '../../shared/schema';
 import { aufbereitenText } from '../../shared/textaufbereitung';
 import { applyErsetzungen } from '../../shared/vokabular';
@@ -46,7 +47,7 @@ import { runClipboardSequence, realDelay } from '../clipboard/transcript-clipboa
 import { readGlobalConfig, writeGlobalConfig } from '../config/config-store';
 import { IpcChannel } from '../ipc/channels';
 import type { Logger } from '../log/logger';
-import { transcriptModelName } from '../model/model-catalog';
+import { transcriptModelNameFor } from '../model/model-catalog';
 import type { CompanyManager } from '../storage/companies';
 import { createOverlayWindow, showOverlayInactive } from '../overlay/overlay-window';
 import { createPasteAdapter, type PasteAdapter } from '../paste/index';
@@ -272,12 +273,32 @@ export class DictationFlowController {
   }
 
   /**
+   * Diktatsprache der aktiven Firma (Paket B1), fehlertolerant: jeder
+   * Lese-Fehler faellt auf Deutsch zurueck und blockiert die Zustellung nie.
+   */
+  private async activeLanguageLenient(): Promise<DictationLanguage> {
+    const companies = this.deps.companies;
+    if (companies === null) {
+      return 'de';
+    }
+    try {
+      return await companies.activeSprache();
+    } catch (error) {
+      this.deps.logger.warn(
+        `Diktatsprache nicht lesbar, es gilt Deutsch: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 'de';
+    }
+  }
+
+  /**
    * Stufe 1 (ABARBEITUNG 2.7): finaler Text = Ersetzungsliste der aktiven
    * Firma (deterministisch, Literal, Wortgrenzen), dann regelbasierte
    * Aufbereitung (Interpunktion immer; Fuellwoerter/Sprachkommandos gemaess
-   * globaler Schalter). Reine lokale String-Verarbeitung, KEIN Modell,
-   * KEIN externer Aufruf (harte Guardrail). Fehler beim Laden der
-   * Ersetzungsliste blockieren die Zustellung nie.
+   * globaler Schalter, Listen sprachabhaengig je Firmensprache, Paket B1).
+   * Reine lokale String-Verarbeitung, KEIN Modell, KEIN externer Aufruf
+   * (harte Guardrail). Fehler beim Laden der Ersetzungsliste blockieren die
+   * Zustellung nie.
    */
   private async processTranscriptText(roh: string): Promise<string> {
     let text = roh;
@@ -291,7 +312,7 @@ export class DictationFlowController {
         );
       }
     }
-    return aufbereitenText(text, this.config.aufbereitung);
+    return aufbereitenText(text, this.config.aufbereitung, await this.activeLanguageLenient());
   }
 
   // ---------------------------------------------------------------------
@@ -357,11 +378,13 @@ export class DictationFlowController {
       if (!(await companies.isAutoSaveEnabled())) {
         return;
       }
+      const sprache = await this.activeLanguageLenient();
       const saved = await companies.saveDictate({
         text,
         dauerSekunden: Math.round(audioMs / 1000),
         quelle: 'diktat',
-        modell: transcriptModelName(this.config.modell),
+        sprache,
+        modell: transcriptModelNameFor(sprache, this.config.modell),
       });
       if (!saved.ok) {
         this.deps.logger.warn(`Diktat konnte nicht gespeichert werden: ${saved.message}`);
@@ -384,11 +407,13 @@ export class DictationFlowController {
         message: 'Es gibt noch kein Diktat. Bitte zuerst per Hotkey oder Testaufnahme diktieren.',
       };
     }
+    const sprache = await this.activeLanguageLenient();
     return this.deps.companies.saveDictate({
       text: this.lastTranscript,
       dauerSekunden: Math.round(this.lastAudioMs / 1000),
       quelle: 'diktat',
-      modell: transcriptModelName(this.config.modell),
+      sprache,
+      modell: transcriptModelNameFor(sprache, this.config.modell),
     });
   }
 

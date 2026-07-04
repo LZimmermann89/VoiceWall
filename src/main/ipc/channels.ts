@@ -56,6 +56,8 @@ export const IpcChannel = {
   CompanyPreviewName: 'company:preview-name',
   CompanyCreate: 'company:create',
   CompanySetActive: 'company:set-active',
+  /** Diktatsprache der aktiven Firma wechseln (Paket B1). */
+  CompanySetLanguage: 'company:set-language',
   CompanyCheckSync: 'company:check-sync',
   DictateSaveLast: 'dictate:save-last',
   DictateList: 'dictate:list',

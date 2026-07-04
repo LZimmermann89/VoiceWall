@@ -266,3 +266,41 @@ describe('aufbereitenText (Pipeline)', () => {
     expect(aufbereitenText(satz, AN)).toBe(satz);
   });
 });
+
+describe('sprachabhaengige Aufbereitung (Paket B1, Englisch)', () => {
+  it('englische Fuellwoerter (uh, um, erm) werden nur bei Sprache en entfernt', () => {
+    expect(entferneFuellwoerter('This is uh a test.', 'en')).toBe('This is a test.');
+    expect(entferneFuellwoerter('Um, this works, erm, fine.', 'en')).toBe('This works, fine.');
+    // Bei Sprache de bleibt "um" unangetastet (normales deutsches Wort).
+    expect(entferneFuellwoerter('Wir treffen uns um drei.', 'de')).toBe('Wir treffen uns um drei.');
+    // Umgekehrt entfernt die EN-Liste kein deutsches "äh".
+    expect(entferneFuellwoerter('Das ist äh ein Test.', 'en')).toBe('Das ist äh ein Test.');
+  });
+
+  it('englische Kommandos (new line, new paragraph, period, comma) nur bei en', () => {
+    expect(ersetzeSprachkommandos('line one new line line two', 'en')).toBe('line one\nline two');
+    expect(ersetzeSprachkommandos('part one new paragraph part two', 'en')).toBe(
+      'part one\n\npart two',
+    );
+    expect(ersetzeSprachkommandos('that was good period', 'en')).toBe('that was good.');
+    expect(ersetzeSprachkommandos('first comma second', 'en')).toBe('first, second');
+    // Deutsche Kommandos wirken bei en NICHT (und umgekehrt).
+    expect(ersetzeSprachkommandos('Hallo Punkt', 'en')).toBe('Hallo Punkt');
+    expect(ersetzeSprachkommandos('that was good period', 'de')).toBe('that was good period');
+  });
+
+  it('EN-Pipeline: Fuellwoerter, Kommandos und Grossschreibung greifen zusammen', () => {
+    expect(aufbereitenText('hello uh this is a test period it works period', ALLES_AN, 'en')).toBe(
+      'hello this is a test. It works.',
+    );
+  });
+
+  it('EN-Kommandos verbrauchen ein von Whisper gesetztes Satzzeichen', () => {
+    expect(aufbereitenText('that was good period.', ALLES_AN, 'en')).toBe('that was good.');
+  });
+
+  it('Default-Sprache bleibt Deutsch (Rueckwaertskompatibilitaet)', () => {
+    expect(aufbereitenText('Das ist äh ein Test.', AN)).toBe('Das ist ein Test.');
+    expect(aufbereitenText('Hallo Punkt', ALLES_AN)).toBe('Hallo.');
+  });
+});

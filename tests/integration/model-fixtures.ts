@@ -24,9 +24,12 @@ function userDataDir(): string {
 
 export const modelsDir = join(userDataDir(), 'models');
 export const whisperModelPath = join(modelsDir, 'ggml-model-q5_0.bin');
+export const multilingualModelPath = join(modelsDir, 'ggml-large-v3-turbo-q5_0.bin');
 export const sileroModelPath = join(modelsDir, 'ggml-silero-v5.1.2.bin');
 
 export const modelsAvailable = existsSync(whisperModelPath) && existsSync(sileroModelPath);
+/** EN-Tests brauchen zusaetzlich das mehrsprachige Originalmodell (B1). */
+export const modelsAvailableEn = existsSync(multilingualModelPath) && existsSync(sileroModelPath);
 
 /**
  * Liest die 16-bit-PCM-Daten (data-Chunk) eines 16 kHz mono WAV als frischen

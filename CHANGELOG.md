@@ -8,6 +8,26 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- Diktatsprache Englisch als wählbare Sprache pro Firma (Paket B1,
+  Entscheidung E39; die Oberfläche bleibt deutsch). Neue Firmen wählen
+  im Wizard-Schritt "Sprache" zwischen Deutsch (empfohlen, Standard,
+  DE-optimiertes Finetune-Modell) und Englisch (originales
+  multilinguales large-v3-turbo, Q5_0, MIT, aus ggerganov/whisper.cpp;
+  zusätzlicher einmaliger Download von ca. 574 MB, SHA-256 nach dem
+  R14-Verfahren selbst berechnet und identisch mit dem
+  Hugging-Face-LFS-OID). Kein Auto-Download: geladen werden nur die
+  Modelle der aktiven Sprache plus VAD. Die Sprache der aktiven Firma
+  bestimmt Modell und language-Parameter der Transkription
+  (Sprachwechsel = geordneter Engine-Neustart mit deutscher
+  Statusmeldung); sie ist in der Verwaltung sichtbar und nachträglich
+  über ein Auswahlfeld änderbar (Hinweis auf den ggf. nötigen
+  Modell-Download). Füllwörter-Filter und Sprachkommandos folgen der
+  Firmensprache (englisch: "uh/um/erm" bzw. "period", "comma",
+  "new line", "new paragraph", gleiche Opt-in-Logik); Front-Matter
+  `sprache` und Modellkennung tragen die echten Werte. Neues englisches
+  Test-WAV (tests/fixtures/testdiktat-en.wav), Integrations- und
+  E2E-Beweise inklusive Sprachwechsel über die UI.
+
 - Stufe 1: Fach-Wörterbuch pro Firma und regelbasierte lokale
   Textaufbereitung (ABARBEITUNG 2.7; rein deterministische
   String-Verarbeitung, kein Modell, kein externer Aufruf). Neue Datei

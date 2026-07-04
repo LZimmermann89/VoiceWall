@@ -16,13 +16,15 @@
  */
 import { app, BrowserWindow, ipcMain, type IpcMainEvent } from 'electron';
 import { z } from 'zod';
-import type {
-  AccessibilityState,
-  AppStatus,
-  AufbereitungConfig,
-  DictationFlowStateView,
-  HotkeyStatus,
-  MicrophoneState,
+import {
+  dictationLanguageSchema,
+  type AccessibilityState,
+  type AppStatus,
+  type AufbereitungConfig,
+  type DictationFlowStateView,
+  type DictationLanguage,
+  type HotkeyStatus,
+  type MicrophoneState,
 } from '../../shared/schema';
 import { createCaptureWindow } from '../audio/capture-window';
 import { DEFAULT_MAX_SAMPLES, PcmRingBuffer } from '../audio/ring-buffer';
@@ -39,7 +41,7 @@ import type { Logger } from '../log/logger';
 import {
   ALL_MODEL_DESCRIPTORS,
   MODEL_CATALOG,
-  whisperDescriptorFor,
+  whisperDescriptorForLanguage,
   type WhisperModelChoice,
 } from '../model/model-catalog';
 import { ensureModel, getModelStatuses } from '../model/model-store';
@@ -47,6 +49,7 @@ import { ensureMicrophoneAccess } from '../permission/microphone';
 import {
   DEFAULT_ENGINE_TUNING,
   WhisperEngineManager,
+  type DictationContext,
   type TranscriptEvent,
 } from '../whisper/engine-manager';
 
@@ -102,11 +105,16 @@ export class DictationOrchestrator {
   private transcriptListener: ((text: string, audioMs: number) => void) | null = null;
   private flowStatusProvider: (() => FlowStatus) | null = null;
   /**
-   * Liefert den Initial-Prompt des Fach-Woerterbuchs der aktiven Firma
-   * (Stufe 1). Registriert vom Bootstrap (CompanyManager); solange keiner
-   * registriert ist, laeuft die Engine ohne Prompt.
+   * Liefert den Diktat-Kontext der aktiven Firma (Paket B1): feste
+   * Diktatsprache plus Initial-Prompt des Fach-Woerterbuchs (Stufe 1).
+   * Registriert vom Bootstrap (CompanyManager); solange keiner registriert
+   * ist, laeuft die Engine auf Deutsch und ohne Prompt.
    */
-  private promptProvider: (() => Promise<string | null>) | null = null;
+  private contextProvider: (() => Promise<DictationContext>) | null = null;
+  /** Sprache/Modell, mit der die laufende Engine gestartet wurde. */
+  private engineLanguage: DictationLanguage | null = null;
+  /** Deutsche Statusmeldung der Engine (z. B. Modellwechsel), sonst null. */
+  private engineHinweis: string | null = null;
 
   private engine: WhisperEngineManager | null = null;
   private captureWindow: BrowserWindow | null = null;
@@ -160,7 +168,15 @@ export class DictationOrchestrator {
       }
     });
     ipcMain.handle(IpcChannel.GrantConsent, () => this.guarded(() => this.grantConsent()));
-    ipcMain.handle(IpcChannel.PrepareModels, () => this.guarded(() => this.prepareModels()));
+    // Optionaler Sprach-Parameter (Wizard: die Sprache steht fest, bevor die
+    // Firma existiert); ohne Parameter gilt die Sprache der aktiven Firma.
+    ipcMain.handle(IpcChannel.PrepareModels, (_event, raw: unknown) => {
+      const parsed = dictationLanguageSchema.optional().safeParse(raw ?? undefined);
+      if (!parsed.success) {
+        return Promise.resolve({ ok: false as const, message: 'Ungültige Diktatsprache.' });
+      }
+      return this.guarded(() => this.prepareModels(parsed.data));
+    });
     ipcMain.handle(IpcChannel.StartDictation, () => this.guarded(() => this.startDictation()));
     ipcMain.handle(IpcChannel.StopDictation, () => this.guarded(() => this.stopDictation()));
     // Kontrollierter Neustart: macOS meldet frisch erteilte TCC-Freigaben
@@ -230,6 +246,7 @@ export class DictationOrchestrator {
       await this.engine.shutdown();
       this.engine = null;
       this.engineReady = false;
+      this.engineLanguage = null;
     }
     await this.broadcastStatus();
   }
@@ -262,30 +279,31 @@ export class DictationOrchestrator {
     this.flowStatusProvider = provider;
   }
 
-  /** Registriert den Initial-Prompt-Lieferanten (Fach-Woerterbuch, Stufe 1). */
-  setPromptProvider(provider: (() => Promise<string | null>) | null): void {
-    this.promptProvider = provider;
+  /**
+   * Registriert den Diktat-Kontext-Lieferanten (Sprache der aktiven Firma
+   * plus Fach-Woerterbuch-Prompt, Stufe 1/Paket B1).
+   */
+  setDictationContextProvider(provider: (() => Promise<DictationContext>) | null): void {
+    this.contextProvider = provider;
   }
 
   /**
-   * Setzt den aktuellen Initial-Prompt an der Engine (vor jedem Diktat-Start
-   * und vor jeder Test-Injektion, damit Vokabular-Aenderungen und
-   * Firmenwechsel sofort greifen). Fehler blockieren das Diktat nie; es
-   * werden nie Prompt-Inhalte geloggt.
+   * Loest den aktuellen Diktat-Kontext auf (vor jedem Diktat-Start und vor
+   * jeder Test-Injektion, damit Vokabular-Aenderungen, Firmen- und
+   * Sprachwechsel sofort greifen). Fehler blockieren das Diktat nie: der
+   * Fallback ist Deutsch ohne Prompt; es werden nie Prompt-Inhalte geloggt.
    */
-  private async applyVocabularyPrompt(): Promise<void> {
-    if (this.engine === null) {
-      return;
-    }
+  private async resolveDictationContext(): Promise<DictationContext> {
     try {
-      const prompt = this.promptProvider === null ? null : await this.promptProvider();
-      this.engine.setPrompt(prompt);
+      if (this.contextProvider !== null) {
+        return await this.contextProvider();
+      }
     } catch (error) {
       this.deps.logger.warn(
-        `Initial-Prompt konnte nicht geladen werden, Diktat läuft ohne Prompt weiter: ${error instanceof Error ? error.message : String(error)}`,
+        `Diktat-Kontext konnte nicht geladen werden, Diktat läuft auf Deutsch ohne Prompt weiter: ${error instanceof Error ? error.message : String(error)}`,
       );
-      this.engine.setPrompt(null);
     }
+    return { language: 'de', prompt: null };
   }
 
   /** Stoesst eine Statusmeldung an das Hauptfenster an (fuer den Controller). */
@@ -303,8 +321,9 @@ export class DictationOrchestrator {
       await this.loadInitialState();
     }
     // Status ALLER bekannten Modelle (der Wizard zeigt auch das optionale
-    // fp16-Modell); betriebsbereit ist die App, sobald das GEWAEHLTE
-    // Whisper-Modell plus VAD vorhanden und verifiziert sind.
+    // fp16-Modell und das mehrsprachige EN-Modell); betriebsbereit ist die
+    // App, sobald das fuer die AKTIVE Sprache noetige Whisper-Modell plus
+    // VAD vorhanden und verifiziert sind.
     const statuses = await getModelStatuses(this.deps.userDataPath, ALL_MODEL_DESCRIPTORS);
     const models = statuses.map((status) => ({
       id: status.descriptor.id,
@@ -312,17 +331,23 @@ export class DictationOrchestrator {
       present: status.present,
       byteSize: status.descriptor.byteSize,
     }));
-    const requiredIds = [whisperDescriptorFor(this.modelChoice).id, MODEL_CATALOG.sileroVad.id];
+    const language = (await this.resolveDictationContext()).language;
+    const requiredIds = [
+      whisperDescriptorForLanguage(language, this.modelChoice).id,
+      MODEL_CATALOG.sileroVad.id,
+    ];
     const flow = this.flowStatusProvider?.() ?? DEFAULT_FLOW_STATUS;
     return {
       consentGranted: this.consentGranted,
       microphoneState: this.microphoneState,
       models,
       modelChoice: this.modelChoice,
+      dictationLanguage: language,
       modelsReady: models
         .filter((model) => requiredIds.includes(model.id))
         .every((model) => model.present),
       engineReady: this.engineReady,
+      engineHinweis: this.engineHinweis,
       dictationActive: this.dictationActive,
       lastError: this.lastError,
       flowState: flow.flowState,
@@ -374,9 +399,20 @@ export class DictationOrchestrator {
     return { ok: true };
   }
 
-  /** Fehlende Modelle (gewaehltes Whisper plus VAD) laden und Engine starten. */
-  async prepareModels(): Promise<{ ok: true } | { ok: false; message: string }> {
-    const descriptors = [whisperDescriptorFor(this.modelChoice), MODEL_CATALOG.sileroVad];
+  /**
+   * Fehlende Modelle laden und Engine starten. Geladen werden NUR die fuer
+   * die aktive Diktatsprache noetigen Modelle plus VAD (kein Auto-Download
+   * des EN-Modells, solange keine Firma Englisch waehlt). `languageOverride`
+   * nutzt der Wizard: dort steht die Sprache fest, BEVOR die Firma existiert.
+   */
+  async prepareModels(
+    languageOverride?: DictationLanguage,
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    const language = languageOverride ?? (await this.resolveDictationContext()).language;
+    const descriptors = [
+      whisperDescriptorForLanguage(language, this.modelChoice),
+      MODEL_CATALOG.sileroVad,
+    ];
     for (const descriptor of descriptors) {
       const result = await ensureModel(this.deps.userDataPath, descriptor, {
         allowDownload: true,
@@ -396,7 +432,7 @@ export class DictationOrchestrator {
       }
     }
     this.deps.logger.info('Alle Modelle vorhanden und verifiziert.');
-    const started = await this.ensureEngine();
+    const started = await this.ensureEngine(language);
     if (!started.ok) {
       return { ok: false, message: started.message };
     }
@@ -404,17 +440,41 @@ export class DictationOrchestrator {
     return { ok: true };
   }
 
-  private async ensureEngine(): Promise<{ ok: true } | { ok: false; message: string }> {
-    if (this.engine !== null && this.engine.isReady) {
+  /**
+   * Stellt die Engine fuer die gewuenschte Diktatsprache sicher. Laeuft
+   * bereits eine Engine mit dem Modell einer ANDEREN Sprache, wird sie
+   * geordnet beendet und mit dem richtigen Modell neu gestartet
+   * (Modellwechsel = Engine-Neustart; deutsche Statusmeldung in der UI).
+   */
+  private async ensureEngine(
+    language: DictationLanguage,
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    if (this.engine !== null && this.engine.isReady && this.engineLanguage === language) {
       return { ok: true };
     }
-    const whisperId = whisperDescriptorFor(this.modelChoice).id;
+    if (this.engine !== null && this.engineLanguage !== language) {
+      this.engineHinweis =
+        language === 'en'
+          ? 'Sprachwechsel: die Spracherkennung startet mit dem mehrsprachigen Modell (Englisch) neu ...'
+          : 'Sprachwechsel: die Spracherkennung startet mit dem deutschen Modell neu ...';
+      this.deps.logger.info(
+        `Diktatsprache gewechselt (${this.engineLanguage ?? 'unbekannt'} -> ${language}): Engine wird mit dem passenden Modell neu gestartet.`,
+      );
+      await this.broadcastStatus();
+      await this.engine.shutdown();
+      this.engine = null;
+      this.engineReady = false;
+    }
+    const whisperId = whisperDescriptorForLanguage(language, this.modelChoice).id;
     const statuses = await getModelStatuses(this.deps.userDataPath, ALL_MODEL_DESCRIPTORS);
     const whisper = statuses.find((status) => status.descriptor.id === whisperId);
     const silero = statuses.find((status) => status.descriptor.id === 'silero-vad');
     if (whisper === undefined || silero === undefined || !whisper.present || !silero.present) {
+      this.engineHinweis = null;
       const message =
-        'Die Modelle fehlen. Bitte zuerst den einmaligen Modell-Download im Einrichtungs-Assistenten ausführen.';
+        language === 'en'
+          ? 'Das mehrsprachige Erkennungsmodell für Englisch fehlt. Bitte den einmaligen Modell-Download starten (Knopf "Modelle laden und Engine starten" bzw. Einrichtungs-Assistent, ca. 574 MB).'
+          : 'Die Modelle fehlen. Bitte zuerst den einmaligen Modell-Download im Einrichtungs-Assistenten ausführen.';
       this.setError(message);
       return { ok: false, message };
     }
@@ -455,10 +515,14 @@ export class DictationOrchestrator {
     const start = await this.engine.start();
     if (!start.ok) {
       this.engineReady = false;
+      this.engineLanguage = null;
+      this.engineHinweis = null;
       this.setError(start.error);
       return { ok: false, message: start.error };
     }
     this.engineReady = true;
+    this.engineLanguage = language;
+    this.engineHinweis = null;
     return { ok: true };
   }
 
@@ -478,12 +542,14 @@ export class DictationOrchestrator {
       const message = 'Bitte zuerst die Mikrofon-Einwilligung erteilen.';
       return { ok: false, message };
     }
-    const engineOk = await this.ensureEngine();
+    // Diktat-Kontext der aktiven Firma: Sprache bestimmt das Modell
+    // (Engine-Neustart bei Wechsel), Prompt kommt aus dem Fach-Woerterbuch.
+    const context = await this.resolveDictationContext();
+    const engineOk = await this.ensureEngine(context.language);
     if (!engineOk.ok) {
       return engineOk;
     }
-    // Fach-Woerterbuch (Stufe 1): aktuellen Initial-Prompt setzen.
-    await this.applyVocabularyPrompt();
+    this.engine?.setContext(context);
     this.engine?.reset();
     this.ringBuffer.clear();
     this.lastError = null;
@@ -566,15 +632,15 @@ export class DictationOrchestrator {
   async transcribeInjectedPcm(
     pcm: ArrayBuffer,
   ): Promise<{ ok: true; transcript: TranscriptEvent | null } | { ok: false; message: string }> {
-    const engineOk = await this.ensureEngine();
+    const context = await this.resolveDictationContext();
+    const engineOk = await this.ensureEngine(context.language);
     if (!engineOk.ok) {
       return engineOk;
     }
     if (this.engine === null) {
       return { ok: false, message: 'Engine nicht verfügbar.' };
     }
-    // Fach-Woerterbuch (Stufe 1): aktuellen Initial-Prompt setzen.
-    await this.applyVocabularyPrompt();
+    this.engine.setContext(context);
     const result = await this.engine.transcribeSegment(pcm);
     if (!result.ok) {
       this.setError(result.error);
@@ -610,6 +676,7 @@ export class DictationOrchestrator {
     if (this.engine !== null) {
       await this.engine.shutdown();
       this.engine = null;
+      this.engineLanguage = null;
     }
     if (this.captureWindow !== null && !this.captureWindow.isDestroyed()) {
       this.captureWindow.destroy();

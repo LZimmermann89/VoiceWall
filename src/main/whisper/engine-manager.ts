@@ -13,6 +13,7 @@
 import { join } from 'node:path';
 import { utilityProcess, type UtilityProcess } from 'electron';
 import { err, ok, type Result } from '../../shared/result';
+import type { DictationLanguage } from '../../shared/schema';
 import type { Logger } from '../log/logger';
 import { NativeLogRingBuffer, routeNativeOutput } from './native-log';
 import { workerEventSchema, type WorkerCommand, type WorkerEvent } from './protocol';
@@ -31,6 +32,12 @@ export interface TranscriptEvent {
   readonly text: string;
   readonly durationMs: number;
   readonly audioMs: number;
+}
+
+/** Diktat-Kontext: feste Sprache plus optionaler Woerterbuch-Prompt. */
+export interface DictationContext {
+  readonly language: DictationLanguage;
+  readonly prompt: string | null;
 }
 
 export interface EngineCallbacks {
@@ -61,11 +68,11 @@ export class WhisperEngineManager {
   private ready = false;
   private restarts = 0;
   /**
-   * Zuletzt gesetzter Initial-Prompt (Fach-Woerterbuch, Stufe 1). Wird nach
-   * einem Engine-Neustart automatisch erneut gesetzt, damit ein Absturz den
-   * Prompt nicht verliert.
+   * Zuletzt gesetzter Diktat-Kontext (Sprache plus Initial-Prompt, Stufe 1
+   * und Paket B1). Wird nach einem Engine-Neustart automatisch erneut
+   * gesetzt, damit ein Absturz weder Sprache noch Prompt verliert.
    */
-  private lastPrompt: string | null = null;
+  private lastContext: DictationContext | null = null;
   private shuttingDown = false;
   private requestCounter = 0;
   private readonly pending = new Map<string, PendingSegment>();
@@ -152,9 +159,13 @@ export class WhisperEngineManager {
         this.ready = true;
         this.restarts = 0;
         this.logger.info('Whisper-Engine bereit (Modell geladen).');
-        // Initial-Prompt nach (Neu-)Start wieder anlegen (Stufe 1).
-        if (this.lastPrompt !== null) {
-          this.post({ type: 'set-prompt', prompt: this.lastPrompt });
+        // Diktat-Kontext (Sprache, Prompt) nach (Neu-)Start wieder anlegen.
+        if (this.lastContext !== null) {
+          this.post({
+            type: 'set-context',
+            language: this.lastContext.language,
+            prompt: this.lastContext.prompt,
+          });
         }
         settleStart(ok(undefined));
         return;
@@ -310,12 +321,14 @@ export class WhisperEngineManager {
   }
 
   /**
-   * Initial-Prompt (Fach-Woerterbuch) fuer alle folgenden Transkriptionen
-   * setzen bzw. mit null loeschen. Es werden NIE Inhalte geloggt.
+   * Diktat-Kontext (Sprache plus Initial-Prompt des Fach-Woerterbuchs) fuer
+   * alle folgenden Transkriptionen setzen; `prompt: null` loescht den
+   * Prompt. Es werden NIE Prompt-Inhalte geloggt. Das passende Modell muss
+   * bereits geladen sein (Modellwechsel = Neustart, siehe Orchestrator).
    */
-  setPrompt(prompt: string | null): void {
-    this.lastPrompt = prompt;
-    this.post({ type: 'set-prompt', prompt });
+  setContext(context: DictationContext): void {
+    this.lastContext = context;
+    this.post({ type: 'set-context', language: context.language, prompt: context.prompt });
   }
 
   /**

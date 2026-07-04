@@ -27,7 +27,10 @@ die Windows-Hardware-Abnahme.
   Modell whisper-large-v3-turbo-german (Q5_0 als Standard, fp16 als
   Option für starke Hardware) plus Silero-VAD-Segmentierung. Audio lebt
   ausschließlich im Arbeitsspeicher und wird nie auf die Festplatte
-  geschrieben.
+  geschrieben. Optional lässt sich pro Firma Englisch als Diktatsprache
+  wählen (originales multilinguales large-v3-turbo, einmaliger
+  zusätzlicher Download von ca. 574 MB; VoiceWall bleibt primär für
+  Deutsch optimiert).
 - **First-Run-Wizard:** informierte Einwilligung mit
   KI-Transparenzhinweis, Firmendaten, Speicherort mit
   Cloud-Sync-Erkennung (iCloud/OneDrive/Dropbox-Falle), Modellwahl mit

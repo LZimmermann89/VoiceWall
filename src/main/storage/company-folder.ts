@@ -31,6 +31,7 @@ import {
   type Manifest,
   type TagsFile,
 } from '../../shared/company';
+import type { DictationLanguage } from '../../shared/schema';
 import { err, ok, type Result } from '../../shared/result';
 import { formatIsoWithOffset } from '../../shared/time';
 import { buildCompanyDirPath, findEquivalentDirEntry } from './sanitize';
@@ -48,7 +49,8 @@ export const PAPIERKORB_DIR = 'Papierkorb';
 export interface CreateCompanyFolderOptions {
   /** App-Version fuer `erstelltMit` (z. B. "VoiceWall 0.1.0"). */
   readonly erstelltMit: string;
-  readonly sprache?: string;
+  /** Diktatsprache der Firma (Paket B1, Default 'de'). */
+  readonly sprache?: DictationLanguage;
   readonly modell?: string;
   /**
    * Optionaler, vom Nutzer im Wizard editierter Ordnername. Er durchlaeuft

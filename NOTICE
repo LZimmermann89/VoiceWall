@@ -43,6 +43,14 @@ Attributionen (Pflicht-Hinweise):
    https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml
    Dateien und SHA-256-Prüfsummen: resources/model-manifest.json.
 
+4a. Whisper-Modell "large-v3-turbo" (multilingual, Q5_0-Quantisierung)
+   Für die optionale Diktatsprache Englisch. Ursprungsgewichte:
+   OpenAI Whisper large-v3-turbo (Nr. 3, MIT). Die von VoiceWall geladene
+   Datei ggml-large-v3-turbo-q5_0.bin ist die GGML/Q5_0-Konvertierung aus
+   dem whisper.cpp-Modellbestand von Georgi Gerganov. Lizenz: MIT.
+   https://huggingface.co/ggerganov/whisper.cpp
+   Datei und SHA-256-Prüfsumme: resources/model-manifest.json.
+
 5. Silero VAD, Version v5.1.2 (gepinnt)
    Copyright (c) 2020-present Silero Team (snakers4/silero-vad).
    Lizenz: MIT (gilt für die v5-Serie; ältere Distributionen hatten

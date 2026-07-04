@@ -24,8 +24,13 @@
  *   ("Der Punkt ist wichtig" wuerde zu "Der. ist wichtig"). Deshalb ist der
  *   Schalter standardmaessig AUS und ausdruecklich Opt-in (Entscheidung E38).
  *
+ * Sprachabhaengigkeit (Paket B1, Entscheidung E39): Fuellwortliste und
+ * Kommandoliste sind sprachabhaengig (Deutsch/Englisch, je Firmensprache);
+ * die Interpunktions-Regeln sind sprachneutral und gelten fuer beide.
+ *
  * Dieses Modul bleibt plattformneutral (kein Node/Electron/DOM).
  */
+import type { DictationLanguage } from './schema';
 
 /** Schalter der Aufbereitung (globale Konfiguration, Entscheidung E35). */
 export interface AufbereitungOptions {
@@ -111,22 +116,43 @@ export function schaerfeInterpunktion(text: string): string {
   return result;
 }
 
-/** Die konservative Standardliste eigenstaendiger Fuellwoerter. */
+/** Die konservative deutsche Standardliste eigenstaendiger Fuellwoerter. */
 export const FUELLWOERTER = ['ähm', 'öhm', 'äh', 'hm'] as const;
 
 /**
+ * Die englischen Pendants (Paket B1). "um" ist zugleich ein deutsches Wort;
+ * die Liste gilt deshalb NUR fuer Firmen mit Diktatsprache Englisch.
+ */
+export const FUELLWOERTER_EN = ['erm', 'uh', 'um'] as const;
+
+/** Fuellwortliste je Diktatsprache. */
+export function fuellwoerterFor(sprache: DictationLanguage): readonly string[] {
+  return sprache === 'en' ? FUELLWOERTER_EN : FUELLWOERTER;
+}
+
+/** Alternation fuer die Fuellwort-Regexe (Listen sind regex-sichere Woerter). */
+function fuellwortAlternation(sprache: DictationLanguage): string {
+  return fuellwoerterFor(sprache).join('|');
+}
+
+/**
  * Fuellwoerter-Filter (Regel 2, Schalter, Default AN):
- * - entfernt eigenstaendige "aeh"/"aehm"/"oehm"/"hm" (nur ganze Woerter,
+ * - entfernt eigenstaendige Fuellwoerter der Diktatsprache (deutsch:
+ *   "aeh"/"aehm"/"oehm"/"hm"; englisch: "uh"/"um"/"erm"; nur ganze Woerter,
  *   case-insensitiv, Unicode-Wortgrenzen) inklusive eines direkt folgenden
  *   Kommas und der Leerzeichen-Bereinigung,
  * - zieht direkte Wortdopplungen zusammen ("das das" -> "das"); Dopplungen
  *   mit Komma ("sehr, sehr") bleiben erhalten. Grenzen siehe Modulkommentar.
  */
-export function entferneFuellwoerter(text: string): string {
-  const beginntMitFuellwort = /^(ähm|öhm|äh|hm)(?=[^\p{L}]|$)/iu.test(text);
+export function entferneFuellwoerter(text: string, sprache: DictationLanguage = 'de'): string {
+  const alternation = fuellwortAlternation(sprache);
+  const beginntMitFuellwort = new RegExp(`^(${alternation})(?=[^\\p{L}]|$)`, 'iu').test(text);
 
   // Ganze Fuellwoerter inkl. eines direkt folgenden Kommas entfernen.
-  let result = text.replace(/(?<=^|[^\p{L}])(ähm|öhm|äh|hm)(?=[^\p{L}]|$),?/giu, '');
+  let result = text.replace(
+    new RegExp(`(?<=^|[^\\p{L}])(${alternation})(?=[^\\p{L}]|$),?`, 'giu'),
+    '',
+  );
   // Hinterlassene Zeichenreste bereinigen: ", ," / ",." / haengende Kommas.
   result = result.replace(/,\s*,/g, ',');
   result = result.replace(/,\s*([.!?;:])/g, '$1');
@@ -159,7 +185,7 @@ export function entferneFuellwoerter(text: string): string {
 }
 
 /** Ein Sprachkommando: gesprochene Phrase -> Zeichen. */
-interface Sprachkommando {
+export interface Sprachkommando {
   readonly phrase: string;
   readonly ersatz: string;
   /** Satzzeichen-Kommandos kleben am vorherigen Wort ("Hallo Punkt" -> "Hallo."). */
@@ -167,8 +193,8 @@ interface Sprachkommando {
 }
 
 /**
- * Kommandoliste; laengere Phrasen zuerst, damit "neuer Absatz" nie als
- * Teiltreffer eines kuerzeren Kommandos verarbeitet wird.
+ * Deutsche Kommandoliste; laengere Phrasen zuerst, damit "neuer Absatz" nie
+ * als Teiltreffer eines kuerzeren Kommandos verarbeitet wird.
  */
 export const SPRACHKOMMANDOS: readonly Sprachkommando[] = [
   { phrase: 'ausrufezeichen', ersatz: '!', art: 'satzzeichen' },
@@ -179,6 +205,24 @@ export const SPRACHKOMMANDOS: readonly Sprachkommando[] = [
   { phrase: 'punkt', ersatz: '.', art: 'satzzeichen' },
   { phrase: 'komma', ersatz: ',', art: 'satzzeichen' },
 ];
+
+/**
+ * Englische Kommandoliste (Paket B1, gleiche Opt-in-Logik wie E38: auch
+ * "period" und "comma" sind normale englische Woerter). Laengere Phrasen
+ * zuerst ("new paragraph" vor "new line" ist hier unkritisch, aber die
+ * Regel bleibt konsistent).
+ */
+export const SPRACHKOMMANDOS_EN: readonly Sprachkommando[] = [
+  { phrase: 'new paragraph', ersatz: '\n\n', art: 'umbruch' },
+  { phrase: 'new line', ersatz: '\n', art: 'umbruch' },
+  { phrase: 'period', ersatz: '.', art: 'satzzeichen' },
+  { phrase: 'comma', ersatz: ',', art: 'satzzeichen' },
+];
+
+/** Kommandoliste je Diktatsprache. */
+export function sprachkommandosFor(sprache: DictationLanguage): readonly Sprachkommando[] {
+  return sprache === 'en' ? SPRACHKOMMANDOS_EN : SPRACHKOMMANDOS;
+}
 
 function istWortzeichen(char: string): boolean {
   return /[\p{L}\p{N}_]/u.test(char);
@@ -233,14 +277,15 @@ function ersetzeKommando(text: string, kommando: Sprachkommando): string {
 
 /**
  * Sprachkommandos (Regel 3, Schalter, Default AUS, Entscheidung E38):
- * "neue Zeile", "neuer Absatz", "Punkt", "Komma", "Fragezeichen",
- * "Ausrufezeichen", "Doppelpunkt". Bewusst Opt-in: die Kommandowoerter sind
- * auch normale deutsche Woerter; bei aktiviertem Schalter trifft die Regel
- * auch deren normale Verwendung (siehe Modulkommentar).
+ * deutsch "neue Zeile", "neuer Absatz", "Punkt", "Komma", "Fragezeichen",
+ * "Ausrufezeichen", "Doppelpunkt"; englisch "new line", "new paragraph",
+ * "period", "comma" (Paket B1). Bewusst Opt-in: die Kommandowoerter sind
+ * auch normale Woerter der jeweiligen Sprache; bei aktiviertem Schalter
+ * trifft die Regel auch deren normale Verwendung (siehe Modulkommentar).
  */
-export function ersetzeSprachkommandos(text: string): string {
+export function ersetzeSprachkommandos(text: string, sprache: DictationLanguage = 'de'): string {
   let result = text;
-  for (const kommando of SPRACHKOMMANDOS) {
+  for (const kommando of sprachkommandosFor(sprache)) {
     result = ersetzeKommando(result, kommando);
   }
   return result;
@@ -250,15 +295,19 @@ export function ersetzeSprachkommandos(text: string): string {
  * Die komplette Aufbereitungs-Pipeline (siehe Modulkommentar). Wirkt auf dem
  * finalen Segmenttext NACH der Ersetzungsliste (vokabular.ts) und VOR
  * Zustellung/Speicherung; die Wortzahl im Front-Matter zaehlt damit den
- * finalen Text.
+ * finalen Text. `sprache` waehlt Fuellwort- und Kommandoliste (Paket B1).
  */
-export function aufbereitenText(text: string, options: AufbereitungOptions): string {
+export function aufbereitenText(
+  text: string,
+  options: AufbereitungOptions,
+  sprache: DictationLanguage = 'de',
+): string {
   let result = schaerfeInterpunktion(text);
   if (options.fuellwoerterEntfernen) {
-    result = entferneFuellwoerter(result);
+    result = entferneFuellwoerter(result, sprache);
   }
   if (options.sprachkommandos) {
-    result = ersetzeSprachkommandos(result);
+    result = ersetzeSprachkommandos(result, sprache);
   }
   // Nachlauf: raeumt Leerraum und Grossschreibung auf, die die Schritte 2/3
   // hinterlassen (idempotent, deterministisch).

@@ -34,6 +34,14 @@ export type ModelStatusView = z.infer<typeof modelStatusSchema>;
 export const modelChoiceSchema = z.enum(['q5_0', 'fp16']);
 export type ModelChoiceView = z.infer<typeof modelChoiceSchema>;
 
+/**
+ * Diktatsprache (pro Firma, ABARBEITUNG 2.6): Deutsch ist der Markenkern
+ * und Standard (DE-optimiertes Finetune-Modell); Englisch nutzt das
+ * originale multilinguale large-v3-turbo-Modell (Entscheidung E39).
+ */
+export const dictationLanguageSchema = z.enum(['de', 'en']);
+export type DictationLanguage = z.infer<typeof dictationLanguageSchema>;
+
 /** Zustand des systemweiten Diktat-Flows (siehe shared/dictation-flow.ts). */
 export const dictationFlowStateSchema = z.enum(['idle', 'recording', 'transcribing', 'delivering']);
 export type DictationFlowStateView = z.infer<typeof dictationFlowStateSchema>;
@@ -68,8 +76,12 @@ export const appStatusSchema = z.object({
   models: z.array(modelStatusSchema),
   /** Aktive Whisper-Modellwahl (globale Konfig). */
   modelChoice: modelChoiceSchema,
+  /** Diktatsprache der aktiven Firma (ohne Firma: de). */
+  dictationLanguage: dictationLanguageSchema,
   modelsReady: z.boolean(),
   engineReady: z.boolean(),
+  /** Deutsche Statusmeldung der Engine (z. B. Modellwechsel), sonst null. */
+  engineHinweis: z.string().nullable(),
   dictationActive: z.boolean(),
   lastError: z.string().nullable(),
   /** Systemweites Diktat (M3). */

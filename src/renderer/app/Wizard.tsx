@@ -21,7 +21,7 @@ import {
   type ReactElement,
 } from 'react';
 import { EMAIL_LAX_PATTERN, type CreateCompanyResult } from '../../shared/company';
-import type { AppStatus, ModelProgress, SystemInfo } from '../../shared/schema';
+import type { AppStatus, DictationLanguage, ModelProgress, SystemInfo } from '../../shared/schema';
 import type { WizardMode } from './App';
 import { formatAccelerator, formatBytes } from './format';
 
@@ -107,6 +107,9 @@ export function Wizard(props: WizardProps): ReactElement {
   });
   const [syncChecked, setSyncChecked] = useState(false);
   const [strategie, setStrategie] = useState<'desktop' | 'lokal-mit-verknuepfung'>('desktop');
+
+  // Schritt 4: Diktatsprache (Deutsch empfohlen und Standard, Paket B1).
+  const [sprache, setSprache] = useState<DictationLanguage>('de');
 
   // Schritt 5: Modellwahl.
   const [modell, setModell] = useState<'q5_0' | 'fp16'>('q5_0');
@@ -195,7 +198,12 @@ export function Wizard(props: WizardProps): ReactElement {
 
   const models = status?.models ?? [];
   const vadPresent = models.some((entry) => entry.id === 'silero-vad' && entry.present);
-  const selectedModelId = modell === 'fp16' ? 'whisper-fp16' : 'whisper-q5';
+  const selectedModelId =
+    sprache === 'en'
+      ? 'turbo-q5_0-multilingual'
+      : modell === 'fp16'
+        ? 'whisper-fp16'
+        : 'whisper-q5';
   const selectedPresent = models.some((entry) => entry.id === selectedModelId && entry.present);
   const modelsReadyForChoice = vadPresent && selectedPresent;
 
@@ -221,12 +229,16 @@ export function Wizard(props: WizardProps): ReactElement {
     setDownloading(true);
     setDownloadError(null);
     try {
-      const choiceResult = await window.voicewall.setModelChoice(modell);
-      if (!choiceResult.ok) {
-        setDownloadError(choiceResult.message);
-        return;
+      // Die deutsche Modellwahl (q5_0/fp16) betrifft nur die Sprache Deutsch;
+      // Englisch nutzt immer das mehrsprachige Originalmodell.
+      if (sprache === 'de') {
+        const choiceResult = await window.voicewall.setModelChoice(modell);
+        if (!choiceResult.ok) {
+          setDownloadError(choiceResult.message);
+          return;
+        }
       }
-      const result = await window.voicewall.prepareModels();
+      const result = await window.voicewall.prepareModels(sprache);
       if (!result.ok) {
         setDownloadError(result.message);
       }
@@ -234,7 +246,7 @@ export function Wizard(props: WizardProps): ReactElement {
       setDownloading(false);
       await onRefreshStatus();
     }
-  }, [modell, onRefreshStatus]);
+  }, [modell, sprache, onRefreshStatus]);
 
   const applySetup = useCallback(async () => {
     setBusy(true);
@@ -270,6 +282,7 @@ export function Wizard(props: WizardProps): ReactElement {
         },
         modell,
         ordnernameEdited ? ordnername.trim() : undefined,
+        mode === 'first-run' ? sprache : undefined,
       );
       if (!created.ok) {
         setApplyError(
@@ -299,6 +312,7 @@ export function Wizard(props: WizardProps): ReactElement {
     mode,
     status,
     modell,
+    sprache,
     hotkey,
     name,
     strategie,
@@ -622,25 +636,54 @@ export function Wizard(props: WizardProps): ReactElement {
                   Diktatsprache
                 </h2>
                 <p className="lede">
-                  VoiceWall ist auf deutsches Diktat optimiert. Das Erkennungsmodell ist eine
-                  deutsch-feinabgestimmte Whisper-Variante; die Sprache wird fest übergeben, ohne
-                  automatische Spracherkennung. Das spart Zeit und verhindert Sprachwechsel-Fehler.
+                  VoiceWall ist primär auf deutsches Diktat optimiert. Die Sprache gilt pro Firma
+                  und wird der Spracherkennung fest übergeben, ohne automatische Spracherkennung.
+                  Das spart Zeit und verhindert Sprachwechsel-Fehler.
                 </p>
-                <table className="proto-table">
-                  <tbody>
-                    <tr>
-                      <th scope="row">Diktatsprache</th>
-                      <td className="value-ok">Deutsch (de)</td>
-                    </tr>
-                    <tr>
-                      <th scope="row">Oberflächensprache</th>
-                      <td>Deutsch</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div className="choice-list" role="radiogroup" aria-label="Diktatsprache">
+                  <label className="choice-card">
+                    <input
+                      type="radio"
+                      name="sprache"
+                      value="de"
+                      checked={sprache === 'de'}
+                      data-testid="wizard-language-de"
+                      onChange={() => {
+                        setSprache('de');
+                        setDownloadError(null);
+                      }}
+                    />
+                    <span className="choice-title">
+                      Deutsch (de) <span className="badge">empfohlen</span>
+                    </span>
+                    <p className="choice-desc">
+                      Nutzt das deutsch-feinabgestimmte Whisper-Modell (der Markenkern dieser
+                      Ausgabe): beste deutsche Erkennung, Standard für neue Firmen.
+                    </p>
+                  </label>
+                  <label className="choice-card">
+                    <input
+                      type="radio"
+                      name="sprache"
+                      value="en"
+                      checked={sprache === 'en'}
+                      data-testid="wizard-language-en"
+                      onChange={() => {
+                        setSprache('en');
+                        setDownloadError(null);
+                      }}
+                    />
+                    <span className="choice-title">Englisch (en)</span>
+                    <p className="choice-desc">
+                      Nutzt das mehrsprachige Whisper-Originalmodell (large-v3-turbo). Ehrlicher
+                      Hinweis: VoiceWall ist primär für Deutsch optimiert; für Englisch fällt ein
+                      zusätzlicher einmaliger Modell-Download von ca. 574 MB an.
+                    </p>
+                  </label>
+                </div>
                 <p className="note">
-                  Weitere Diktatsprachen sind für eine spätere Version vorgesehen. Deutsch ist der
-                  Markenkern dieser Ausgabe.
+                  Die Oberflächensprache bleibt Deutsch. Die Diktatsprache lässt sich später in der
+                  Verwaltung pro Firma ändern.
                 </p>
               </>
             )}
@@ -650,6 +693,7 @@ export function Wizard(props: WizardProps): ReactElement {
                 headingRef={headingRef}
                 models={models}
                 systemInfo={systemInfo}
+                sprache={sprache}
                 modell={modell}
                 onModellChange={(choice) => {
                   setModell(choice);
@@ -790,12 +834,16 @@ export function Wizard(props: WizardProps): ReactElement {
                       <>
                         <tr>
                           <th scope="row">Sprache</th>
-                          <td>Deutsch (de)</td>
+                          <td>{sprache === 'en' ? 'Englisch (en)' : 'Deutsch (de)'}</td>
                         </tr>
                         <tr>
                           <th scope="row">Modell</th>
                           <td>
-                            {modell === 'fp16' ? 'fp16 (maximale Genauigkeit)' : 'Q5_0 (empfohlen)'}
+                            {sprache === 'en'
+                              ? 'Mehrsprachig (large-v3-turbo, Q5_0)'
+                              : modell === 'fp16'
+                                ? 'fp16 (maximale Genauigkeit)'
+                                : 'Q5_0 (empfohlen)'}
                           </td>
                         </tr>
                         <tr>
@@ -980,6 +1028,7 @@ function StepModell(
   props: HeadingRefProp & {
     readonly models: AppStatus['models'];
     readonly systemInfo: SystemInfo | null;
+    readonly sprache: DictationLanguage;
     readonly modell: 'q5_0' | 'fp16';
     readonly onModellChange: (choice: 'q5_0' | 'fp16') => void;
     readonly vadPresent: boolean;
@@ -994,6 +1043,7 @@ function StepModell(
   const fp16Erlaubt = systemInfo?.fp16Erlaubt ?? false;
   const q5 = props.models.find((entry) => entry.id === 'whisper-q5');
   const fp16 = props.models.find((entry) => entry.id === 'whisper-fp16');
+  const multilingual = props.models.find((entry) => entry.id === 'turbo-q5_0-multilingual');
   const vad = props.models.find((entry) => entry.id === 'silero-vad');
   const ready = props.selectedPresent && props.vadPresent;
 
@@ -1008,6 +1058,86 @@ function StepModell(
       )}
     </p>
   );
+
+  if (props.sprache === 'en') {
+    // Englisch: es gibt genau ein passendes Modell (mehrsprachiges Original).
+    return (
+      <>
+        <h2 ref={props.headingRef} tabIndex={-1}>
+          Erkennungsmodell
+        </h2>
+        <p className="lede">
+          Für die Diktatsprache Englisch nutzt VoiceWall das mehrsprachige Whisper-Originalmodell
+          (large-v3-turbo, Q5_0). Der Download erfolgt einmalig; danach arbeitet VoiceWall zu 100 %
+          offline.
+        </p>
+        <div className="choice-list">
+          <label className="choice-card">
+            <span className="choice-title">
+              Englisch / mehrsprachig (large-v3-turbo, Q5_0){' '}
+              <span className="badge">für Englisch</span>
+            </span>
+            <p className="choice-desc" data-testid="wizard-model-multilingual">
+              Originalmodell von OpenAI/whisper.cpp, nicht deutsch-optimiert.{' '}
+              {multilingual !== undefined ? formatBytes(multilingual.byteSize) : ''}.
+            </p>
+            {statusLine(multilingual)}
+          </label>
+        </div>
+        <p className="field-hint">
+          Zusätzlich wird das kleine Sprach-Erkennungsmodell (VAD,{' '}
+          {vad !== undefined ? formatBytes(vad.byteSize) : 'unter 1 MB'}) geladen:{' '}
+          {props.vadPresent ? 'vorhanden.' : 'noch nicht geladen.'}
+        </p>
+        <div aria-live="polite">
+          {props.downloading && props.progress !== null && (
+            <>
+              <progress
+                max={100}
+                value={props.progress.percent ?? 0}
+                aria-label={`Download ${props.progress.label}`}
+              />
+              <p className="progress-line" data-testid="wizard-download-progress">
+                {props.progress.label}: {formatBytes(props.progress.receivedBytes)}
+                {props.progress.totalBytes !== null
+                  ? ` von ${formatBytes(props.progress.totalBytes)}`
+                  : ''}
+                {props.progress.percent !== null ? ` (${props.progress.percent.toFixed(0)} %)` : ''}
+              </p>
+            </>
+          )}
+          {ready && (
+            <p className="note" data-testid="wizard-model-ready">
+              Alle benötigten Modelldateien sind vorhanden und gegen die fest hinterlegten
+              Prüfsummen verifiziert. Es ist kein Download nötig.
+            </p>
+          )}
+        </div>
+        {!ready && (
+          <div className="actions">
+            <button
+              type="button"
+              className="primary"
+              disabled={props.downloading}
+              data-testid="wizard-model-download"
+              onClick={props.onDownload}
+            >
+              {props.downloading ? 'Lädt ...' : 'Modell jetzt laden (einmalig)'}
+            </button>
+          </div>
+        )}
+        {props.downloadError !== null && (
+          <div className="note error" role="alert">
+            <p>{props.downloadError}</p>
+          </div>
+        )}
+        <p className="field-hint">
+          Hinweis: Der Modell-Download ist der einzige Moment, in dem VoiceWall das Internet nutzt
+          (huggingface.co, mit Prüfsummen-Verifikation).
+        </p>
+      </>
+    );
+  }
 
   return (
     <>

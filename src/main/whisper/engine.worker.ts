@@ -26,6 +26,7 @@ import {
   type WhisperVadContext,
 } from '@fugood/whisper.node';
 import { TARGET_SAMPLE_RATE } from '../../shared/pcm';
+import type { DictationLanguage } from '../../shared/schema';
 import { workerCommandSchema, type WorkerCommand, type WorkerEvent } from './protocol';
 import {
   detectSpeech,
@@ -55,11 +56,14 @@ interface EngineState {
 let state: EngineState | null = null;
 
 /**
- * Initial-Prompt aus dem Fach-Woerterbuch (Stufe 1), gesetzt per
- * `set-prompt`. Er beeinflusst NUR transcribeData; die VAD-Schleuse
- * (Anti-Halluzination) laeuft davor und unabhaengig davon.
+ * Diktat-Kontext (Stufe 1 plus Paket B1), gesetzt per `set-context`:
+ * Initial-Prompt aus dem Fach-Woerterbuch und feste Diktatsprache der
+ * aktiven Firma. Beides beeinflusst NUR transcribeData; die VAD-Schleuse
+ * (Anti-Halluzination) laeuft davor und unabhaengig davon. Das geladene
+ * Modell passt der EngineManager zur Sprache an (Neustart bei Wechsel).
  */
 let initialPrompt: string | null = null;
+let dictationLanguage: DictationLanguage = 'de';
 
 /** Akkumulierte PCM-Chunks des laufenden (noch offenen) Sprachbereichs. */
 let pendingChunks: Int16Array[] = [];
@@ -96,13 +100,10 @@ async function processSegment(
   pcm: ArrayBuffer,
   requestId?: string,
 ): Promise<void> {
-  const outcome = await transcribeWithVadGate(
-    active.whisper,
-    active.vad,
-    pcm,
-    active.tuning,
-    initialPrompt ?? undefined,
-  );
+  const outcome = await transcribeWithVadGate(active.whisper, active.vad, pcm, active.tuning, {
+    language: dictationLanguage,
+    ...(initialPrompt === null ? {} : { prompt: initialPrompt }),
+  });
   if (!outcome.hadSpeech) {
     send(requestId === undefined ? { type: 'silence' } : { type: 'silence', requestId });
     return;
@@ -149,7 +150,7 @@ async function tryEndpoint(active: EngineState): Promise<void> {
 
   const started = Date.now();
   const { promise } = active.whisper.transcribeData(pcm, {
-    language: 'de',
+    language: dictationLanguage,
     temperature: 0,
     ...(initialPrompt === null ? {} : { prompt: initialPrompt }),
   });
@@ -253,11 +254,12 @@ function handleCommand(command: WorkerCommand): void {
         return Promise.resolve();
       });
       return;
-    case 'set-prompt':
+    case 'set-context':
       // In der Verarbeitungskette setzen, damit ein laufendes Segment noch
-      // mit dem bisherigen Prompt abgeschlossen wird (deterministisch).
+      // mit dem bisherigen Kontext abgeschlossen wird (deterministisch).
       enqueue(() => {
         initialPrompt = command.prompt;
+        dictationLanguage = command.language;
         return Promise.resolve();
       });
       return;

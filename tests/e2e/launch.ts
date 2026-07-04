@@ -7,11 +7,25 @@
  * `withCompany` legt deshalb vor den Assertions eine Testfirma ueber die
  * IPC-Bruecke an und laedt das Fenster neu.
  */
-import { copyFileSync, existsSync, linkSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
-import { modelsAvailable, sileroModelPath, whisperModelPath } from '../integration/model-fixtures';
+import { ALL_MODEL_DESCRIPTORS } from '../../src/main/model/model-catalog';
+import {
+  modelsAvailable,
+  multilingualModelPath,
+  sileroModelPath,
+  whisperModelPath,
+} from '../integration/model-fixtures';
 import { getMainUiWindow } from './main-window';
 
 const projectRoot = join(import.meta.dirname, '../..');
@@ -56,7 +70,12 @@ function linkModelsInto(userDataDir: string): void {
   }
   const modelsDir = join(userDataDir, 'models');
   mkdirSync(modelsDir, { recursive: true });
-  for (const source of [whisperModelPath, sileroModelPath]) {
+  // Das multilinguale EN-Modell (Paket B1) ist optional: es wird nur
+  // verlinkt, wenn es lokal vorhanden ist (EN-Tests skippen sonst selbst).
+  const sources = [whisperModelPath, sileroModelPath, multilingualModelPath].filter((source) =>
+    existsSync(source),
+  );
+  for (const source of sources) {
     const target = join(modelsDir, basename(source));
     if (existsSync(target)) {
       continue;
@@ -67,26 +86,63 @@ function linkModelsInto(userDataDir: string): void {
       copyFileSync(source, target);
     }
   }
+  // Integritaets-Marker vorbefuellen (wie er nach der ersten echten
+  // SHA-256-Verifikation aussieht): sonst hasht der App-Start im frischen
+  // Test-userData ueber 1 GB Modelldateien voll und die ersten UI-Asserts
+  // laufen in den Timeout. Die Sicherheitsentscheidung bleibt unveraendert
+  // an den Katalog-Konstanten; die verlinkten Dateien sind die bereits
+  // verifizierten Originale (Hardlink, gleiche Inode).
+  const marker: Record<string, { sha256: string; byteSize: number; mtimeMs: number }> = {};
+  for (const descriptor of ALL_MODEL_DESCRIPTORS) {
+    const target = join(modelsDir, descriptor.fileName);
+    if (!existsSync(target)) {
+      continue;
+    }
+    const info = statSync(target);
+    marker[descriptor.fileName] = {
+      sha256: descriptor.sha256,
+      byteSize: info.size,
+      mtimeMs: info.mtimeMs,
+    };
+  }
+  writeFileSync(join(modelsDir, '.model-integrity.json'), JSON.stringify(marker, null, 2), {
+    mode: 0o600,
+  });
 }
 
-/** Legt ueber die IPC-Bruecke eine Testfirma an (Standard: Desktop-Strategie). */
+/**
+ * Legt ueber die IPC-Bruecke eine Testfirma an (Standard: Desktop-Strategie,
+ * Diktatsprache Deutsch; `sprache: 'en'` legt eine EN-Firma an, Paket B1).
+ */
 export async function createTestCompany(
   window: Page,
   name = 'Testfirma GmbH',
+  sprache: 'de' | 'en' = 'de',
 ): Promise<{ ok: boolean; pfad?: string }> {
   return window.evaluate(
-    (companyName: string) =>
+    (args: { name: string; sprache: 'de' | 'en' }) =>
       (
         globalThis as unknown as {
           voicewall: {
             createCompany: (
               n: string,
               strategie: 'desktop',
+              details?: undefined,
+              modell?: undefined,
+              ordnername?: undefined,
+              sprache?: 'de' | 'en',
             ) => Promise<{ ok: boolean; pfad?: string }>;
           };
         }
-      ).voicewall.createCompany(companyName, 'desktop'),
-    name,
+      ).voicewall.createCompany(
+        args.name,
+        'desktop',
+        undefined,
+        undefined,
+        undefined,
+        args.sprache,
+      ),
+    { name, sprache },
   );
 }
 

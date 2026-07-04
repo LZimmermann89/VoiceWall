@@ -35,6 +35,7 @@ import type {
   AufbereitungConfig,
   DeliveryResult,
   DevDictateResult,
+  DictationLanguage,
   ModelChoiceView,
   ModelProgress,
   PingResponse,
@@ -57,8 +58,12 @@ export interface VoiceWallBridge {
   readonly getStatus: () => Promise<AppStatus>;
   /** Informierte Mikrofon-Einwilligung erteilen (mit Zeitstempel gespeichert). */
   readonly grantConsent: () => Promise<ActionResult>;
-  /** Fehlende Modelle laden (einmaliger Download) und Engine starten. */
-  readonly prepareModels: () => Promise<ActionResult>;
+  /**
+   * Fehlende Modelle der aktiven Diktatsprache laden (einmaliger Download)
+   * und Engine starten. Der optionale Sprach-Parameter dient dem Wizard
+   * (die Sprache steht dort fest, bevor die Firma existiert).
+   */
+  readonly prepareModels: (sprache?: DictationLanguage) => Promise<ActionResult>;
   /** Testaufnahme starten (oeffnet das versteckte Capture-Fenster). */
   readonly startDictation: () => Promise<ActionResult>;
   /** Testaufnahme stoppen und letztes Segment verarbeiten. */
@@ -110,9 +115,12 @@ export interface VoiceWallBridge {
     details?: CompanyDetails,
     modell?: ModelChoiceView,
     ordnername?: string,
+    sprache?: DictationLanguage,
   ) => Promise<CreateCompanyResult>;
   /** Aktive Firma wechseln. */
   readonly setActiveCompany: (pfad: string) => Promise<ActionResult>;
+  /** Diktatsprache der aktiven Firma wechseln (Paket B1). */
+  readonly setCompanyLanguage: (sprache: DictationLanguage) => Promise<ActionResult>;
   /** Sync-Pruefung des Desktop-Zielordners (Risiko R8). */
   readonly checkDesktopSync: () => Promise<SyncCheckView>;
   /** Letztes Transkript als Diktat in der aktiven Firma speichern. */

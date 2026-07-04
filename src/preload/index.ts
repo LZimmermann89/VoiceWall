@@ -59,8 +59,8 @@ const bridge: VoiceWallBridge = {
   getStatus: async () => appStatusSchema.parse(await ipcRenderer.invoke(IpcChannel.GetStatus)),
   grantConsent: async () =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.GrantConsent)),
-  prepareModels: async () =>
-    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.PrepareModels)),
+  prepareModels: async (sprache) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.PrepareModels, sprache)),
   startDictation: async () =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.StartDictation)),
   stopDictation: async () =>
@@ -105,7 +105,7 @@ const bridge: VoiceWallBridge = {
     companyListViewSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanyList)),
   previewCompanyName: async (name) =>
     companyNamePreviewSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanyPreviewName, name)),
-  createCompany: async (name, strategie, details, modell, ordnername) =>
+  createCompany: async (name, strategie, details, modell, ordnername, sprache) =>
     createCompanyResultSchema.parse(
       await ipcRenderer.invoke(IpcChannel.CompanyCreate, {
         name,
@@ -113,10 +113,13 @@ const bridge: VoiceWallBridge = {
         details,
         modell,
         ordnername,
+        sprache,
       }),
     ),
   setActiveCompany: async (pfad) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanySetActive, pfad)),
+  setCompanyLanguage: async (sprache) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanySetLanguage, sprache)),
   checkDesktopSync: async () =>
     syncCheckViewSchema.parse(await ipcRenderer.invoke(IpcChannel.CompanyCheckSync)),
   saveLastDictate: async () =>

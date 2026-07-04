@@ -226,6 +226,7 @@ if (!hasSingleInstanceLock) {
     // Zugriff aufgeloest (OneDrive-/Known-Folder-Umleitung, paths.ts); im
     // Test ersetzt VOICEWALL_TEST_BASE_DIR den Desktop vollstaendig.
     const testBase = testBaseDir();
+    const activeOrchestrator = orchestrator;
     companyManager = new CompanyManager({
       userDataPath: app.getPath('userData'),
       logger,
@@ -238,14 +239,19 @@ if (!hasSingleInstanceLock) {
         return desktop.ok ? desktop.value : null;
       },
       localBase: testBase !== null ? join(testBase, 'VoiceWall-lokal') : localStorageBaseDir(),
+      // Firmen-/Sprachwechsel aendert Modellbedarf und Status (Paket B1).
+      onCompanyChanged: () => {
+        activeOrchestrator.notifyStatusChanged();
+      },
     });
     companyManager.register();
 
-    // Fach-Woerterbuch (Stufe 1): der Orchestrator holt sich vor jedem
-    // Diktat-Start den Initial-Prompt der aktiven Firma (gecacht ueber
+    // Diktat-Kontext (Stufe 1 plus Paket B1): der Orchestrator holt sich vor
+    // jedem Diktat-Start die Diktatsprache der aktiven Firma (bestimmt das
+    // Modell) und den Initial-Prompt des Fach-Woerterbuchs (gecacht ueber
     // mtime im vokabular-store; Kappung wird als Anzahl geloggt).
     const companies = companyManager;
-    orchestrator.setPromptProvider(() => companies.activePrompt());
+    orchestrator.setDictationContextProvider(() => companies.activeDictationContext());
 
     flowController = new DictationFlowController({
       userDataPath: app.getPath('userData'),

@@ -14,6 +14,17 @@ import type {
   WhisperVadContext,
 } from '@fugood/whisper.node';
 import { TARGET_SAMPLE_RATE } from '../../shared/pcm';
+import type { DictationLanguage } from '../../shared/schema';
+
+/**
+ * Kontext einer Transkription (Paket B1): Diktatsprache (fest uebergeben,
+ * keine automatische Spracherkennung; Default 'de') und optionaler
+ * Initial-Prompt aus dem Fach-Woerterbuch (Stufe 1).
+ */
+export interface TranscriptionContext {
+  readonly language?: DictationLanguage;
+  readonly prompt?: string;
+}
 
 export interface VadTuning {
   readonly threshold: number;
@@ -57,26 +68,28 @@ export async function detectSpeech(
  * VAD-Schleuse plus Transkription. Findet der VAD keine Sprache, wird nicht
  * transkribiert und hadSpeech=false zurueckgegeben (kein Halluzinationstext).
  *
- * `prompt` ist der optionale Initial-Prompt aus dem Fach-Woerterbuch
- * (Stufe 1). Er wird NUR an transcribeData gereicht, NIE an den VAD: die
- * Anti-Halluzinations-Schleuse entscheidet vor und unabhaengig vom Prompt,
- * Stille erzeugt auch mit gesetztem Prompt keinen Text.
+ * `context` traegt die Diktatsprache (fest, Default 'de') und den optionalen
+ * Initial-Prompt aus dem Fach-Woerterbuch (Stufe 1). Beides wird NUR an
+ * transcribeData gereicht, NIE an den VAD: die Anti-Halluzinations-Schleuse
+ * entscheidet vor und unabhaengig davon, Stille erzeugt auch mit gesetztem
+ * Prompt keinen Text.
  */
 export async function transcribeWithVadGate(
   whisper: WhisperContext,
   vad: WhisperVadContext,
   pcm: ArrayBuffer,
   tuning: VadTuning,
-  prompt?: string,
+  context?: TranscriptionContext,
 ): Promise<SegmentOutcome> {
   const audioMs = (pcm.byteLength / 2 / TARGET_SAMPLE_RATE) * 1000;
   const speechSegments = await detectSpeech(vad, pcm, tuning);
   if (speechSegments.length === 0) {
     return { speechSegments, hadSpeech: false, text: '', durationMs: 0, audioMs };
   }
+  const prompt = context?.prompt;
   const started = Date.now();
   const { promise } = whisper.transcribeData(pcm, {
-    language: 'de',
+    language: context?.language ?? 'de',
     temperature: 0,
     ...(prompt === undefined || prompt.length === 0 ? {} : { prompt }),
   });

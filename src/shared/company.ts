@@ -12,6 +12,7 @@
  * Dieses Modul bleibt plattformneutral (nur zod, kein Node/Electron/DOM).
  */
 import { z } from 'zod';
+import { dictationLanguageSchema } from './schema';
 
 /** Aktuelle Schema-Version des Firmenordners (.voicewall/.schema-version). */
 export const COMPANY_SCHEMA_VERSION = 1;
@@ -123,7 +124,14 @@ export const companyConfigSchema = z
         hinweis: z.string().max(2000).default(''),
       })
       .passthrough(),
-    sprache: z.string().min(2).max(16).default('de'),
+    /**
+     * Diktatsprache der Firma (Paket B1, Entscheidung E39): 'de' (Standard,
+     * DE-Finetune-Modell) oder 'en' (multilinguales Originalmodell).
+     * Bestehende Konfigs ohne Feld bleiben gueltig (Default 'de'); ein von
+     * Hand eingetragener unbekannter Wert faellt kontrolliert auf 'de'
+     * zurueck (catch), statt die ganze Firmen-Konfig unlesbar zu machen.
+     */
+    sprache: dictationLanguageSchema.default('de').catch('de'),
     modell: z.string().min(1).max(100).default('q5_0'),
     erstelltMit: z.string().max(100),
     erstellt: isoDateTimeSchema,
@@ -143,6 +151,8 @@ export const companyInfoSchema = z.object({
   anzeigename: z.string(),
   /** Ordnername (sanitisiertes Pfadsegment). */
   ordnername: z.string(),
+  /** Diktatsprache der Firma (aus der firmenbezogenen Konfig). */
+  sprache: dictationLanguageSchema,
   /** True, wenn dies die aktive Firma ist. */
   aktiv: z.boolean(),
 });

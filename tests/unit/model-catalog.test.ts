@@ -4,9 +4,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  ALL_MODEL_DESCRIPTORS,
   isValidSha256Hex,
   MODEL_CATALOG,
   MODEL_DESCRIPTORS,
+  transcriptModelNameFor,
+  whisperDescriptorForLanguage,
 } from '../../src/main/model/model-catalog';
 
 describe('Modellkatalog', () => {
@@ -37,11 +40,49 @@ describe('Modellkatalog', () => {
   });
 
   it('nutzt ausschliesslich stabile resolve/main-URLs auf huggingface.co', () => {
-    for (const descriptor of MODEL_DESCRIPTORS) {
+    for (const descriptor of ALL_MODEL_DESCRIPTORS) {
       expect(descriptor.url).toMatch(/^https:\/\/huggingface\.co\/.+\/resolve\/main\//);
       // Nie eine signierte CDN-URL (cdn-lfs) hardcoden.
       expect(descriptor.url).not.toContain('cdn-lfs');
     }
+  });
+
+  it('haelt die R14-verifizierte Checksumme des multilingualen EN-Modells (B1)', () => {
+    // Selbst berechneter SHA-256 UND identischer Hugging-Face-LFS-OID
+    // (04.07.2026, ggerganov/whisper.cpp, ggml-large-v3-turbo-q5_0.bin).
+    expect(MODEL_CATALOG.whisperTurboMultilingual.sha256).toBe(
+      '394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2',
+    );
+    expect(MODEL_CATALOG.whisperTurboMultilingual.byteSize).toBe(574_041_195);
+    expect(MODEL_CATALOG.whisperTurboMultilingual.id).toBe('turbo-q5_0-multilingual');
+  });
+
+  it('EN-Modell ist KEIN Pflichtmodell des Standardbetriebs (kein Auto-Download)', () => {
+    expect(MODEL_DESCRIPTORS.map((descriptor) => descriptor.id)).not.toContain(
+      'turbo-q5_0-multilingual',
+    );
+    expect(ALL_MODEL_DESCRIPTORS.map((descriptor) => descriptor.id)).toContain(
+      'turbo-q5_0-multilingual',
+    );
+  });
+});
+
+describe('Modellwahl je Diktatsprache (E39)', () => {
+  it('Deutsch nutzt das DE-Finetune gemaess Modellwahl', () => {
+    expect(whisperDescriptorForLanguage('de', 'q5_0').id).toBe('whisper-q5');
+    expect(whisperDescriptorForLanguage('de', 'fp16').id).toBe('whisper-fp16');
+  });
+
+  it('Englisch nutzt immer das multilinguale Originalmodell', () => {
+    expect(whisperDescriptorForLanguage('en', 'q5_0').id).toBe('turbo-q5_0-multilingual');
+    expect(whisperDescriptorForLanguage('en', 'fp16').id).toBe('turbo-q5_0-multilingual');
+  });
+
+  it('Modellkennung der Diktat-Metadaten folgt Sprache und Modellwahl', () => {
+    expect(transcriptModelNameFor('de', 'q5_0')).toBe('whisper-large-v3-turbo-german-q5_0');
+    expect(transcriptModelNameFor('de', 'fp16')).toBe('whisper-large-v3-turbo-german-fp16');
+    expect(transcriptModelNameFor('en', 'q5_0')).toBe('whisper-large-v3-turbo-q5_0');
+    expect(transcriptModelNameFor('en', 'fp16')).toBe('whisper-large-v3-turbo-q5_0');
   });
 });
 

@@ -37,14 +37,21 @@ export const workerCommandSchema = z.discriminatedUnion('type', [
   /** Akkumuliertes Segment ohne Transkription verwerfen. */
   z.object({ type: z.literal('reset') }),
   /**
-   * Initial-Prompt fuer alle folgenden Transkriptionen setzen (Stufe 1,
-   * Fach-Woerterbuch: kommaseparierte Begriffsliste, im Main-Prozess bereits
-   * hart gekappt). null loescht den Prompt. WICHTIG: Der VAD-Gate-Pfad
-   * (hadSpeech) bleibt davon unberuehrt; bei Stille wird gar nicht erst
-   * transkribiert, ein gesetzter Prompt kann also keine Halluzination bei
-   * Stille ausloesen (Integrationstest vokabular-whisper.test.ts).
+   * Diktat-Kontext fuer alle folgenden Transkriptionen setzen (Stufe 1 plus
+   * Paket B1): `language` ist die feste Diktatsprache der aktiven Firma
+   * (das passende Modell laedt der EngineManager; ein Modellwechsel ist ein
+   * Engine-Neustart), `prompt` der Initial-Prompt des Fach-Woerterbuchs
+   * (kommaseparierte Begriffsliste, im Main-Prozess bereits hart gekappt;
+   * null loescht den Prompt). WICHTIG: Der VAD-Gate-Pfad (hadSpeech) bleibt
+   * davon unberuehrt; bei Stille wird gar nicht erst transkribiert, ein
+   * gesetzter Prompt kann also keine Halluzination bei Stille ausloesen
+   * (Integrationstest vokabular-whisper.test.ts).
    */
-  z.object({ type: z.literal('set-prompt'), prompt: z.string().max(2000).nullable() }),
+  z.object({
+    type: z.literal('set-context'),
+    language: z.enum(['de', 'en']),
+    prompt: z.string().max(2000).nullable(),
+  }),
   /**
    * Einmal-Transkription eines vollstaendigen PCM-Segments. Genutzt vom
    * Dev-/Test-Injektionskanal: geht durch dieselbe VAD-Schleuse wie echtes
