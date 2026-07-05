@@ -37,3 +37,7 @@ Thumbs.db
 # Internes Planungsdokument, bleibt lokal (Strategie, Preise, Risikoregister)
 ABARBEITUNG.md
 ROADMAP.md
+
+# Interne Prozess-Dokumentation, bleibt lokal
+intern/
+release/

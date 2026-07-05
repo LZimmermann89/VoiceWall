@@ -14,7 +14,7 @@ Vertreten durch die Geschäftsführung: Clara Fernau, Theodor Fernau,
 Lars Zimmermann
 
 Telefon: +49 6150 184973-0
-E-Mail: kontakt@der-ki-auditor.de
+E-Mail: info@der-ki-auditor.de
 
 Registergericht: Amtsgericht Darmstadt
 Registernummer: HRB 7378
@@ -37,8 +37,7 @@ angezeigt; die App benötigt dafür keinen Internetzugriff.
 
 Hinweise zur Nutzung der Software (Nutzungsrecht, Gewährleistungs- und
 Haftungsrahmen) stehen in der Datei `LICENSE` im Wurzelverzeichnis des
-Quellcodes. Die Widerrufsbelehrung für den Vor-Ort-Installationsdienst
-steht getrennt in `rechtstexte/WIDERRUF.md`, die Datenschutzerklärung in
+Quellcodes. Die Datenschutzerklärung steht in
 `rechtstexte/DATENSCHUTZ.md`.
 
 ## Hinweis zur Rechtsgrundlage

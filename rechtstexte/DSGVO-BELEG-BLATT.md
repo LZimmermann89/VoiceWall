@@ -10,7 +10,7 @@ nicht pauschal "DSGVO-fertig". Die Pflichten für Ihre eigenen Inhalte
 bleiben bei Ihnen (Abschnitt 5).
 
 Herausgeber: FERNAU Präzisionstechnik GmbH, Merianstraße 5a, 64291
-Darmstadt, kontakt@der-ki-auditor.de (Anbieterangaben:
+Darmstadt, info@der-ki-auditor.de (Anbieterangaben:
 `rechtstexte/IMPRESSUM.md`). Stand: 03.07.2026.
 
 ## 1. Kein Auftragsverarbeiter, kein AVV nötig (Art. 28 DSGVO)
@@ -75,7 +75,7 @@ entfällt der Download in der Regel ganz (Offline-Einspielung).
   und wird standardmäßig nach etwa einer Sekunde durch den vorherigen
   Inhalt ersetzt. Ein installierter Clipboard-Manager des Betreibers
   kann es in diesem Fenster mitlesen und historisieren (Details:
-  `docs/ENTSCHEIDUNGEN.md`, E2/E3). Prüfen Sie Ihre
+  dokumentiert). Prüfen Sie Ihre
   Clipboard-Werkzeuge, wenn Sie hochsensible Inhalte diktieren.
 - **Swap und Kernel-Speicherabbilder (Fußnote zu N3):** "RAM-only"
   bedeutet: die Anwendung schreibt Audio nie selbst auf die Platte. Das

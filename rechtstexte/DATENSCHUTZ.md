@@ -12,7 +12,7 @@ existiert, der sie empfangen könnte.**
 FERNAU Präzisionstechnik GmbH
 Merianstraße 5a, 64291 Darmstadt, Deutschland
 Telefon: +49 6150 184973-0
-E-Mail: kontakt@der-ki-auditor.de
+E-Mail: info@der-ki-auditor.de
 
 Vollständige Anbieterangaben: siehe `rechtstexte/IMPRESSUM.md`.
 
@@ -57,7 +57,7 @@ hinterlegte SHA-256-Prüfsummen. Transparenzhinweis dazu:
   gesendet.
 - Der Download lässt sich vollständig vermeiden: Bei der
   Vor-Ort-Installation werden die Modelle in der Regel offline vom
-  Übergabemedium eingespielt (siehe `docs/ON-SITE-PROTOKOLL.md`). Danach
+  Übergabemedium eingespielt. Danach
   arbeitet die App dauerhaft ohne jede Netzverbindung.
 
 Nach der Einrichtung baut VoiceWall keine Netzwerkverbindung mehr auf.
@@ -86,7 +86,7 @@ der Verarbeitung, Datenübertragbarkeit und Widerspruch. Sie haben zudem
 das Recht auf Beschwerde bei einer Datenschutz-Aufsichtsbehörde; für den
 Anbieter zuständig ist der Hessische Beauftragte für Datenschutz und
 Informationsfreiheit. Kontakt für alle Anliegen:
-kontakt@der-ki-auditor.de.
+info@der-ki-auditor.de.
 
 Für die Inhalte Ihrer eigenen Diktate richten sich Betroffenenrechte an
 Sie als Verantwortlichen, nicht an den Software-Anbieter; VoiceWall

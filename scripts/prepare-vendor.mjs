@@ -257,4 +257,4 @@ for (const model of manifest.models) {
 console.log('');
 console.log(`Vendor-Stand fuer ${platform} ist bereit (vendor/).`);
 console.log('Naechster Schritt: vendor/ zusammen mit dem Repo zum Termin mitnehmen');
-console.log('(Ablauf: docs/ON-SITE-PROTOKOLL.md).');
+console.log('(Vendor-Stand auf das Uebergabemedium kopieren, vor Ort Setup-Skript starten.)');

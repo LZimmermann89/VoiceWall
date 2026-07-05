@@ -33,11 +33,11 @@ Telemetrie. Das Kernversprechen ist beweisbar, nicht behauptet: siehe
 - **Windows:** Der Code ist auf der CI (windows-latest) grün (alle
   Unit- und E2E-Tests, Paste in der CI gemockt), aber der komplette
   Ablauf auf ECHTER Windows-Hardware wurde noch nie ausgeführt. Du
-  wärst der Erste. Die offenen Windows-Punkte stehen in
-  `docs/ABNAHME-CHECKLISTE.md`, Abschnitte B und D2 bis D4, das ist
-  faktisch dein Testprotokoll.
+  wärst der Erste. Dein Testprotokoll ist der Abschnitt
+  "Windows-spezifisch" weiter unten in diesem Leitfaden.
 - Es gibt bewusst keine gekauften Code-Signing-Zertifikate
-  (Inhaber-Entscheidung, `docs/SIGNING-ENTSCHEIDUNG.md`): Rechne unter
+  (bewusste Produktentscheidung: alles wird lokal aus dem Quellcode
+  gebaut, nichts wird als anonymes Binary verteilt): Rechne unter
   Windows mit einer SmartScreen-/Defender-Rückfrage, unter macOS mit
   den üblichen TCC-Freigaben.
 
@@ -113,8 +113,7 @@ gepackte App verwenden.
 
 ## Windows-spezifisch bitte genau protokollieren
 
-Das sind die offenen Abnahmepunkte (Details in
-`docs/ABNAHME-CHECKLISTE.md` D2 bis D4 und B1 bis B3):
+Das sind die offenen Abnahmepunkte:
 
 - Läuft `voicewall-setup.cmd` komplett durch? Wo hakt es? (Log
   beilegen: `%USERPROFILE%\.voicewall\logs\`)
@@ -140,11 +139,11 @@ ein Screenshot. Sicherheitsfunde bitte über den Weg in `SECURITY.md`.
 ## Bekannte Grenzen (kein Bug-Report nötig)
 
 - Nach jedem Neubau der App verlangt macOS die Freigaben erneut
-  (Ad-hoc-Signierung, bewusste Entscheidung, siehe
-  `docs/SIGNING-ENTSCHEIDUNG.md`); der Knopf "Freigabe anfordern"
-  plus App-Neustart ist der vorgesehene Weg.
-- Push-to-talk gibt es nicht (nur Toggle), Begründung in
-  `docs/ENTSCHEIDUNGEN.md` E1.
+  (Folge der Ad-hoc-Signierung, bewusste Entscheidung); der Knopf
+  "Freigabe anfordern" plus App-Neustart ist der vorgesehene Weg.
+- Push-to-talk gibt es nicht (nur Umschalt-Modus): Electrons
+  globaler Hotkey liefert kein Loslass-Ereignis, ein nativer
+  Tastatur-Listener wäre zusätzliche Angriffsfläche.
 - Das Transkript liegt für rund eine Sekunde in der Zwischenablage
   (danach wird der vorherige Inhalt wiederhergestellt); Clipboard-
   Manager können es in diesem Fenster sehen, dokumentierte Restgrenze.

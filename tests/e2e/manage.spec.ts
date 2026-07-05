@@ -204,7 +204,7 @@ test('M9: Beleg-Ansicht zeigt die Anbieterkennzeichnung (Impressum, § 5 DDG) lo
     await expect(impressum).toBeVisible();
     await expect(impressum).toContainText('FERNAU Präzisionstechnik GmbH');
     await expect(impressum).toContainText('Merianstraße 5a, 64291 Darmstadt');
-    await expect(impressum).toContainText('kontakt@der-ki-auditor.de');
+    await expect(impressum).toContainText('info@der-ki-auditor.de');
     await expect(impressum).toContainText('Amtsgericht Darmstadt, HRB 7378');
     await expect(impressum).toContainText('DE812710783');
     await expect(impressum).toContainText('§ 18 Abs. 2 MStV');

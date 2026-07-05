@@ -6,7 +6,7 @@ Wenn Sie eine Schwachstelle in VoiceWall finden, melden Sie diese bitte
 vertraulich an den Anbieter (FERNAU Präzisionstechnik GmbH, siehe
 `rechtstexte/IMPRESSUM.md`):
 
-- E-Mail: kontakt@der-ki-auditor.de
+- E-Mail: info@der-ki-auditor.de
 - Betreff: `[SECURITY] VoiceWall: <Kurzbeschreibung>`
 - Direkter Kontakt zum Projektverantwortlichen (Ausweichweg):
   lars.zimmermann89@gmail.com

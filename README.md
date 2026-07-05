@@ -8,12 +8,11 @@ Netzwerk-Port; die interne Kommunikation läuft ausschließlich über
 Electron-IPC. Das Kernversprechen lautet nicht "vertrauen Sie uns",
 sondern "prüfen Sie es nach": Beleg statt Behauptung.
 
-**Projektstatus:** Version 1.0.0-rc.1 (Release-Kandidat). Alle
-Funktionsmeilensteine (M0 bis M9) sind umgesetzt und automatisiert
-getestet. Für die 1.0.0 stehen noch die manuellen Abnahmen aus
-`docs/ABNAHME-CHECKLISTE.md` aus, insbesondere der echte
-Auto-Paste-Pfad auf macOS und Windows, der TCC-Grant-/Rebuild-Test und
-die Windows-Hardware-Abnahme.
+**Projektstatus:** Version 1.0.0-rc.2 (Release-Kandidat). Alle
+Funktionen sind umgesetzt und automatisiert getestet; der Kernpfad ist
+auf macOS abgenommen. Vor der 1.0.0 steht noch die Praxisabnahme auf
+echter Windows-Hardware aus, Testberichte sind willkommen (siehe
+`docs/TESTLEITFADEN.md`).
 
 ## Was VoiceWall kann
 
@@ -114,21 +113,20 @@ Diktat-Durchlaufs.
 - **Logging ohne Inhalte:** strukturierte, rotierte Logdateien mit
   restriktiven Rechten; Diktat-Inhalte werden nie geloggt.
 
-Details: `docs/ENTSCHEIDUNGEN.md` (Entscheidungsprotokoll E1 bis E49),
-`docs/M1-SPIKE-ERGEBNIS.md` (empirische Architektur-Belege),
-`SECURITY.md` (Meldeweg für Schwachstellen).
+Details zum Meldeweg für Schwachstellen: `SECURITY.md`.
 
-Hinweis zu Quellenangaben: Kommentare und Dokumente zitieren
-stellenweise "ABARBEITUNG X.Y". Das ist das interne Bau- und
-Anforderungsdokument des Projekts; es wird nicht mit ausgeliefert, die
-Zitate dienen der internen Nachvollziehbarkeit der Entscheidungen.
+Hinweis zu Quellenangaben: Kommentare zitieren stellenweise
+"ABARBEITUNG X.Y" oder Entscheidungsnummern wie "E12". Beides verweist
+auf die interne Bau- und Entscheidungsdokumentation des Projekts; sie
+wird nicht mit ausgeliefert, die Zitate dienen der internen
+Nachvollziehbarkeit.
 
 ## Systemvoraussetzungen
 
 - **macOS:** Apple Silicon (arm64) oder Intel (x64); Mikrofon- und
   Bedienungshilfen-Freigabe (führt der Wizard). Nach jedem Rebuild der
-  ad-hoc-signierten App verlangt macOS die Freigaben erneut (TCC,
-  dokumentiert in `docs/ON-SITE-PROTOKOLL.md`).
+  ad-hoc-signierten App verlangt macOS die Freigaben erneut; die App
+  führt mit dem Knopf "Freigabe anfordern" durch die Neuerteilung.
 - **Windows:** x64. Grenze: in als Administrator laufende Ziel-Apps
   kann systembedingt nicht automatisch eingefügt werden (UIPI), der
   Kopieren-Knopf greift.
@@ -186,9 +184,7 @@ portables Node, npm-Cache, Electron-Binary und Modelle, alle
 SHA-256-verankert in `install/lib/checksums.json`. Beim Kunden nutzt
 dasselbe Setup-Skript dann die portable Node-Runtime aus `vendor/`,
 `npm ci` läuft offline gegen den Vendor-Cache, die Modelle werden
-verifiziert kopiert. Der
-komplette Ablauf (Vendor-Stand vorbereiten, Termin unter 10 Minuten,
-Funktionsbeleg, Datensauberkeit) steht in `docs/ON-SITE-PROTOKOLL.md`.
+verifiziert kopiert.
 
 ### Deinstallation
 
@@ -239,10 +235,8 @@ Im Ordner `rechtstexte/` liegen: Impressum (`IMPRESSUM.md`,
 Anbieterkennzeichnung nach § 5 DDG, in der App unter Beleg, "Über
 VoiceWall" lokal angezeigt), Datenschutzerklärung (`DATENSCHUTZ.md`),
 DSGVO-Beleg-Blatt für die Kundendokumentation
-(`DSGVO-BELEG-BLATT.md`), AI-Act-Einordnung
-(`AI-ACT-EINORDNUNG.md`) sowie die Vertriebs-Rechtstexte für den
-Vor-Ort-Installationsdienst (`WIDERRUF.md`,
-`MUSTER-WIDERRUFSFORMULAR.md`).
+(`DSGVO-BELEG-BLATT.md`) und AI-Act-Einordnung
+(`AI-ACT-EINORDNUNG.md`).
 
 ## Lizenz
 

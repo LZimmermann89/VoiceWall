@@ -106,7 +106,7 @@ if ($NodeOk) {
 } else {
     $NodeZip = Get-ChildItem -Path (Join-Path $RepoDir 'vendor\node-runtime') -Filter 'node-v*-win-x64.zip' -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -eq $NodeZip) {
-        Stop-WithError "Node >=26 <27 fehlt und es liegt kein Vendor-Stand unter vendor\node-runtime\. Fuer die Selbst-Installation bitte Node 26 installieren: https://nodejs.org/en/download aufrufen und dort ausdruecklich Version 26 ('Current') als Windows-Installer (.msi) waehlen; der vorausgewaehlte Standard-Button liefert die aeltere LTS-Version, die dieser Preflight ablehnt. Danach dieses Skript erneut ausfuehren. Der Vendor-Weg ueber scripts/prepare-vendor.mjs ist der Dienstleistungsweg fuer die Offline-Vor-Ort-Installation und setzt seinerseits eine Maschine mit Node 26 voraus (docs/ON-SITE-PROTOKOLL.md)."
+        Stop-WithError "Node >=26 <27 fehlt und es liegt kein Vendor-Stand unter vendor\node-runtime\. Fuer die Selbst-Installation bitte Node 26 installieren: https://nodejs.org/en/download aufrufen und dort ausdruecklich Version 26 ('Current') als Windows-Installer (.msi) waehlen; der vorausgewaehlte Standard-Button liefert die aeltere LTS-Version, die dieser Preflight ablehnt. Danach dieses Skript erneut ausfuehren. Der Vendor-Weg ueber scripts/prepare-vendor.mjs ist der Dienstleistungsweg fuer die Offline-Vor-Ort-Installation und setzt seinerseits eine Maschine mit Node 26 voraus."
     }
     $Expected = $Checksums.nodeRuntime.($NodeZip.Name)
     if ([string]::IsNullOrEmpty($Expected)) {

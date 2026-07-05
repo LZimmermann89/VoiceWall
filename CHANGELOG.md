@@ -97,7 +97,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 ### Ausblick
 
 - Für 1.0.0 vorgesehen: bestandene manuelle Abnahme nach
-  `docs/ABNAHME-CHECKLISTE.md` (Auto-Paste auf macOS und Windows,
+  der internen Abnahme-Checkliste (Auto-Paste auf macOS und Windows,
   TCC-Rebuild-Test, Windows-Setup-Trockenlauf, Schwachhardware-Latenz,
   echter Download-Pfad, SmartScreen/AV-Verhalten, On-Site-Trockenlauf).
   Begründung des Release-Kandidaten: Entscheidung E33.
@@ -268,7 +268,7 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   E2E-Beleg in `tests/e2e/manage.spec.ts`. Das CI-Rechtsverweis-Gate
   deckt `rechtstexte/` mit ab (Verstoß-Beweis geführt).
   Signing-Kostenentscheidung aufbereitet
-  (`docs/SIGNING-ENTSCHEIDUNG.md`, E32), Abnahme-Checkliste zu einer
+  (interne Signing-Entscheidung E32), Abnahme-Checkliste zu einer
   konsolidierten 1.0.0-Checkliste erweitert, README auf den Ist-Stand
   neu geschrieben, NOTICE und THIRD_PARTY_LICENSES.md vervollständigt
   (whisper.cpp, @fugood/whisper.node samt sechs Plattform-Binaries,
@@ -337,7 +337,7 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   `scripts/prepare-vendor.mjs` bereitet den Offline-Vendor-Stand je
   Zielplattform vor (Node-Tarball gegen offizielle SHASUMS256.txt,
   npm-Cache inkl. Cross-Plattform-Whisper-Subpaket, Modelle verifiziert);
-  Ablauf dokumentiert in docs/ON-SITE-PROTOKOLL.md.
+  Ablauf intern dokumentiert.
   First-Run-Wizard als echte App-Shell (ersetzt die M2-Test-UI):
   Willkommen mit informierter Einwilligung und AI-Act-Transparenzhinweis,
   Firmendaten mit Live-Ordnernamen-Vorschau (editierbar) und
@@ -420,7 +420,7 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   Resilienz-Primaerpfad (Text geht nie verloren), App laeuft nach dem
   Onboarding ohne Fenster im Tray weiter, Aufnahme-Abbruch bei
   Sperrbildschirm/Suspend. Push-to-talk fuer v1 gestrichen (technisch
-  unmoeglich mit globalShortcut, siehe docs/ENTSCHEIDUNGEN.md).
+  unmoeglich mit globalShortcut, intern dokumentiert).
 
 - M2: STT-Kern. Audio-Aufnahme in einem eigenen, unsichtbaren
   Capture-Fenster (getUserMedia, 16 kHz mono, RAM-only, kein
@@ -433,7 +433,7 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   Test-Oberflaeche fuer den Diktat-Flow.
 
 - M1: Architektur-Spike (Projektbrecher empirisch geklaert, Ergebnisse
-  in docs/M1-SPIKE-ERGEBNIS.md): `@fugood/whisper.node` ist ein echtes
+  im internen M1-Spike-Bericht): `@fugood/whisper.node` ist ein echtes
   N-API-Addon (ABI-stabil, kein nan), laedt und transkribiert im
   `utilityProcess` (R1/R2 entschaerft); der Binary-Bezug funktioniert
   unter npm-Skript-Restriktionen ueber optionale Plattform-Subpakete,

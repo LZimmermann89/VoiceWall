@@ -30,7 +30,7 @@ export const IMPRESSUM_ANGABEN: readonly { readonly label: string; readonly wert
     wert: 'Clara Fernau, Theodor Fernau, Lars Zimmermann',
   },
   { label: 'Telefon', wert: '+49 6150 184973-0' },
-  { label: 'E-Mail', wert: 'kontakt@der-ki-auditor.de' },
+  { label: 'E-Mail', wert: 'info@der-ki-auditor.de' },
   { label: 'Registergericht', wert: 'Amtsgericht Darmstadt, HRB 7378' },
   { label: 'USt-IdNr. (§ 27a UStG)', wert: 'DE812710783' },
   {

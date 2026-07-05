@@ -58,7 +58,7 @@ die eine Stelle in `paste/macos.ts` (plus Dokumentation und Tests).
 
 ## Bekannte TCC-Grenze: Die Freigabe hängt an der Signatur-Identität (cdhash)
 
-Empirisch belegt im M1-Spike (docs/M1-SPIKE-ERGEBNIS.md, Abschnitt F4): Bei
+Empirisch gemessen: Bei
 einer ad-hoc-signierten App bildet macOS die TCC-Vertrauensbeziehung über die
 Designated Requirement `cdhash H"<hash>"`, also über den Hash des konkreten
 Builds, nicht über die Bundle-ID. Konsequenzen:
@@ -86,6 +86,6 @@ Builds, nicht über die Bundle-ID. Konsequenzen:
 
 Windows kennt keine Bedienungshilfen-Freigabe für SendKeys; dafür gilt dort
 die UIPI-Grenze (keine simulierten Eingaben an als Administrator laufende
-Ziel-Apps, siehe docs/ENTSCHEIDUNGEN.md, E4). Auf beiden Plattformen gilt
+Ziel-Apps). Auf beiden Plattformen gilt
 dieselbe Resilienz-Regel: Scheitert das automatische Einfügen, ist der Text in
 der Zwischenablage und über den Kopieren-Knopf jederzeit erneut verfügbar.

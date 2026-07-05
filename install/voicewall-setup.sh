@@ -157,7 +157,7 @@ else
     [ -f "${candidate}" ] && NODE_TARBALL="${candidate}"
   done
   if [ -z "${NODE_TARBALL}" ]; then
-    fail "Node >=26 <27 fehlt und es liegt kein Vendor-Stand unter vendor/node-runtime/. Fuer die Selbst-Installation bitte Node 26 installieren: https://nodejs.org/en/download aufrufen und dort ausdruecklich Version 26 ('Current') waehlen; der vorausgewaehlte Standard-Button liefert die aeltere LTS-Version, die dieser Preflight ablehnt. Auf macOS geht alternativ 'brew install node' (die Homebrew-Formel node liefert derzeit die 26er-Linie). Danach dieses Skript erneut ausfuehren. Der Vendor-Weg ueber scripts/prepare-vendor.mjs ist der Dienstleistungsweg fuer die Offline-Vor-Ort-Installation und setzt seinerseits eine Maschine mit Node 26 voraus (docs/ON-SITE-PROTOKOLL.md)."
+    fail "Node >=26 <27 fehlt und es liegt kein Vendor-Stand unter vendor/node-runtime/. Fuer die Selbst-Installation bitte Node 26 installieren: https://nodejs.org/en/download aufrufen und dort ausdruecklich Version 26 ('Current') waehlen; der vorausgewaehlte Standard-Button liefert die aeltere LTS-Version, die dieser Preflight ablehnt. Auf macOS geht alternativ 'brew install node' (die Homebrew-Formel node liefert derzeit die 26er-Linie). Danach dieses Skript erneut ausfuehren. Der Vendor-Weg ueber scripts/prepare-vendor.mjs ist der Dienstleistungsweg fuer die Offline-Vor-Ort-Installation und setzt seinerseits eine Maschine mit Node 26 voraus."
   fi
   TARBALL_NAME="$(basename "${NODE_TARBALL}")"
   require_python3
