@@ -38,7 +38,7 @@ Audit notes:
   checks with `systemPreferences.isTrustedAccessibilityClient(false)`
   whether the permission is granted. Without the permission, **no**
   osascript attempt is started; instead, the UI explains the
-  permission in German and opens the right settings pane at the press
+  permission (in the selected interface language) and opens the right settings pane at the press
   of a button (static deep link
   `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`).
 

@@ -36,7 +36,7 @@ Auditier-Hinweise:
 - Vor jedem Einfügen prüft `src/main/permission/accessibility.ts` mit
   `systemPreferences.isTrustedAccessibilityClient(false)`, ob die Freigabe
   vorliegt. Ohne Freigabe wird **kein** osascript-Versuch gestartet; die UI
-  erklärt stattdessen auf Deutsch die Freigabe und öffnet auf Knopfdruck den
+  erklärt stattdessen die Freigabe (in der gewählten Oberflächensprache) und öffnet auf Knopfdruck den
   richtigen Einstellungsbereich (statischer Deep-Link
   `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility`).
 

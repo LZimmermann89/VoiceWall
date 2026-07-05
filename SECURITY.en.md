@@ -43,7 +43,7 @@ lockfile guard.
 ## Supported versions
 
 Until the final 1.0.0 release, only the current state of the `main`
-branch is supported (currently: 1.0.0-rc.1). Updates are rolled out
+branch is supported (currently: 1.0.0-rc.2). Updates are rolled out
 in a controlled way as a new, inspectable repo release that is
 installed on site (review-then-run); there is deliberately no
 automatic update channel and no phone-home.

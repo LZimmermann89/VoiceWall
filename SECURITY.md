@@ -40,7 +40,7 @@ Stand: Typprüfung, Lint mit Modulgrenzen, Tests, Build, E2E,
 ## Unterstützte Versionen
 
 Bis zum finalen Release 1.0.0 wird ausschließlich der jeweils aktuelle
-Stand des `main`-Branches unterstützt (aktuell: 1.0.0-rc.1). Updates
+Stand des `main`-Branches unterstützt (aktuell: 1.0.0-rc.2). Updates
 erfolgen kontrolliert als neues, inspizierbares Repo-Release, das vor
 Ort eingespielt wird (review-then-run); es gibt bewusst keinen
 automatischen Update-Kanal und kein Phone-Home.
