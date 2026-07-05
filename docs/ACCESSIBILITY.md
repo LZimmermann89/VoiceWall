@@ -1,3 +1,5 @@
+> 🇬🇧 English version: [ACCESSIBILITY.en.md](ACCESSIBILITY.en.md)
+
 # Warum VoiceWall das macOS-Bedienungshilfen-Recht braucht und was es damit NICHT tut
 
 Dieses Dokument ist die auditierbare Begründung für die einzige

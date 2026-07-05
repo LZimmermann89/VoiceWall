@@ -1,3 +1,5 @@
+> 🇬🇧 English version: [CONTRIBUTING.en.md](CONTRIBUTING.en.md)
+
 # Mitwirken an VoiceWall
 
 Danke für Ihr Interesse. Damit keine falschen Erwartungen entstehen,

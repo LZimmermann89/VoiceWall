@@ -3,3 +3,6 @@ contact_links:
   - name: Sicherheitslücke vertraulich melden
     url: https://github.com/LZimmermann89/voicewall/blob/main/SECURITY.md
     about: Bitte Schwachstellen nicht als öffentliches Issue melden.
+  - name: Report a security vulnerability confidentially (English)
+    url: https://github.com/LZimmermann89/voicewall/blob/main/SECURITY.en.md
+    about: Please do not report vulnerabilities as a public issue.

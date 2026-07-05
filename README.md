@@ -1,3 +1,5 @@
+> 🇬🇧 English version: [README.en.md](README.en.md)
+
 # VoiceWall
 
 VoiceWall ist ein zu 100 Prozent lokales, DSGVO-freundliches

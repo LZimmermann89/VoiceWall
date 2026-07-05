@@ -1,3 +1,5 @@
+> 🇬🇧 English version: [BACKUP-HINWEISE.en.md](BACKUP-HINWEISE.en.md)
+
 # Backup und Verschlüsselung (VoiceWall)
 
 Dieses Dokument gehört zum DSGVO-Beleg-Blatt

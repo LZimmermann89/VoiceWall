@@ -1,3 +1,5 @@
+> 🇬🇧 English version: [TESTLEITFADEN.en.md](TESTLEITFADEN.en.md)
+
 # Testleitfaden für externe Tester
 
 Stand: 04.07.2026, Version 1.0.0-rc.2. Zielgruppe: technisch versierte

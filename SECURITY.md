@@ -1,3 +1,5 @@
+> 🇬🇧 English version: [SECURITY.en.md](SECURITY.en.md)
+
 # Sicherheitsrichtlinie (SECURITY.md)
 
 ## Schwachstellen melden

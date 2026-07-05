@@ -1,3 +1,5 @@
+> 🇬🇧 English version: [NETZWERK-SELBSTTEST.en.md](NETZWERK-SELBSTTEST.en.md)
+
 # So prüfen Sie selbst, dass VoiceWall keine Daten sendet
 
 VoiceWall verspricht: **Ihre Diktate verlassen Ihren Rechner nie.** Dieses

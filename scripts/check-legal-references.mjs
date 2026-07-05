@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const TARGETS = ['src', 'README.md', 'resources', 'rechtstexte'];
+const TARGETS = ['src', 'README.md', 'README.en.md', 'resources', 'rechtstexte'];
 const TEXT_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs|json|html|css|md|txt|xml|yml|yaml)$/i;
 const FORBIDDEN = /\b(TMG|TTDSG)\b/;
 
@@ -71,4 +71,6 @@ if (hits.length > 0) {
   }
   process.exit(1);
 }
-console.log('OK: Keine aktiven TMG-/TTDSG-Zitate in src/, README.md, resources/, rechtstexte/.');
+console.log(
+  'OK: Keine aktiven TMG-/TTDSG-Zitate in src/, README.md, README.en.md, resources/, rechtstexte/.',
+);
