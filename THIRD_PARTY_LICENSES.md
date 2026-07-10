@@ -73,6 +73,13 @@ Zur Lizenzlage von Silero VAD: MIT gilt für die v5-Serie
 Lizenzlagen. Deshalb ist die Version auf v5.1.2 gepinnt und die Datei
 per SHA-256 verifiziert (`resources/model-manifest.json`).
 
+Rückfallquelle (Mirror): alle vier Modelldateien sind zusätzlich
+Byte-identisch als Release-Assets im VoiceWall-Repo gespiegelt
+(Release `modelle-v1`). Die Weiterverteilung erfolgt gemäß Apache-2.0
+beziehungsweise MIT mit den vorstehenden Attributions-Ketten; am
+Inhalt der Dateien ändert der Mirror nichts, die App verifiziert jede
+Quelle gegen dieselben SHA-256-Konstanten.
+
 ## 3. Entwicklungs-Abhängigkeiten (nicht Teil der ausgelieferten App)
 
 | Paket                                            | Version | Lizenz     | Quelle                                                 |

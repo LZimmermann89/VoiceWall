@@ -12,10 +12,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ModelDescriptor } from '../../src/main/model/model-catalog';
-import { ensureModel, getModelsDirectory, removeModelFile } from '../../src/main/model/model-store';
+import {
+  ensureModel,
+  getModelsDirectory,
+  removeModelFile,
+  type SourceFallbackInfo,
+} from '../../src/main/model/model-store';
 
 const CONTENT = Buffer.from('Fixture-Modell-Inhalt-fuer-model-store-Test', 'utf8');
 const SHA = createHash('sha256').update(CONTENT).digest('hex');
+// Gleiche Laenge wie CONTENT, damit gezielt der Checksummen-Vergleich
+// anschlaegt (nicht der Groessen-Vorab-Check).
+const WRONG_CONTENT = Buffer.alloc(CONTENT.length, 'x');
 
 let server: Server;
 let baseUrl: string;
@@ -27,6 +35,7 @@ function descriptor(): ModelDescriptor {
     id: 'silero-vad',
     fileName: 'fixture-model.bin',
     url: `${baseUrl}/model`,
+    mirrorUrls: [],
     byteSize: CONTENT.length,
     sha256: SHA,
     label: 'Fixture-Modell',
@@ -34,8 +43,18 @@ function descriptor(): ModelDescriptor {
 }
 
 beforeAll(async () => {
-  server = createServer((_request, response) => {
+  server = createServer((request, response) => {
     requestCount += 1;
+    if (request.url === '/kaputt') {
+      response.statusCode = 404;
+      response.end('nicht da');
+      return;
+    }
+    if (request.url === '/falsche-bytes') {
+      response.setHeader('content-length', String(WRONG_CONTENT.length));
+      response.end(WRONG_CONTENT);
+      return;
+    }
     response.setHeader('content-length', String(CONTENT.length));
     response.end(CONTENT);
   });
@@ -114,6 +133,101 @@ describe('ensureModel', () => {
     }
     // Fuer Folgetests wieder in Ordnung bringen.
     await ensureModel(userDataDir, descriptor(), { allowDownload: true });
+  });
+});
+
+describe('Rueckfallquelle (E50)', () => {
+  function mirrorDescriptor(primaryPath: string, mirrorPath: string): ModelDescriptor {
+    return {
+      ...descriptor(),
+      url: `${baseUrl}${primaryPath}`,
+      mirrorUrls: [`${baseUrl}${mirrorPath}`],
+    };
+  }
+
+  it('weicht bei HTTP-Fehler der Primaerquelle auf den Mirror aus', async () => {
+    const fresh = await mkdtemp(join(tmpdir(), 'voicewall-store-mirror-'));
+    const fallbacks: SourceFallbackInfo[] = [];
+    requestCount = 0;
+    const result = await ensureModel(fresh, mirrorDescriptor('/kaputt', '/model'), {
+      allowDownload: true,
+      onSourceFallback: (info) => fallbacks.push(info),
+    });
+    expect(result.ok).toBe(true);
+    // Ein Versuch gegen die Primaerquelle, einer gegen den Mirror.
+    expect(requestCount).toBe(2);
+    expect(fallbacks).toHaveLength(1);
+    expect(fallbacks[0]?.errorKind).toBe('http-status');
+    expect(fallbacks[0]?.attempt).toBe(1);
+    expect(fallbacks[0]?.maxAttempts).toBe(2);
+    expect(fallbacks[0]?.failedHost).toBe(new URL(baseUrl).host);
+    if (result.ok) {
+      const restored = await readFile(result.value);
+      expect(restored.equals(CONTENT)).toBe(true);
+    }
+
+    // Folgeaufruf: Datei ist intakt, keine weiteren Requests.
+    requestCount = 0;
+    const again = await ensureModel(fresh, mirrorDescriptor('/kaputt', '/model'), {
+      allowDownload: true,
+    });
+    expect(again.ok).toBe(true);
+    expect(requestCount).toBe(0);
+    await rm(fresh, { recursive: true, force: true });
+  });
+
+  it('weicht bei falschen Bytes (Checksummen-Mismatch) auf den Mirror aus', async () => {
+    const fresh = await mkdtemp(join(tmpdir(), 'voicewall-store-mirror-sha-'));
+    const fallbacks: SourceFallbackInfo[] = [];
+    const result = await ensureModel(fresh, mirrorDescriptor('/falsche-bytes', '/model'), {
+      allowDownload: true,
+      onSourceFallback: (info) => fallbacks.push(info),
+    });
+    expect(result.ok).toBe(true);
+    expect(fallbacks).toHaveLength(1);
+    expect(fallbacks[0]?.errorKind).toBe('checksum-mismatch');
+    if (result.ok) {
+      // Es liegt der korrekte Mirror-Inhalt, keine .part-Reste.
+      const restored = await readFile(result.value);
+      expect(restored.equals(CONTENT)).toBe(true);
+      expect(existsSync(`${result.value}.part`)).toBe(false);
+    }
+    await rm(fresh, { recursive: true, force: true });
+  });
+
+  it('meldet den letzten Fehler, wenn alle Quellen scheitern; keine Datei bleibt zurueck', async () => {
+    const fresh = await mkdtemp(join(tmpdir(), 'voicewall-store-mirror-tot-'));
+    const fallbacks: SourceFallbackInfo[] = [];
+    const target = mirrorDescriptor('/kaputt', '/falsche-bytes');
+    const result = await ensureModel(fresh, target, {
+      allowDownload: true,
+      onSourceFallback: (info) => fallbacks.push(info),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      // Letzter Fehler ist der des Mirrors (falsche Bytes).
+      expect(result.error.kind).toBe('checksum-mismatch');
+    }
+    // Callback nur ZWISCHEN Versuchen, nicht nach dem letzten Scheitern.
+    expect(fallbacks).toHaveLength(1);
+    const filePath = join(getModelsDirectory(fresh), target.fileName);
+    expect(existsSync(filePath)).toBe(false);
+    expect(existsSync(`${filePath}.part`)).toBe(false);
+    await rm(fresh, { recursive: true, force: true });
+  });
+
+  it('nutzt den Mirror nicht, wenn die Primaerquelle liefert', async () => {
+    const fresh = await mkdtemp(join(tmpdir(), 'voicewall-store-mirror-primaer-'));
+    const fallbacks: SourceFallbackInfo[] = [];
+    requestCount = 0;
+    const result = await ensureModel(fresh, mirrorDescriptor('/model', '/kaputt'), {
+      allowDownload: true,
+      onSourceFallback: (info) => fallbacks.push(info),
+    });
+    expect(result.ok).toBe(true);
+    expect(requestCount).toBe(1);
+    expect(fallbacks).toHaveLength(0);
+    await rm(fresh, { recursive: true, force: true });
   });
 });
 

@@ -47,6 +47,17 @@ describe('Modellkatalog', () => {
     }
   });
 
+  it('hat je Modell genau eine Mirror-URL im Release modelle-v1 (E50)', () => {
+    for (const descriptor of ALL_MODEL_DESCRIPTORS) {
+      expect(descriptor.mirrorUrls).toHaveLength(1);
+      // Asset-Name ist exakt der Katalog-fileName; jede Quelle wird gegen
+      // dieselbe SHA-256-Konstante verifiziert.
+      expect(descriptor.mirrorUrls[0]).toBe(
+        `https://github.com/LZimmermann89/VoiceWall/releases/download/modelle-v1/${descriptor.fileName}`,
+      );
+    }
+  });
+
   it('haelt die R14-verifizierte Checksumme des multilingualen EN-Modells (B1)', () => {
     // Selbst berechneter SHA-256 UND identischer Hugging-Face-LFS-OID
     // (04.07.2026, ggerganov/whisper.cpp, ggml-large-v3-turbo-q5_0.bin).

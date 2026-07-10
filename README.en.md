@@ -95,7 +95,9 @@ decisions:
   (whisper-large-v3-turbo-german). The custom dictionary mitigates
   mis-transcribed technical terms, but there is no second German
   model as a fallback; a Q4 emergency variant for weak hardware is
-  deliberately deferred to v1.1.
+  deliberately deferred to v1.1. The availability risk of the download
+  source is neutralised by our own model mirror (release
+  `modelle-v1`); the quality dependency remains.
 - **Not a meeting tool:** VoiceWall is a dictation device for one
   voice. There is no speaker separation (diarisation) and no meeting
   minutes feature; transcribing meetings requires a different tool.
@@ -138,7 +140,11 @@ requests during a complete dictation run for every revision.
   SHA-256 pinning of all six native Whisper binaries
   (`scripts/verify-checksums.mjs`) and of all models
   (`resources/model-manifest.json`), no compiling `binding.gyp` in
-  the tree, Dependabot active.
+  the tree, Dependabot active. Model downloads have a fallback source
+  (our own byte-identical mirror as GitHub release assets, release
+  `modelle-v1`); every source is verified against the same compiled-in
+  SHA-256 constants, so the choice of source is never a matter of
+  trust.
 - **Logging without content:** structured, rotated log files with
   restrictive permissions; dictation contents are never logged.
 

@@ -12,7 +12,10 @@ unplugged.
 The only exception you may see along the way: the **one-time model
 download** during the initial setup. VoiceWall downloads two model
 files from `huggingface.co` and checks them against hard-coded
-checksums. After that, the app is completely offline.
+checksums. If `huggingface.co` does not deliver, the app falls back
+once to `github.com` (our own mirror of the same files, verified
+against the same checksums). After that, the app is completely
+offline.
 
 ## Probe 1: network view of the app (developer tools)
 
@@ -44,7 +47,8 @@ which programs establish connections.
 - With a firewall tool such as **LuLu** (free, open source) or
   **Little Snitch**: watch the list of outgoing connections while you
   dictate. VoiceWall does not appear there, with the single exception
-  of the one-time `huggingface.co` download during setup.
+  of the one-time model download during setup (`huggingface.co`, with
+  `github.com` as the fallback source).
 - Alternatively in the terminal:
   `lsof -i -a -p <VoiceWall process ID>` shows no open internet
   connections.

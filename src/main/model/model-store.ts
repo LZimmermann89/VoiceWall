@@ -46,6 +46,21 @@ export interface EnsureModelError {
   readonly message: string;
 }
 
+/**
+ * Meldung an den Aufrufer, dass eine Download-Quelle fehlgeschlagen ist und
+ * die naechste versucht wird (E50). Nur Betriebslog-Zwecke; die fachliche
+ * Fehlerbehandlung bleibt beim Result von ensureModel.
+ */
+export interface SourceFallbackInfo {
+  /** Host der fehlgeschlagenen Quelle (nie die volle URL, log-sparsam). */
+  readonly failedHost: string;
+  readonly errorKind: DownloadError['kind'];
+  /** 1-basierte Nummer des fehlgeschlagenen Versuchs. */
+  readonly attempt: number;
+  /** Gesamtzahl der verfuegbaren Quellen (Primaer plus Mirrors). */
+  readonly maxAttempts: number;
+}
+
 export function getModelsDirectory(userDataPath: string): string {
   return join(userDataPath, 'models');
 }
@@ -116,14 +131,34 @@ async function verifyFile(
   return ok(undefined);
 }
 
+/** Host einer URL fuer log-sparsame Meldungen; nie die volle URL loggen. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return 'unbekannt';
+  }
+}
+
 /**
  * Stellt sicher, dass eine Modelldatei vorhanden und intakt ist. Fehlt oder
  * ist sie beschaedigt, wird sie (bei allowDownload) geladen und verifiziert.
+ *
+ * Quellen-Reihenfolge (E50): erst die Primaerquelle (descriptor.url), dann
+ * die Mirrors (descriptor.mirrorUrls). Bei Netz-/HTTP-/Groessen-/
+ * Checksummen-Fehlern wird die naechste Quelle versucht; bei einem lokalen
+ * io-Fehler wird sofort abgebrochen, weil eine andere Quelle ein
+ * Plattenproblem nicht loest. Jede Quelle wird gegen dieselbe SHA-256-
+ * Konstante verifiziert; scheitern alle, kommt der letzte Fehler zurueck.
  */
 export async function ensureModel(
   userDataPath: string,
   descriptor: ModelDescriptor,
-  options: { allowDownload: boolean; onProgress?: (progress: DownloadProgress) => void },
+  options: {
+    allowDownload: boolean;
+    onProgress?: (progress: DownloadProgress) => void;
+    onSourceFallback?: (info: SourceFallbackInfo) => void;
+  },
 ): Promise<Result<string, EnsureModelError>> {
   const dir = getModelsDirectory(userDataPath);
   await mkdir(dir, { recursive: true });
@@ -146,22 +181,49 @@ export async function ensureModel(
 
   // Beschaedigte Datei vorher entfernen, dann sauber neu laden.
   await rm(filePath, { force: true });
-  const download = await downloadModel({
-    url: descriptor.url,
-    destinationPath: filePath,
-    expectedSha256: descriptor.sha256,
-    expectedByteSize: descriptor.byteSize,
-    ...(options.onProgress ? { onProgress: options.onProgress } : {}),
-  });
-  if (!download.ok) {
-    return err({ kind: download.error.kind, message: download.error.message });
+  const sources: readonly string[] = [descriptor.url, ...descriptor.mirrorUrls];
+  let lastError: DownloadError | null = null;
+  let downloaded: { sha256: string; byteSize: number } | null = null;
+  for (const [index, sourceUrl] of sources.entries()) {
+    const attempt = await downloadModel({
+      url: sourceUrl,
+      destinationPath: filePath,
+      expectedSha256: descriptor.sha256,
+      expectedByteSize: descriptor.byteSize,
+      ...(options.onProgress ? { onProgress: options.onProgress } : {}),
+    });
+    if (attempt.ok) {
+      downloaded = attempt.value;
+      break;
+    }
+    lastError = attempt.error;
+    if (attempt.error.kind === 'io') {
+      break;
+    }
+    if (index < sources.length - 1 && options.onSourceFallback) {
+      options.onSourceFallback({
+        failedHost: hostOf(sourceUrl),
+        errorKind: attempt.error.kind,
+        attempt: index + 1,
+        maxAttempts: sources.length,
+      });
+    }
+  }
+  if (downloaded === null) {
+    // lastError ist hier immer gesetzt (mindestens eine Quelle wurde
+    // versucht); der Fallback existiert nur fuer die Typsicherheit.
+    const error = lastError ?? {
+      kind: 'network' as const,
+      message: texte().modelle.downloadNetzwerkfehler('unbekannt'),
+    };
+    return err({ kind: error.kind, message: error.message });
   }
 
   const fileStat = await stat(filePath);
   const marker = await readMarker(userDataPath);
   marker[descriptor.fileName] = {
-    sha256: download.value.sha256,
-    byteSize: download.value.byteSize,
+    sha256: downloaded.sha256,
+    byteSize: downloaded.byteSize,
     mtimeMs: fileStat.mtimeMs,
   };
   await writeMarker(userDataPath, marker);

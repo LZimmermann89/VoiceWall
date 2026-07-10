@@ -11,7 +11,10 @@ gezogenem Netzwerkstecker.
 Einzige Ausnahme, die Sie dabei sehen dürfen: der **einmalige
 Modell-Download** bei der ersten Einrichtung. Dabei lädt VoiceWall zwei
 Modelldateien von `huggingface.co` und prüft sie gegen fest hinterlegte
-Prüfsummen. Danach ist die App vollständig offline.
+Prüfsummen. Liefert `huggingface.co` nicht, weicht die App einmalig auf
+die Ersatzquelle `github.com` aus (eigener Mirror derselben Dateien,
+gleiche Prüfsummen-Verifikation). Danach ist die App vollständig
+offline.
 
 ## Probe 1: Netzwerk-Anzeige der App (Entwicklertools)
 
@@ -43,7 +46,8 @@ Programme Verbindungen aufbauen.
 - Mit einem Firewall-Werkzeug wie **LuLu** (kostenlos, Open Source) oder
   **Little Snitch**: Beobachten Sie die Liste der ausgehenden Verbindungen,
   während Sie diktieren. VoiceWall taucht dort nicht auf, mit der einzigen
-  Ausnahme des einmaligen `huggingface.co`-Downloads bei der Einrichtung.
+  Ausnahme des einmaligen Modell-Downloads bei der Einrichtung
+  (`huggingface.co`, ersatzweise `github.com`).
 - Alternativ im Terminal: `lsof -i -a -p <VoiceWall-Prozess-ID>` zeigt keine
   offenen Internet-Verbindungen.
 

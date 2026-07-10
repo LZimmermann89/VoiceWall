@@ -8,6 +8,19 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- Rückfallquelle für den Modell-Download (Entscheidung E50): alle vier
+  Modelldateien sind zusätzlich Byte-identisch als Release-Assets im
+  VoiceWall-Repo gespiegelt (Release `modelle-v1`). Scheitert die
+  Primärquelle (huggingface.co) mit Netz-, HTTP-, Größen- oder
+  Prüfsummen-Fehler, versucht die App den Mirror; bei lokalem
+  io-Fehler wird sofort abgebrochen. Jede Quelle wird gegen dieselben
+  fest einkompilierten SHA-256-Konstanten verifiziert; ein
+  Quellenwechsel landet als Warnung im Betriebslog (nur Host und
+  Fehlerart, nie die volle URL). Katalog und Manifest tragen die
+  Mirror-URLs testgesichert synchron; NOTICE,
+  THIRD_PARTY_LICENSES.md und der Netzwerk-Selbsttest (DE/EN) nennen
+  den Mirror ausdrücklich.
+
 - README-Abschnitt "Ehrliche Schwächen" (deutsch und englisch): nur
   Desktop, ein prüfsummen-verifizierter Netzmoment beim
   Modell-Download, Abhängigkeit vom einen deutschen Finetune, kein

@@ -83,6 +83,11 @@ Attributionen (Pflicht-Hinweise):
 Die Whisper-Modelle und die Silero-VAD-Datei werden nicht im Repo
 ausgeliefert, sondern bei der Einrichtung prüfsummen-verifiziert von
 huggingface.co geladen oder vor Ort offline eingespielt
-(vendor/models/). Herkunft, URL, Größe und SHA-256 jeder Datei:
+(vendor/models/). Als Rückfallquelle sind dieselben Dateien zusätzlich
+unverändert (Byte-identisch, gleiche SHA-256-Prüfsummen) als
+Release-Assets im VoiceWall-Repo gespiegelt (Release modelle-v1); die
+Weiterverteilung erfolgt gemäß Apache-2.0 beziehungsweise MIT mit den
+vorstehenden Quellenangaben, der Änderungshinweis zu Nr. 4 gilt
+unverändert. Herkunft, URLs, Größe und SHA-256 jeder Datei:
 resources/model-manifest.json (testgesichert synchron zum Katalog
 src/main/model/model-catalog.ts).

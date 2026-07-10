@@ -93,7 +93,10 @@ Entscheidungen:
   (whisper-large-v3-turbo-german). Das Fach-Wörterbuch mildert
   Fehltranskriptionen von Fachbegriffen, aber es gibt kein zweites
   deutsches Modell als Ausweichoption; eine Q4-Notvariante für
-  schwache Hardware ist bewusst auf v1.1 verschoben.
+  schwache Hardware ist bewusst auf v1.1 verschoben. Das
+  Verfügbarkeits-Risiko der Bezugsquelle ist durch den eigenen
+  Modell-Mirror (Release `modelle-v1`) neutralisiert; die
+  Qualitätsabhängigkeit bleibt bestehen.
 - **Kein Meeting-Werkzeug:** VoiceWall ist ein Diktiergerät für eine
   Stimme. Es gibt keine Sprecher-Trennung (Diarisierung) und keine
   Besprechungsprotokolle; wer Meetings transkribieren will, braucht
@@ -138,7 +141,11 @@ Diktat-Durchlaufs.
   SHA-256-Pinning aller sechs nativen Whisper-Binaries
   (`scripts/verify-checksums.mjs`) und aller Modelle
   (`resources/model-manifest.json`), keine kompilierende `binding.gyp`
-  im Baum, Dependabot aktiv.
+  im Baum, Dependabot aktiv. Modell-Downloads haben eine
+  Rückfallquelle (eigener, Byte-identischer Mirror als
+  GitHub-Release-Asset, Release `modelle-v1`); jede Quelle wird gegen
+  dieselben fest einkompilierten SHA-256-Konstanten verifiziert, die
+  Quellenwahl ist nie eine Vertrauensentscheidung.
 - **Logging ohne Inhalte:** strukturierte, rotierte Logdateien mit
   restriktiven Rechten; Diktat-Inhalte werden nie geloggt.
 

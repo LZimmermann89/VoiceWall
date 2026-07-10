@@ -9,6 +9,12 @@
  *
  * Bewusst nie die HF-CDN-URL hardcoden: die ist signiert und laeuft ab. Immer
  * die stabile `resolve/main`-URL, Redirects folgt der Downloader selbst.
+ *
+ * Rueckfallquellen (E50): jede Datei ist zusaetzlich als unveraendertes
+ * Release-Asset im VoiceWall-Repo gespiegelt (Tag modelle-v1). Der Mirror
+ * neutralisiert das Verschwinde-Risiko der Hugging-Face-Repos; die
+ * Vertrauensfrage haengt nicht an der Quelle, weil jede Quelle gegen
+ * dieselben einkompilierten SHA-256-Konstanten verifiziert wird.
  */
 
 import type { DictationLanguage } from '../../shared/schema';
@@ -17,6 +23,18 @@ import { texte } from '../i18n';
 /** Stabile Modell-Kennungen (Katalog, Manifest, Statusanzeigen). */
 export type ModelId = 'whisper-q5' | 'whisper-fp16' | 'turbo-q5_0-multilingual' | 'silero-vad';
 
+/**
+ * Basis-URL des eigenen Modell-Mirrors (E50): unveraenderte Kopien der
+ * Originaldateien als Release-Assets im oeffentlichen VoiceWall-Repo.
+ * Asset-Name ist exakt der Katalog-fileName.
+ */
+export const MODEL_MIRROR_BASE_URL =
+  'https://github.com/LZimmermann89/VoiceWall/releases/download/modelle-v1';
+
+function mirrorUrl(fileName: string): string {
+  return `${MODEL_MIRROR_BASE_URL}/${fileName}`;
+}
+
 export interface ModelDescriptor {
   /** Interner Schluessel. */
   readonly id: ModelId;
@@ -24,6 +42,12 @@ export interface ModelDescriptor {
   readonly fileName: string;
   /** Stabile Download-URL (resolve/main), niemals die CDN-URL. */
   readonly url: string;
+  /**
+   * Rueckfallquellen in Versuchsreihenfolge (E50). Jede Quelle wird gegen
+   * dieselbe SHA-256-Konstante verifiziert; die Reihenfolge ist reine
+   * Verfuegbarkeits-, nie eine Vertrauensentscheidung.
+   */
+  readonly mirrorUrls: readonly string[];
   /** Erwartete Groesse in Bytes (schneller Vorab-Sanity-Check). */
   readonly byteSize: number;
   /** Erwarteter SHA-256 in Kleinbuchstaben-Hex. */
@@ -46,6 +70,7 @@ export const MODEL_CATALOG = {
     id: 'whisper-q5',
     fileName: 'ggml-model-q5_0.bin',
     url: 'https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml/resolve/main/ggml-model-q5_0.bin',
+    mirrorUrls: [mirrorUrl('ggml-model-q5_0.bin')],
     byteSize: 574_041_195,
     sha256: '15e92e3db0993c52fffa781513eec9253475331c1be808f8fb409285c9d9d030',
     label: 'Deutsches Whisper-Modell (large-v3-turbo, Q5_0)',
@@ -65,6 +90,7 @@ export const MODEL_CATALOG = {
     id: 'whisper-fp16',
     fileName: 'ggml-model.bin',
     url: 'https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml/resolve/main/ggml-model.bin',
+    mirrorUrls: [mirrorUrl('ggml-model.bin')],
     byteSize: 1_624_555_275,
     sha256: '6eb2e025198a6cbac7bdb1e86e278f5de002e583aae7bdfcf5183ef8da16decd',
     label: 'Deutsches Whisper-Modell (large-v3-turbo, fp16, maximale Genauigkeit)',
@@ -82,6 +108,7 @@ export const MODEL_CATALOG = {
     id: 'turbo-q5_0-multilingual',
     fileName: 'ggml-large-v3-turbo-q5_0.bin',
     url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin',
+    mirrorUrls: [mirrorUrl('ggml-large-v3-turbo-q5_0.bin')],
     byteSize: 574_041_195,
     sha256: '394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2',
     label: 'Englisch / mehrsprachig (large-v3-turbo, Q5_0)',
@@ -90,6 +117,7 @@ export const MODEL_CATALOG = {
     id: 'silero-vad',
     fileName: 'ggml-silero-v5.1.2.bin',
     url: 'https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin',
+    mirrorUrls: [mirrorUrl('ggml-silero-v5.1.2.bin')],
     byteSize: 885_098,
     sha256: '29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf',
     label: 'Silero-VAD-Modell (v5.1.2)',

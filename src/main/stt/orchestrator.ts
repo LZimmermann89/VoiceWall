@@ -50,7 +50,12 @@ import {
   type ModelId,
   type WhisperModelChoice,
 } from '../model/model-catalog';
-import { ensureModel, getModelStatuses, removeModelFile } from '../model/model-store';
+import {
+  ensureModel,
+  getModelStatuses,
+  removeModelFile,
+  type SourceFallbackInfo,
+} from '../model/model-store';
 import { ensureMicrophoneAccess } from '../permission/microphone';
 import {
   DEFAULT_ENGINE_TUNING,
@@ -461,6 +466,23 @@ export class DictationOrchestrator {
    * des EN-Modells, solange keine Firma Englisch waehlt). `languageOverride`
    * nutzt der Wizard: dort steht die Sprache fest, BEVOR die Firma existiert.
    */
+  /**
+   * Betriebslog-Warnung, wenn eine Download-Quelle scheitert und die
+   * naechste versucht wird (E50). Nur Host und Fehlerart, nie die volle
+   * URL; alle Meta-Felder sind in der Logger-Allowlist freigegeben.
+   */
+  private sourceFallbackLogger(modelId: ModelId): (info: SourceFallbackInfo) => void {
+    return (info) => {
+      this.deps.logger.warn('Modell-Download: Quelle fehlgeschlagen, versuche Rueckfallquelle.', {
+        modelId,
+        source: info.failedHost,
+        reason: info.errorKind,
+        attempt: info.attempt,
+        maxAttempts: info.maxAttempts,
+      });
+    };
+  }
+
   async prepareModels(
     languageOverride?: DictationLanguage,
   ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -481,6 +503,7 @@ export class DictationOrchestrator {
             percent: progress.percent,
           });
         },
+        onSourceFallback: this.sourceFallbackLogger(descriptor.id),
       });
       if (!result.ok) {
         this.setError(result.error.message);
@@ -556,6 +579,7 @@ export class DictationOrchestrator {
             percent: progress.percent,
           });
         },
+        onSourceFallback: this.sourceFallbackLogger(descriptor.id),
       });
       if (!result.ok) {
         this.setError(result.error.message);

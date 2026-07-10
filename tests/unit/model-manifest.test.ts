@@ -20,6 +20,7 @@ const manifestSchema = z.object({
       id: z.string(),
       fileName: z.string(),
       url: z.string().url(),
+      mirrorUrls: z.array(z.string().url()).min(1),
       byteSize: z.number().int().positive(),
       sha256: z.string(),
       label: z.string(),
@@ -39,6 +40,7 @@ describe('resources/model-manifest.json', () => {
       expect(entry, `Manifest-Eintrag fuer ${descriptor.id} fehlt`).toBeDefined();
       expect(entry?.fileName).toBe(descriptor.fileName);
       expect(entry?.url).toBe(descriptor.url);
+      expect(entry?.mirrorUrls).toEqual([...descriptor.mirrorUrls]);
       expect(entry?.byteSize).toBe(descriptor.byteSize);
       expect(entry?.sha256).toBe(descriptor.sha256);
       expect(entry?.label).toBe(descriptor.label);
@@ -50,6 +52,17 @@ describe('resources/model-manifest.json', () => {
       expect(isValidSha256Hex(model.sha256)).toBe(true);
       expect(model.url.startsWith('https://huggingface.co/')).toBe(true);
       expect(model.url).toContain('/resolve/main/');
+    }
+  });
+
+  it('Mirror-URLs zeigen auf Release-Assets des VoiceWall-Repos (E50)', () => {
+    for (const model of manifest.models) {
+      for (const mirror of model.mirrorUrls) {
+        expect(
+          mirror.startsWith('https://github.com/LZimmermann89/VoiceWall/releases/download/'),
+        ).toBe(true);
+        expect(mirror.endsWith(`/${model.fileName}`)).toBe(true);
+      }
     }
   });
 
