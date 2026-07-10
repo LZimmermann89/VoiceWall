@@ -8,6 +8,19 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- README-Abschnitt "Ehrliche Schwächen" (deutsch und englisch): nur
+  Desktop, ein prüfsummen-verifizierter Netzmoment beim
+  Modell-Download, Abhängigkeit vom einen deutschen Finetune, kein
+  Meeting-/Diarisierungs-Werkzeug. Gehört zum Grundsatz "Beleg statt
+  Behauptung".
+
+- fp16-Selbst-Hash-Quercheck (R14) erledigt: die vollständig geladene
+  1,6-GB-Datei wurde am 10.07.2026 unabhängig mit `shasum -a 256`
+  gehasht, Ergebnis identisch mit der Katalog-Konstante und dem erneut
+  abgefragten Hugging-Face-LFS-OID. Kommentar in `model-catalog.ts`
+  und Entscheidung E21 aktualisiert (keine Änderung an der Prüfsumme
+  selbst).
+
 - Deinstallation per Doppelklick (Entscheidung E49):
   `install/uninstall.command` (macOS) und `install\uninstall.cmd`
   (Windows, prozess-scoped ExecutionPolicy Bypass), analog zu den

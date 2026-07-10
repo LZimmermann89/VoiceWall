@@ -74,6 +74,32 @@ welcome (see the test guide `docs/TESTLEITFADEN.md`, English version:
   notes and the full provider identification (Impressum) displayed
   locally.
 
+## Honest weaknesses
+
+The principle "evidence over claims" includes naming the limits
+honestly. These four are known, and some of them are deliberate
+decisions:
+
+- **Desktop only:** VoiceWall runs on Mac and Windows. There is no
+  Linux, no mobile, no server variant and no team sync. This is
+  intentional: one store per workstation, physically with the user,
+  without a central component that would have to be operated and
+  secured.
+- **One network moment remains:** the one-time model download during
+  setup is the only network connection in the app's life cycle. It is
+  SHA-256-verified (a deviating file is rejected, never silently
+  accepted) and is eliminated entirely by offline vendoring in the
+  on-site installation.
+- **Dependency on a single model:** German recognition quality
+  depends on the quality of the one German fine-tune
+  (whisper-large-v3-turbo-german). The custom dictionary mitigates
+  mis-transcribed technical terms, but there is no second German
+  model as a fallback; a Q4 emergency variant for weak hardware is
+  deliberately deferred to v1.1.
+- **Not a meeting tool:** VoiceWall is a dictation device for one
+  voice. There is no speaker separation (diarisation) and no meeting
+  minutes feature; transcribing meetings requires a different tool.
+
 ## Verify instead of believing: the network self-test
 
 The network self-test guide `docs/NETZWERK-SELBSTTEST.md` (English

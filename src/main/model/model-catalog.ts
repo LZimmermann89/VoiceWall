@@ -57,8 +57,9 @@ export const MODEL_CATALOG = {
    * `api/models/cstr/whisper-large-v3-turbo-german-ggml/tree/main` (der OID
    * IST der SHA-256, gegen den HF die Datei selbst verifiziert). Der
    * unabhaengige Selbst-Hash-Quercheck (R14, wie beim Q5_0 im M1-Spike)
-   * steht fuer diese 1,6-GB-Datei noch aus; schlimmster Fall bei falscher
-   * Konstante ist ein abgelehnter Download, nie eine falsch akzeptierte Datei.
+   * ist am 10.07.2026 erledigt: die vollstaendig geladene 1,6-GB-Datei
+   * wurde mit `shasum -a 256` unabhaengig gehasht, Ergebnis identisch
+   * mit dieser Konstante UND mit dem erneut abgefragten HF-LFS-OID.
    */
   whisperFp16: {
     id: 'whisper-fp16',

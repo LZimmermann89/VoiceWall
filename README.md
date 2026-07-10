@@ -72,6 +72,33 @@ echter Windows-Hardware aus, Testberichte sind willkommen (siehe
   Backup-/Verschlüsselungs-Hinweise und die vollständige
   Anbieterkennzeichnung (Impressum) lokal angezeigt.
 
+## Ehrliche Schwächen
+
+Zum Grundsatz "Beleg statt Behauptung" gehört auch die ehrliche
+Nennung der Grenzen. Diese vier sind bekannt, teils sind es bewusste
+Entscheidungen:
+
+- **Nur Desktop:** VoiceWall läuft auf Mac und Windows. Es gibt kein
+  Linux, kein Mobile, keine Server-Variante und keinen Team-Sync. Das
+  ist gewollt: ein Bestand pro Arbeitsplatz, physisch beim Nutzer,
+  ohne zentrale Komponente, die betrieben und abgesichert werden
+  müsste.
+- **Ein Netzmoment bleibt:** der einmalige Modell-Download bei der
+  Einrichtung ist die einzige Netzverbindung im Lebenszyklus der App.
+  Er ist SHA-256-verifiziert (eine abweichende Datei wird abgelehnt,
+  nie stillschweigend akzeptiert) und entfällt bei der
+  Vor-Ort-Installation durch Offline-Vendoring vollständig.
+- **Abhängigkeit von einem Modell:** die deutsche Erkennungsqualität
+  hängt an der Qualität des einen deutschen Finetunes
+  (whisper-large-v3-turbo-german). Das Fach-Wörterbuch mildert
+  Fehltranskriptionen von Fachbegriffen, aber es gibt kein zweites
+  deutsches Modell als Ausweichoption; eine Q4-Notvariante für
+  schwache Hardware ist bewusst auf v1.1 verschoben.
+- **Kein Meeting-Werkzeug:** VoiceWall ist ein Diktiergerät für eine
+  Stimme. Es gibt keine Sprecher-Trennung (Diarisierung) und keine
+  Besprechungsprotokolle; wer Meetings transkribieren will, braucht
+  ein anderes Werkzeug.
+
 ## Prüfen statt glauben: der Netzwerk-Selbsttest
 
 `docs/NETZWERK-SELBSTTEST.md` beschreibt drei unabhängige Proben, mit
