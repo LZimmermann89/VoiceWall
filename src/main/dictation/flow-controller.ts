@@ -322,10 +322,7 @@ export class DictationFlowController {
     const companies = this.deps.companies;
     if (companies !== null) {
       try {
-        const protokoll = applyErsetzungenMitProtokoll(
-          text,
-          await companies.activeErsetzungen(),
-        );
+        const protokoll = applyErsetzungenMitProtokoll(text, await companies.activeErsetzungen());
         text = protokoll.text;
         ersetzungen = protokoll.angewandt.map(formatAngewandteErsetzung);
       } catch (error) {

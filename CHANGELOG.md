@@ -24,7 +24,6 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   dass die Weiterverwendung der Texte eine eigene
   Verarbeitungstätigkeit ist.
 
-
 - Rückfallquelle für den Modell-Download (Entscheidung E50): alle vier
   Modelldateien sind zusätzlich Byte-identisch als Release-Assets im
   VoiceWall-Repo gespiegelt (Release `modelle-v1`). Scheitert die
