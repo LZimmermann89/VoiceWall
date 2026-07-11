@@ -84,9 +84,9 @@ Consequences:
   therefore the regular, tested dev state.
 - **Only a rebuild-stable signing identity solves this permanently:**
   Apple Developer ID plus notarisation yields an identifier-/
-  team-based designated requirement that survives rebuilds
-  (recommendation priority 2 of the ABARBEITUNG; decision after the
-  manual TCC test with Lars). Until then: plan for the re-grant step
+  team-based designated requirement that survives rebuilds (that
+  decision will be made after the manual TCC test). Until then: plan
+  for the re-grant step
   after every update, and the copy button plus clipboard remains the
   primary resilience path.
 

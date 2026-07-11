@@ -79,8 +79,8 @@ Builds, nicht über die Bundle-ID. Konsequenzen:
   reguläre, getestete Dev-Zustand.
 - **Dauerhaft löst das nur eine rebuild-stabile Signatur-Identität:** Apple
   Developer ID plus Notarisierung ergibt eine identifier-/teambasierte
-  Designated Requirement, die Rebuilds übersteht (Empfehlung Priorität 2 der
-  ABARBEITUNG; Entscheidung nach dem manuellen TCC-Test mit Lars). Bis dahin
+  Designated Requirement, die Rebuilds übersteht (die Entscheidung
+  darüber fällt nach dem manuellen TCC-Test). Bis dahin
   gilt: Nach jedem Update ist der Re-Grant-Schritt einzuplanen, und der
   Kopieren-Knopf plus Zwischenablage bleibt der Primär-Resilienzpfad.
 

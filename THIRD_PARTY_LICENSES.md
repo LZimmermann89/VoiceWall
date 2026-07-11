@@ -61,7 +61,7 @@ Attributions-Kette des deutschen Whisper-Modells (Apache-2.0,
    nach GGML, Quantisierung).
 
 Attributions-Kette des multilingualen Whisper-Modells (Diktatsprache
-Englisch, Paket B1): Modellarchitektur und Ursprungsgewichte OpenAI
+Englisch): Modellarchitektur und Ursprungsgewichte OpenAI
 Whisper large-v3-turbo (MIT, https://github.com/openai/whisper); die
 tatsächlich geladene Datei ist die GGML/Q5_0-Konvertierung aus dem
 whisper.cpp-Modellbestand von Georgi Gerganov (MIT,

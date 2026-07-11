@@ -154,11 +154,9 @@ Diktat-Durchlaufs.
 
 Details zum Meldeweg für Schwachstellen: `SECURITY.md`.
 
-Hinweis zu Quellenangaben: Kommentare zitieren stellenweise
-"ABARBEITUNG X.Y" oder Entscheidungsnummern wie "E12". Beides verweist
-auf die interne Bau- und Entscheidungsdokumentation des Projekts; sie
-wird nicht mit ausgeliefert, die Zitate dienen der internen
-Nachvollziehbarkeit.
+Hinweis: Quellcode-Kommentare enthalten stellenweise interne
+Planungs-Kürzel. Sie haben für Nutzer keine Bedeutung; die zugehörigen
+Unterlagen sind nicht Teil dieses Repos.
 
 ## Systemvoraussetzungen
 

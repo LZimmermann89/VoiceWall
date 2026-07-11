@@ -5,8 +5,8 @@
 This document (the backup notes) belongs to the GDPR evidence sheet
 (`rechtstexte/DSGVO-BELEG-BLATT.md`, section 5) and is substantively
 identical to the section "Backup and encryption" in the app's
-evidence view (`src/shared/backup-hinweise.ts`). It addresses risk
-R16 from the risk register: an unencrypted plain-text backup of
+evidence view (`src/shared/backup-hinweise.ts`). It addresses a risk
+taken deliberately seriously: an unencrypted plain-text backup of
 highly sensitive dictations.
 
 ## The central warning first
@@ -19,7 +19,7 @@ highly sensitive dictations.
 > meaning of Art. 9 GDPR. Therefore use encrypted backup media only.
 
 The plain-text format is a deliberate architecture decision (folder
-as database, ABARBEITUNG 4.4): it makes the data provably local,
+as database): it makes the data provably local,
 portable and readable even without VoiceWall. The flip side is that
 PROTECTING the copies is in your hands. This page says concretely
 how.
@@ -70,8 +70,8 @@ The password (at least 12 characters) is not stored anywhere. If the
 password is lost, the content of the `.vwenc` file is irrecoverably
 lost; there is no backdoor and no recovery.
 
-Technical key facts (decision E30,
-`src/main/storage/encrypted-export.ts`): a deliberately simple
+Technical key facts (`src/main/storage/encrypted-export.ts`): a
+deliberately simple
 container format `VWENC1` (magic, version and KDF identifier, salt,
 nonce, auth tag, ciphertext), key derivation scrypt (N=16384, r=8,
 p=1), AES-256-GCM with authenticated decryption: a wrong password or

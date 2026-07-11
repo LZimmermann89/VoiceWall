@@ -153,10 +153,9 @@ requests during a complete dictation run for every revision.
 Details on the reporting channel for vulnerabilities: `SECURITY.md`
 (English version: `SECURITY.en.md`).
 
-Note on source citations: comments occasionally cite "ABARBEITUNG
-X.Y" or decision numbers such as "E12". Both refer to the project's
-internal build and decision documentation; it is not shipped, the
-citations serve internal traceability.
+Note: source-code comments occasionally contain internal planning
+shorthands. They carry no meaning for users; the underlying documents
+are not part of this repo.
 
 ## System requirements
 

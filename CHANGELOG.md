@@ -8,7 +8,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
-- Ersetzungs-Beleg je Diktat (Entscheidung E51): tatsächlich
+- Ersetzungs-Beleg je Diktat: tatsächlich
   angewandte Wörterbuch-Ersetzungen werden im Front-Matter des
   Diktats vermerkt (Feld `ersetzungen`, Format
   `von -> zu (Nx)`) und in der Detailansicht des Registers angezeigt
@@ -24,7 +24,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   dass die Weiterverwendung der Texte eine eigene
   Verarbeitungstätigkeit ist.
 
-- Rückfallquelle für den Modell-Download (Entscheidung E50): alle vier
+- Rückfallquelle für den Modell-Download: alle vier
   Modelldateien sind zusätzlich Byte-identisch als Release-Assets im
   VoiceWall-Repo gespiegelt (Release `modelle-v1`). Scheitert die
   Primärquelle (huggingface.co) mit Netz-, HTTP-, Größen- oder
@@ -47,21 +47,20 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   1,6-GB-Datei wurde am 10.07.2026 unabhängig mit `shasum -a 256`
   gehasht, Ergebnis identisch mit der Katalog-Konstante und dem erneut
   abgefragten Hugging-Face-LFS-OID. Kommentar in `model-catalog.ts`
-  und Entscheidung E21 aktualisiert (keine Änderung an der Prüfsumme
-  selbst).
+  aktualisiert (keine Änderung an der Prüfsumme selbst).
 
-- Deinstallation per Doppelklick (Entscheidung E49):
+- Deinstallation per Doppelklick:
   `install/uninstall.command` (macOS) und `install\uninstall.cmd`
   (Windows, prozess-scoped ExecutionPolicy Bypass), analog zu den
   Setup-Wrappern. Firmendaten bleiben wie immer erhalten.
 
-- Drift-Gate für die Install-Checksummen (Entscheidung E49): der neue
+- Drift-Gate für die Install-Checksummen: der neue
   Unit-Test tests/unit/install-checksums.test.ts erzwingt, dass
   `install/lib/checksums.json` exakt die Modelle aus
   `resources/model-manifest.json` mit identischen SHA-256-Werten
   listet (beidseitig, keine verwaisten Einträge).
 
-- Modelle-Reiter in der Verwaltung (Entscheidung E46): alle vier
+- Modelle-Reiter in der Verwaltung: alle vier
   Katalog-Modelle (Deutsch Q5_0, Deutsch fp16, Englisch/mehrsprachig,
   Silero-VAD) mit Zweck, Größe, Status (vorhanden und verifiziert /
   fehlt) und gekürzter SHA-256 (voller Wert im title-Attribut).
@@ -74,7 +73,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   `model:details`, `model:download`, `model:delete`; E2E in
   tests/e2e/modelle.spec.ts.
 
-- Toast-System für sofort sichtbare Meldungen (Entscheidung E44):
+- Toast-System für sofort sichtbare Meldungen:
   Fehler (aria-live assertive, 8 s) und wichtige Erfolge (polite, 4 s)
   erscheinen als Papier-Karte unten rechts, unabhängig von Ansicht und
   Scroll-Position; manuell per Tastatur schließbar, maximal 3
@@ -85,7 +84,7 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   Inline-Anzeigen bleiben als Detail-Ort erhalten. E2E in
   tests/e2e/toast.spec.ts.
 
-- Sprachkommando-Aliasse (Entscheidung E43): deutsch "Absatz" (allein)
+- Sprachkommando-Aliasse: deutsch "Absatz" (allein)
   und "Zeilenumbruch", englisch "paragraph". Die UI-Erklärung nennt
   die vollständige Kommandoliste und erklärt ehrlich, dass Whisper ein
   gesprochenes "Punkt" manchmal selbst in ein Satzzeichen umwandelt
@@ -103,12 +102,12 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   tests/e2e/vokabular-persistenz.spec.ts (Speichern, Ansichtswechsel,
   App-Neustart, Prompt-Inhalt). Befund: die Persistenz- und
   Prompt-Kette war technisch intakt, die Lücke war Sichtbarkeit und
-  Erwartung (Entscheidung E45).
+  Erwartung.
 
 ### Fixed
 
-- Install-Audit des Selbst-Installations-Wegs (Entscheidung E49,
-  sieben Funde): Die Setup-Skripte nennen bei fehlendem Node 26 jetzt
+- Install-Audit des Selbst-Installations-Wegs (sieben Funde): Die
+  Setup-Skripte nennen bei fehlendem Node 26 jetzt
   die exakte Bezugsquelle (nodejs.org/en/download, ausdrücklich
   Version 26 "Current" wählen, nicht die vorausgewählte LTS; macOS
   alternativ `brew install node`) statt eines zirkulären Verweises auf
@@ -129,8 +128,8 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   (Gatekeeper blockiert `.command`; git clone empfohlen).
 
 - Sprachkommandos erzeugen keinen Interpunktions-Müll mehr, wenn
-  Whisper um das Kommandowort selbst Satzzeichen setzt (Entscheidung
-  E43, Praxistest-Repro): "Das ist ein Test, Punkt." wird jetzt
+  Whisper um das Kommandowort selbst Satzzeichen setzt
+  (Praxistest-Repro): "Das ist ein Test, Punkt." wird jetzt
   "Das ist ein Test." (bisher "Das ist ein Test,."); ", Komma" wird
   ","; "Neuer Absatz." mitten im Text hinterlässt keinen Rest-Punkt;
   "Hallo Absatz und weiter" erzeugt jetzt einen Absatz. 21 neue
@@ -142,20 +141,19 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   der internen Abnahme-Checkliste (Auto-Paste auf macOS und Windows,
   TCC-Rebuild-Test, Windows-Setup-Trockenlauf, Schwachhardware-Latenz,
   echter Download-Pfad, SmartScreen/AV-Verhalten, On-Site-Trockenlauf).
-  Begründung des Release-Kandidaten: Entscheidung E33.
 
 ## [1.0.0-rc.2] - 2026-07-04
 
 Zweiter Release-Kandidat: VoiceWall ist vollständig zweisprachig
 (Deutsch/Englisch, Oberfläche UND alle Main-Prozess-Meldungen), die
-Diktatsprache Englisch ist pro Firma wählbar, Stufe 1 (Fach-Wörterbuch
-und regelbasierte Textaufbereitung) ist enthalten. Zusätzlich alle vier
-Pflicht-Fixes aus dem B2-Review (u. a. zentral serialisierte
+Diktatsprache Englisch ist pro Firma wählbar, Fach-Wörterbuch und
+regelbasierte Textaufbereitung sind enthalten. Zusätzlich alle vier
+Pflicht-Fixes aus dem internen Review (u. a. zentral serialisierte
 Konfig-Schreibzugriffe, korrekte Footer-Version).
 
 ### Added
 
-- Alle Main-Prozess-Texte zweisprachig (Paket B3, Entscheidung E41):
+- Alle Main-Prozess-Texte zweisprachig:
   Result-Fehlermeldungen aller IPC-Handler (Diktat-Flow, Firmen,
   Register, Export, Verschlüsselung, Wörterbuch, Modelle, Freigaben),
   engineHinweis-Statusmeldungen, Overlay-Zustellmeldungen
@@ -163,20 +161,20 @@ Konfig-Schreibzugriffe, korrekte Footer-Version).
   PDF-Vorlage (Beschriftungen und Fußzeile folgen der UI-Sprache zum
   Exportzeitpunkt) und der Fehlertext des Capture-Fensters stehen im
   neuen Katalog-Bereich `main` (`src/shared/i18n/de.ts`/`en.ts`,
-  gleiche Typ-Erzwingung wie B2). Der Main-Prozess hält die aktive
+  gleiche Typ-Erzwingung wie bei der Oberfläche). Der Main-Prozess hält die aktive
   UI-Sprache zentral in `src/main/i18n.ts` (`setUiLanguage()` beim
   Start aus der Konfiguration und im `config:set-ui-language`-Handler;
   `texte()` liefert den aktiven Katalog, keine verstreuten
   Konfig-Reads pro Meldung). Der Whisper-Worker erhält die UI-Sprache
   mit `init` und `set-context` und übersetzt seine wenigen
   nutzersichtbaren Fehlertexte selbst. Logs bleiben bewusst DEUTSCH
-  (interne Betriebssprache, E41). Neue Beweise: EN-Smoke-Unit-Tests
+  (interne Betriebssprache). Neue Beweise: EN-Smoke-Unit-Tests
   für Main-Meldungen (tests/unit/main-i18n.test.ts) und ein
   E2E-Durchstich "UI auf Englisch + Diktatfehler-Pfad zeigt englische
   Accessibility-Meldung" (tests/e2e/ui-language.spec.ts).
 
-- Zweisprachige Oberfläche Deutsch/Englisch (Paket B2, Entscheidung
-  E40). Eigene, typisierte Text-Kataloge in `src/shared/i18n/` ohne
+- Zweisprachige Oberfläche Deutsch/Englisch. Eigene, typisierte
+  Text-Kataloge in `src/shared/i18n/` ohne
   neue Abhängigkeit: `de.ts` ist die Quelle der Wahrheit, der Typ
   `Uebersetzung = typeof de` erzwingt die Vollständigkeit von `en.ts`
   beim Kompilieren (Laufzeit-Doppelnetz in tests/unit/i18n.test.ts,
@@ -196,18 +194,19 @@ Konfig-Schreibzugriffe, korrekte Footer-Version).
   Rechtstexte (Anbieterkennzeichnung, rechtstexte/) bleiben bewusst
   deutsch (deutsches Recht); die englische Oberfläche trägt darüber
   eine kurze Einordnungszeile. Meldungen aus dem Main-Prozess
-  (Fehlertexte, Engine-Hinweise, Tray) bleiben in diesem Paket deutsch
-  (Paket B3). Neue E2E-Beweise: Wizard-Schritt 0 mit Live-Umschaltung,
+  (Fehlertexte, Engine-Hinweise, Tray) bleiben in diesem Stand deutsch
+  (der Eintrag darüber zieht sie nach). Neue E2E-Beweise:
+  Wizard-Schritt 0 mit Live-Umschaltung,
   Verwaltungs-Umschalter mit Persistenz über einen Neustart.
 
-- Diktatsprache Englisch als wählbare Sprache pro Firma (Paket B1,
-  Entscheidung E39; die Oberfläche bleibt deutsch). Neue Firmen wählen
+- Diktatsprache Englisch als wählbare Sprache pro Firma (die
+  Oberfläche bleibt deutsch). Neue Firmen wählen
   im Wizard-Schritt "Sprache" zwischen Deutsch (empfohlen, Standard,
   DE-optimiertes Finetune-Modell) und Englisch (originales
   multilinguales large-v3-turbo, Q5_0, MIT, aus ggerganov/whisper.cpp;
-  zusätzlicher einmaliger Download von ca. 574 MB, SHA-256 nach dem
-  R14-Verfahren selbst berechnet und identisch mit dem
-  Hugging-Face-LFS-OID). Kein Auto-Download: geladen werden nur die
+  zusätzlicher einmaliger Download von ca. 574 MB, SHA-256 selbst
+  berechnet und identisch mit dem Hugging-Face-LFS-OID). Kein
+  Auto-Download: geladen werden nur die
   Modelle der aktiven Sprache plus VAD. Die Sprache der aktiven Firma
   bestimmt Modell und language-Parameter der Transkription
   (Sprachwechsel = geordneter Engine-Neustart mit deutscher
@@ -220,23 +219,23 @@ Konfig-Schreibzugriffe, korrekte Footer-Version).
   Test-WAV (tests/fixtures/testdiktat-en.wav), Integrations- und
   E2E-Beweise inklusive Sprachwechsel über die UI.
 
-- Stufe 1: Fach-Wörterbuch pro Firma und regelbasierte lokale
-  Textaufbereitung (ABARBEITUNG 2.7; rein deterministische
-  String-Verarbeitung, kein Modell, kein externer Aufruf). Neue Datei
+- Fach-Wörterbuch pro Firma und regelbasierte lokale
+  Textaufbereitung (rein deterministische String-Verarbeitung, kein
+  Modell, kein externer Aufruf). Neue Datei
   `.voicewall/vokabular.json` je Firma (zod-validiert, atomar
   geschrieben): bis zu 200 Begriffe werden Whisper als Initial-Prompt
-  mitgegeben (kommaseparierte Liste, hart auf 600 Zeichen gekappt,
-  Entscheidung E37; der Anti-Halluzinations-Pfad bleibt unberührt,
+  mitgegeben (kommaseparierte Liste, hart auf 600 Zeichen gekappt;
+  der Anti-Halluzinations-Pfad bleibt unberührt,
   Stille erzeugt auch mit Prompt keinen Text), und bis zu 200
   Ersetzungsregeln korrigieren häufige Fehltranskriptionen
   deterministisch (nur ganze Wörter, Unicode-korrekte Wortgrenzen mit
-  Umlauten, case-sensitiv, längste zuerst, Literalbehandlung,
-  Entscheidung E36). Aufbereitungs-Pipeline
+  Umlauten, case-sensitiv, längste zuerst, Literalbehandlung).
+  Aufbereitungs-Pipeline
   (`src/shared/textaufbereitung.ts`): Interpunktions-Nachschärfung
   (immer an, konservativ), Füllwörter-Filter (Schalter, Standard an)
   und Sprachkommandos ("Punkt", "neue Zeile", ...; Schalter, Standard
-  aus, Entscheidung E38); die Schalter liegen global in der
-  Konfiguration (Entscheidung E35). Editor für Begriffe und
+  aus); die Schalter liegen global in der Konfiguration. Editor für
+  Begriffe und
   Ersetzungen im Bereich Diktat; neue IPC-Kanäle `vocab:get`,
   `vocab:save`, `config:set-aufbereitung`. Die Wortzahl im
   Front-Matter zählt den finalen Text. Die AI-Act-Einordnung wurde um
@@ -246,17 +245,17 @@ Konfig-Schreibzugriffe, korrekte Footer-Version).
 ### Fixed
 
 - Lost-Update-Muster in den Konfig-Handlern (Pflicht-Fix aus dem
-  B2-Review, Entscheidung E42): `setAufbereitung`,
+  internen Review): `setAufbereitung`,
   `setClipboardRestore`, Hotkey- und Modellwahl-Schreiber sowie die
   CompanyManager-Schreiber (Firmenliste, aktive Firma, Auto-Speichern)
   schrieben teils einen veralteten in-memory-Gesamtstand zurück und
   konnten damit fremde Änderungen überschreiben (dasselbe Muster, das
-  in B2 bei `setUiSprache` real frisch angelegte Firmen entfernt
+  bei `setUiSprache` real frisch angelegte Firmen entfernt
   hätte). Jetzt läuft JEDER globale Konfig-Schreibzugriff über EINE
   zentrale, serialisierte Lesen-Ändern-Schreiben-Funktion
   (`src/main/config/config-writer.ts`, Promise-Kette; FlowController
   und CompanyManager teilen sich dieselbe Instanz). Deterministischer
-  Regressionstest nach dem Muster des M7-Lost-Update-Tests:
+  Regressionstest nach dem Muster des bestehenden Lost-Update-Tests:
   tests/unit/config-writer.test.ts.
 
 - Prüfstempel-Footer zeigte im Dev-Modus die Electron-Version
@@ -270,22 +269,23 @@ Konfig-Schreibzugriffe, korrekte Footer-Version).
 
 - `document.documentElement.lang` folgt jetzt dynamisch der
   UI-Sprache (Hauptfenster und Overlay): Screenreader wählen damit die
-  korrekte Aussprache (A11y-Pflicht-Fix aus dem B2-Review).
+  korrekte Aussprache (Barrierefreiheits-Pflichtfix aus dem internen
+  Review).
 
 - Der Fehlertext des Capture-Fensters (Mikrofonzugriff) läuft über den
   Katalog-Kanal: das Capture-Fenster sendet nur noch das technische
   Detail, die nutzersichtbare Meldung baut der Main-Prozess in der
-  UI-Sprache (B2-Übergabepunkt).
+  UI-Sprache.
 
 ## [1.0.0-rc.1] - 2026-07-03
 
-Erster Release-Kandidat: alle Funktionsmeilensteine M0 bis M9 umgesetzt,
+Erster Release-Kandidat: alle Funktionsmeilensteine umgesetzt,
 alle automatisierten Gates grün (Typprüfung, Lint, Format, Unit-Tests,
 Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
 
 ### Added
 
-- M9: Vertriebsreife, Rechtstexte und Release-Vorbereitung. Neues
+- Vertriebsreife, Rechtstexte und Release-Vorbereitung. Neues
   Verzeichnis `rechtstexte/` mit Impressum (§ 5 DDG, § 7 DDG in
   Verbindung mit der VO (EU) 2022/2065, E-Mail von der Live-Quelle
   der-ki-auditor.de/impressum übernommen), kurzer und beweisbar wahrer
@@ -306,11 +306,11 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   In der App: Abschnitt „Über VoiceWall (Anbieterkennzeichnung)“ in
   der Beleg-Ansicht, vollständig lokal gerendert
   (`src/shared/impressum.ts`), plus Knopf zur statischen
-  Impressums-Quelle (zweite dokumentierte openExternal-Ausnahme, E31);
+  Impressums-Quelle (zweite dokumentierte openExternal-Ausnahme);
   E2E-Beleg in `tests/e2e/manage.spec.ts`. Das CI-Rechtsverweis-Gate
   deckt `rechtstexte/` mit ab (Verstoß-Beweis geführt).
-  Signing-Kostenentscheidung aufbereitet
-  (interne Signing-Entscheidung E32), Abnahme-Checkliste zu einer
+  Signing-Kostenentscheidung intern aufbereitet, Abnahme-Checkliste zu
+  einer
   konsolidierten 1.0.0-Checkliste erweitert, README auf den Ist-Stand
   neu geschrieben, NOTICE und THIRD_PARTY_LICENSES.md vervollständigt
   (whisper.cpp, @fugood/whisper.node samt sechs Plattform-Binaries,
@@ -321,32 +321,32 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   (CycloneDX-SBOM und Checksummen-Datei mit Modell-Hashes,
   Plattform-Binary-Hashes und Commit-Bezug).
 
-- M8: Export-, Such- und Backup-Ausbau (v1.1-Posten aus E25). PDF-Export
+- Export-, Such- und Backup-Ausbau. PDF-Export
   über `webContents.printToPDF()` in einem versteckten, sandboxed
   BrowserWindow: lokale Druckvorlage (CSP `default-src 'none'`, Body strikt
   als Text, Prüfdokument-Layout DIN A4 mit Fußzeile „Erstellt mit VoiceWall,
   100 % lokal“), echte Umlaute per Text-Extraktion im E2E-Test bewiesen
-  (pdf-parse nur als gepinnte Test-devDependency, E26). Stapel-Export im
+  (pdf-parse nur als gepinnte Test-devDependency). Stapel-Export im
   Register (Mehrfachauswahl per Checkbox oder alle gefilterten, MD/TXT/PDF):
   mehrere Dateien landen in einem atomar erzeugten Unterordner
-  `Exporte/<datum>-stapel/` statt ZIP (E27), Fortschritt als
+  `Exporte/<datum>-stapel/` statt ZIP, Fortschritt als
   IPC-Progress mit aria-live. Volltextsuche über die Markdown-Bodies
   (Umschalter „Auch im Volltext suchen“): sequenzieller Streaming-Scan,
   Suchbegriff strikt als Literal, Treffer mit Kontext-Snippet, kombiniert
   mit allen Filtern; bewusst ohne Cache nach Messung mit 1000
-  Fixture-Diktaten (E28). Tag-Batch-Rename („Tags verwalten“): firmenweit
+  Fixture-Diktaten. Tag-Batch-Rename („Tags verwalten“): firmenweit
   inklusive Papierkorb, atomare Datei-Updates, Abschluss per atomarem
   Manifest-Rebuild aus dem Dateizustand, Fehlerstrategie „weiterlaufen und
-  sammeln“ (E29). Backup-Härtung (R16): Beleg-Ansicht-Abschnitt „Backup und
+  sammeln“. Backup-Härtung: Beleg-Ansicht-Abschnitt „Backup und
   Verschlüsselung“ mit Klartext-/Art.-9-Warnung und
   FileVault-/BitLocker-Anleitung (auch als docs/BACKUP-HINWEISE.md);
   verschlüsselter Einzel-Export als `.vwenc` (AES-256-GCM, scrypt,
   ausschließlich Node-Bordmittel, Passwort mindestens 12 Zeichen mit
-  Wiederholung, wird nie gespeichert) plus „Datei entschlüsseln“ in der App
-  (E30).
+  Wiederholung, wird nie gespeichert) plus „Datei entschlüsseln“ in der
+  App.
 
-- M7: Verwaltungs-UI (v1-Scope). Ansichts-Container ohne Router-Paket
-  (E23) mit vier Ansichten (Diktat, Register, Papierkorb, Beleg) und
+- Verwaltungs-UI. Ansichts-Container ohne Router-Paket
+  mit vier Ansichten (Diktat, Register, Papierkorb, Beleg) und
   prominentem Firmen-Umschalter. Register als sortierbares
   Aktenverzeichnis (Datum/Titel/Wortzahl) mit Manifest-Schnellsuche und
   Filtern (Zeitraum, Tags-Mehrfachauswahl, Quelle), Tags mit
@@ -354,26 +354,27 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   Textknoten (Stored-XSS-Beweis per E2E), Bearbeiten mit atomarem
   Schreiben und `geaendert`/`version`-Nachführung, manuelle Notiz
   (Quelle `manuell`), MD/TXT-Export nach `Exporte/` mit „Im Finder
-  zeigen“ (Containment auch für Reveal, E24), Soft-Delete/Papierkorb
+  zeigen“ (Containment auch für Reveal), Soft-Delete/Papierkorb
   mit Wiederherstellen und endgültigem Löschen, Beleg-Ansicht („0
   externe Verbindungen“, Modellversionen mit SHA-256 und Pfad,
   eingebetteter Netzwerk-Selbsttest, Konsent-Zeitstempel, App-Version,
   Log-Pfad). Genau eine sichtbare H1 je Ansicht, Fokus wandert beim
-  Ansichtswechsel auf die H2. PDF/Volltext/Tag-Batch-Rename bewusst auf
-  M8 verschoben (E25).
+  Ansichtswechsel auf die H2. PDF/Volltext/Tag-Batch-Rename bewusst in
+  den Folgeausbau verschoben (siehe Eintrag darüber).
 
-- M6: Installer, Packaging und First-Run-Wizard. Packaging als reiner
+- Installer, Packaging und First-Run-Wizard. Packaging als reiner
   `--dir`-Build via electron-builder (`electron-builder.yml`: Bundle-ID
   `de.der-ki-auditor.voicewall`, deutscher NSMicrophoneUsageDescription-Text,
   `electronDist` aus node_modules ohne Netz-Nachladen, `identity: null`;
-  Signierung macht das Setup-Skript, Entscheidung E17); programmatisch
-  erzeugtes App-Icon ohne Binaerdatei im Repo (`scripts/generate-icon.mjs`,
-  E18). Bootstrap-Skripte `install/voicewall-setup.sh|.command|.ps1|.cmd`
-  mit den acht idempotenten Schritten aus ABARBEITUNG 4.1 (Preflight,
+  Signierung macht das Setup-Skript); programmatisch
+  erzeugtes App-Icon ohne Binaerdatei im Repo
+  (`scripts/generate-icon.mjs`).
+  Bootstrap-Skripte `install/voicewall-setup.sh|.command|.ps1|.cmd`
+  mit acht idempotenten Schritten (Preflight,
   portable Node aus Vendor, .npmrc-Haertung, `npm ci --offline` gegen
   Vendor-Cache, Packaging plus Ad-hoc-Codesign mit Bundle-ID-Verifikation
   und TCC-Re-Grant-Hinweis, npm audit/SBOM, App-Start mit
-  Ready-Marker-Poll statt Port/Sleep (E19), First-Run-Erkennung), Log nach
+  Ready-Marker-Poll statt Port/Sleep, First-Run-Erkennung), Log nach
   `~/.voicewall/logs/install-<ISO>.log`; Deinstallation entfernt nur
   VoiceWall-Eigenes und laesst Firmendaten IMMER stehen.
   `scripts/prepare-vendor.mjs` bereitet den Offline-Vendor-Stand je
@@ -386,8 +387,8 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   RFC-lax-E-Mail-Validierung, Speicherort mit Sync-Erkennung und
   Empfehlung "lokal mit Desktop-Verknuepfung", Sprache (Deutsch fest),
   Modellwahl mit Hardware-Empfehlung (Q5_0 Standard, fp16 ab 16 GB/6
-  Kernen, E21) und einmaligem, pruefsummen-verifiziertem Download samt
-  Fortschritt, Hotkey mit Livetest ohne Persistenz (E20) und
+  Kernen) und einmaligem, pruefsummen-verifiziertem Download samt
+  Fortschritt, Hotkey mit Livetest ohne Persistenz und
   Tastatur-Recorder, macOS-Bedienungshilfen-Schritt (nicht blockierend),
   Zusammenfassung mit atomarer Anlage, Erfolgsseite mit Kurzanleitung und
   eingebettetem Netzwerk-Selbsttest. Uebergangs-Hauptansicht (Diktat-Status,
@@ -396,7 +397,7 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   Design-System "Pruefdokument" (Papier-/Elfenbein-Grund, fast-schwarze
   Tinte, Siegel-Gruen als einziger Akzent, lokale Serifen-Systemfonts,
   Formular-Linien, Pruefstempel-Footer mit Version/Modell-Pruefsumme;
-  Kontrast-Nachweis AA in styles.css, A11y-Bilanz E22).
+  Kontrast-Nachweis AA in styles.css).
   Neue IPCs: `system:info` (Hardware/Version), `wizard:test-hotkey`,
   `config:set-model-choice`; Firmen-Anlage traegt jetzt optionale
   Firmendaten (Ansprechpartner, E-Mail, Standort, Hinweis), editierten
@@ -404,13 +405,13 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   CI: Skript-Syntax-Gate (bash -n, PowerShell-Parser) und macOS-Packaging-
   Job mit Bundle-Asserts (Info.plist-Keys, Ad-hoc-Signatur, App-Start).
 
-- M5: Ordner-als-Datenbank. Firmenordner-Anlage atomar (Temp-Ordner plus
-  Rename) und idempotent mit Struktur nach 4.4.1 (`.voicewall/` mit
+- Ordner-als-Datenbank. Firmenordner-Anlage atomar (Temp-Ordner plus
+  Rename) und idempotent mit fester Struktur (`.voicewall/` mit
   manifest.json/config.json/tags.json/.schema-version, `Diktate/YYYY/MM/`,
   `Exporte/`, `Papierkorb/`, POSIX 0700; fremde Ordner werden nie
   beschrieben, Kollisionsvorschlag statt Ueberschreiben), Transkripte als
   Markdown mit YAML-Front-Matter (eigener injektionssicherer Serializer/
-  Parser fuer das flache Schema, Entscheidung E13; Dateinamen
+  Parser fuer das flache Schema; Dateinamen
   `YYYY-MM-DD_HHMMSS_<slug>.md` mit id-Suffix bei Kollision), CRUD mit
   atomarem Schreiben und Containment-Pruefung nach `path.resolve` auch beim
   LESEN (manipulierte Manifest-/Konfig-Pfade werden abgewiesen),
@@ -421,17 +422,17 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   globale firmen[]/aktiveFirma/diktatAutoSpeichern mit Pfad-Validierung
   beim Laden), echte Migrationsroutine (backup-erst nach
   `.voicewall/backups/`, Migration auf Kopie, Validierung, Swap, Rollback,
-  idempotent; Risiko R12, Entscheidung E14), Sync-Fallen-Erkennung
+  idempotent), Sync-Fallen-Erkennung
   (iCloud-Desktop-Redirect via realpath, OneDrive-Muster plus
-  Env-Praefix, Dropbox, Google Drive; Risiko R8) mit lokaler
+  Env-Praefix, Dropbox, Google Drive) mit lokaler
   Alternativ-Strategie `~/VoiceWall/` plus Desktop-Verknuepfung
-  (Symlink/Junction, Entscheidung E15), Mehr-Firmen-Verwaltung mit
+  (Symlink/Junction), Mehr-Firmen-Verwaltung mit
   physischer Trennung, IPC/Preload-Bruecke (zod-validiert) und minimaler
   Test-UI, Diktat-Flow-Anbindung (Auto-Speichern in der aktiven Firma,
   Default AN sobald eine Firma existiert), Mehrbenutzer-/
-  Fast-User-Switching-Klaerung (Entscheidung E16, Kritik D7).
+  Fast-User-Switching-Klaerung.
 
-- M4: Sicherheits- und Datenschutz-Fundament. Firmenname-Sanitisierung mit
+- Sicherheits- und Datenschutz-Fundament. Firmenname-Sanitisierung mit
   7-Stufen-Pipeline und Containment nach `path.resolve`
   (`src/main/storage/sanitize.ts`, 50 Angriffsklassen-Tests, inkl. NFD-/
   Case-Kollisionserkennung fuer macOS/Windows), Desktop-Aufloesung mit
@@ -452,7 +453,7 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   Diktat-Flow) und Kunden-Selbsttest-Anleitung
   `docs/NETZWERK-SELBSTTEST.md`.
 
-- M3: Systemweites Diktat. Globaler Hotkey (Toggle, Standard
+- Systemweites Diktat. Globaler Hotkey (Toggle, Standard
   `CommandOrControl+Shift+D`, konfigurierbar und persistiert, Konflikt-Handling),
   Tray-Icon mit Aufnahme-Indikator, fokus-neutrales Overlay ("Ich hoere zu"),
   Auto-Paste-Adapter (macOS osascript, Windows PowerShell SendKeys, beide
@@ -464,27 +465,27 @@ Build, E2E, npm audit, SBOM, Supply-Chain- und Rechtsverweis-Gate).
   Sperrbildschirm/Suspend. Push-to-talk fuer v1 gestrichen (technisch
   unmoeglich mit globalShortcut, intern dokumentiert).
 
-- M2: STT-Kern. Audio-Aufnahme in einem eigenen, unsichtbaren
+- STT-Kern. Audio-Aufnahme in einem eigenen, unsichtbaren
   Capture-Fenster (getUserMedia, 16 kHz mono, RAM-only, kein
   Datei-Artefakt), informierte Mikrofon-Einwilligung mit Zeitstempel
   und AI-Act-Transparenzhinweis, Whisper-Engine als utilityProcess mit
   dem deutschen Modell whisper-large-v3-turbo-german (Q5_0),
   VAD-gestuetzte Segmentierung (Silero v5.1.2) mit Sliding-Window,
   pruefsummen-verifizierter Modell-Download (SHA-256 aus dem Katalog,
-  Quercheck gegen den Hugging-Face-LFS-OID, Risiko R14) und
+  Quercheck gegen den Hugging-Face-LFS-OID) und
   Test-Oberflaeche fuer den Diktat-Flow.
 
-- M1: Architektur-Spike (Projektbrecher empirisch geklaert, Ergebnisse
-  im internen M1-Spike-Bericht): `@fugood/whisper.node` ist ein echtes
+- Architektur-Spike (Projektbrecher empirisch geklaert):
+  `@fugood/whisper.node` ist ein echtes
   N-API-Addon (ABI-stabil, kein nan), laedt und transkribiert im
-  `utilityProcess` (R1/R2 entschaerft); der Binary-Bezug funktioniert
+  `utilityProcess`; der Binary-Bezug funktioniert
   unter npm-Skript-Restriktionen ueber optionale Plattform-Subpakete,
-  Offline-Vendoring je Zielplattform als Pflichtweg festgelegt (R3);
-  TCC-Befund F4: Ad-hoc-Signatur bindet Freigaben an den cdhash, jeder
+  Offline-Vendoring je Zielplattform als Pflichtweg festgelegt;
+  TCC-Befund: Ad-hoc-Signatur bindet Freigaben an den cdhash, jeder
   Rebuild bricht erteilte Grants (Grundlage der
-  Developer-ID-Empfehlung, R4).
+  Developer-ID-Empfehlung).
 
-- M0: Vollständig gehärtetes, compilerfreies Electron-Projektgerüst
+- Vollständig gehärtetes, compilerfreies Electron-Projektgerüst
   (Electron, electron-vite, TypeScript strict, ESLint-Modulgrenzen, Vitest,
   Playwright for Electron, CI-Pipeline, SBOM, Sicherheits-Defaults,
   Single-Instance-Lock, deaktiviertes Crash-Reporting).

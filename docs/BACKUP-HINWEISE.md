@@ -6,7 +6,7 @@ Dieses Dokument gehört zum DSGVO-Beleg-Blatt
 (`rechtstexte/DSGVO-BELEG-BLATT.md`, Abschnitt 5) und ist inhaltlich
 deckungsgleich mit dem Abschnitt „Backup und Verschlüsselung“ in der
 Beleg-Ansicht der App (`src/shared/backup-hinweise.ts`). Es adressiert
-Risiko R16 aus dem Risikoregister: unverschlüsseltes Klartext-Backup
+ein bewusst ernst genommenes Risiko: unverschlüsseltes Klartext-Backup
 hochsensibler Diktate.
 
 ## Die zentrale Warnung zuerst
@@ -19,7 +19,7 @@ hochsensibler Diktate.
 > deshalb ausschließlich verschlüsselte Backup-Medien.
 
 Das Klartext-Format ist eine bewusste Architektur-Entscheidung (Ordner als
-Datenbank, ABARBEITUNG 4.4): es macht die Daten beweisbar lokal, portabel und
+Datenbank): es macht die Daten beweisbar lokal, portabel und
 auch ohne VoiceWall lesbar. Die Kehrseite ist, dass der SCHUTZ der Kopien in
 Ihrer Hand liegt. Diese Seite sagt konkret, wie.
 
@@ -69,7 +69,7 @@ Das Passwort (mindestens 12 Zeichen) wird nirgends gespeichert. Geht das
 Passwort verloren, ist der Inhalt der `.vwenc`-Datei unwiederbringlich
 verloren; es gibt keine Hintertür und keine Wiederherstellung.
 
-Technische Eckdaten (Entscheidung E30, `src/main/storage/encrypted-export.ts`):
+Technische Eckdaten (`src/main/storage/encrypted-export.ts`):
 eigenes schlichtes Container-Format `VWENC1` (Magic, Versions- und
 KDF-Kennung, Salt, Nonce, Auth-Tag, Ciphertext), Schlüsselableitung scrypt
 (N=16384, r=8, p=1), AES-256-GCM mit authentifizierter Entschlüsselung: ein
