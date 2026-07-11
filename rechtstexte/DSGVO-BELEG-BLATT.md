@@ -57,6 +57,66 @@ entfällt der Download in der Regel ganz (Offline-Einspielung).
   (etwa Gesundheitsdaten) für sich eine DSFA erfordern, bleibt Ihre
   eigene Prüfung, unabhängig vom Werkzeug.
 
+### Kopierfertiger Baustein für Ihr Verzeichnis der Verarbeitungstätigkeiten (Art. 30 Abs. 1 DSGVO)
+
+Den folgenden Baustein können Sie unverändert in Ihr Verzeichnis
+übernehmen. Ersetzen Sie die Angaben in eckigen Klammern durch Ihre
+eigenen; die Verantwortung für die Richtigkeit des Verzeichnisses
+bleibt bei Ihnen als Verantwortlichem.
+
+```
+Verarbeitungstätigkeit: Diktat-Erfassung mit lokaler
+Sprach-zu-Text-Erkennung (Software VoiceWall)
+
+Verantwortlicher: [Name und Kontaktdaten Ihrer Organisation,
+ggf. Datenschutzbeauftragter]
+
+Zwecke der Verarbeitung: Erstellung von Textdokumenten aus
+gesprochenen Diktaten am Arbeitsplatzrechner; Ablage der Diktate
+als Dateien im Dateisystem des Arbeitsplatzrechners.
+[Ergänzen Sie Ihren fachlichen Zweck, z. B. Mandats- oder
+Behandlungsdokumentation.]
+
+Kategorien betroffener Personen: [je nach Diktatinhalt, z. B.
+Mandanten, Patienten, Geschäftspartner, Beschäftigte]
+
+Kategorien personenbezogener Daten: Inhalte der Diktate.
+[Falls Sie über Gesundheitsdaten oder andere besondere Kategorien
+nach Art. 9 DSGVO diktieren, hier ausdrücklich benennen.]
+
+Kategorien von Empfängern: keine. Die Verarbeitung erfolgt
+vollständig lokal auf dem Arbeitsplatzrechner; es gibt keinen
+Cloud-Dienst, keinen externen Server und keinen
+Auftragsverarbeiter (siehe Abschnitt 1 dieses Blatts).
+
+Übermittlungen an Drittländer: keine (siehe Abschnitt 2 dieses
+Blatts). Einzige Netzverbindung im Lebenszyklus der Software ist
+der einmalige, prüfsummen-verifizierte Modell-Download bei der
+Einrichtung; dabei werden keine personenbezogenen Daten
+übertragen.
+
+Löschfristen: Diktate liegen als Markdown-Dateien im Firmenordner
+und unterliegen Ihren eigenen Lösch- und Aufbewahrungsregeln.
+[Tragen Sie Ihre Fristen ein, z. B. nach Mandats- oder
+Behandlungsende zuzüglich gesetzlicher Aufbewahrungspflichten.]
+Die Software bietet Papierkorb mit endgültigem Löschen.
+
+Technische und organisatorische Maßnahmen (Art. 32 DSGVO):
+Verarbeitung ausschließlich lokal ohne Netzwerkfähigkeit im
+Betrieb (nachprüfbar per Netzwerk-Selbsttest, Abschnitt 4);
+Audio nur im Arbeitsspeicher, keine Audiodateien auf der
+Festplatte; SHA-256-verifizierte Softwarelieferkette; optional
+verschlüsselter Export (AES-256-GCM). Ergänzend Ihre eigenen
+Maßnahmen am Arbeitsplatz: [z. B. Festplattenverschlüsselung
+(FileVault/BitLocker), Zugriffsschutz, Backup-Konzept].
+```
+
+Ehrlicher Hinweis zur Abgrenzung: Der Baustein beschreibt die
+Verarbeitung DURCH VoiceWall auf Ihrem Rechner. Was Sie mit den
+erzeugten Texten anschließend tun (Weitergabe, Aktenführung,
+E-Mail-Versand), ist eine eigene Verarbeitungstätigkeit mit eigenen
+Zeilen in Ihrem Verzeichnis.
+
 ## 4. Die Nachweise und wie Sie sie selbst prüfen
 
 | Nr. | Nachweis                                                                                                                                                 | Selbst nachprüfen                                                                                                                                                                                                                                                                                                                                       |

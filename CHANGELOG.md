@@ -16,6 +16,14 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   gültig; geloggt werden Ersetzungs-Inhalte weiterhin nie. Damit gilt
   "Beleg statt Behauptung" bis in die Textaufbereitung.
 
+- Kopierfertiger Art.-30-Baustein im DSGVO-Beleg-Blatt
+  (`rechtstexte/DSGVO-BELEG-BLATT.md`): ein ausfüllfertiger Eintrag
+  für das Verzeichnis der Verarbeitungstätigkeiten (Zwecke,
+  Betroffene, Datenkategorien, keine Empfänger, kein
+  Drittlandtransfer, Löschfristen, TOMs) mit ehrlicher Abgrenzung,
+  dass die Weiterverwendung der Texte eine eigene
+  Verarbeitungstätigkeit ist.
+
 
 - Rückfallquelle für den Modell-Download (Entscheidung E50): alle vier
   Modelldateien sind zusätzlich Byte-identisch als Release-Assets im
