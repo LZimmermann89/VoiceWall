@@ -58,6 +58,8 @@ export interface TranscriptInput {
   readonly tags: readonly string[];
   readonly quelle: TranscriptQuelle;
   readonly zielApp?: string;
+  /** Beleg der Textaufbereitung (E51): angewandte Ersetzungen, formatiert. */
+  readonly ersetzungen?: readonly string[];
 }
 
 export interface TranscriptRecord {
@@ -134,6 +136,9 @@ export function transcriptMetaToFrontMatter(meta: TranscriptMeta): FlatFrontMatt
   if (meta.ziel_app !== undefined) {
     entries['ziel_app'] = meta.ziel_app;
   }
+  if (meta.ersetzungen !== undefined) {
+    entries['ersetzungen'] = meta.ersetzungen;
+  }
   entries['version'] = meta.version;
   return entries;
 }
@@ -189,6 +194,9 @@ export async function createTranscript(
     tags: input.tags.map((tag) => tag.normalize('NFC')),
     quelle: input.quelle,
     ...(input.zielApp === undefined ? {} : { ziel_app: input.zielApp }),
+    ...(input.ersetzungen === undefined || input.ersetzungen.length === 0
+      ? {}
+      : { ersetzungen: [...input.ersetzungen] }),
     version: 1,
   };
   const checked = transcriptMetaSchema.safeParse(meta);

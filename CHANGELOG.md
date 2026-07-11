@@ -8,6 +8,15 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- Ersetzungs-Beleg je Diktat (Entscheidung E51): tatsächlich
+  angewandte Wörterbuch-Ersetzungen werden im Front-Matter des
+  Diktats vermerkt (Feld `ersetzungen`, Format
+  `von -> zu (Nx)`) und in der Detailansicht des Registers angezeigt
+  (zweisprachig). Bestandsdiktate ohne das Feld bleiben unverändert
+  gültig; geloggt werden Ersetzungs-Inhalte weiterhin nie. Damit gilt
+  "Beleg statt Behauptung" bis in die Textaufbereitung.
+
+
 - Rückfallquelle für den Modell-Download (Entscheidung E50): alle vier
   Modelldateien sind zusätzlich Byte-identisch als Release-Assets im
   VoiceWall-Repo gespiegelt (Release `modelle-v1`). Scheitert die

@@ -49,7 +49,9 @@ welcome (see the test guide `docs/TESTLEITFADEN.md`, English version:
   frequent mistranscriptions, plus purely rule-based processing
   (punctuation sharpening, a filler-word filter that can be switched
   off, optional voice commands) without a model and without any
-  external call.
+  external call. Replacements that actually fired are recorded per
+  dictation in the front-matter evidence and shown in the detail
+  view: evidence over claims down to the text processing.
 - **Export:** Markdown, plain text and PDF (audit-document layout,
   correct umlauts verified), individually or as a batch; additionally
   an encrypted single export as `.vwenc` (AES-256-GCM, scrypt)

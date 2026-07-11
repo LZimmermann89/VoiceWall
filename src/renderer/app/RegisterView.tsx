@@ -793,6 +793,16 @@ function DetailPanel(props: {
                 <th scope="row">{t.zeileModell}</th>
                 <td className="mono">{meta.modell}</td>
               </tr>
+              {meta.ersetzungen !== undefined && meta.ersetzungen.length > 0 && (
+                <tr>
+                  <th scope="row">{t.zeileErsetzungen}</th>
+                  <td className="mono">
+                    {meta.ersetzungen.map((eintrag) => (
+                      <div key={eintrag}>{eintrag}</div>
+                    ))}
+                  </td>
+                </tr>
+              )}
               <tr>
                 <th scope="row">{t.zeileDauer}</th>
                 <td>

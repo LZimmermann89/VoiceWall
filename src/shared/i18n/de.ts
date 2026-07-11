@@ -495,6 +495,7 @@ export const de = {
       zeileGeaendert: 'Geändert',
       zeileQuelle: 'Quelle',
       zeileModell: 'Modell',
+      zeileErsetzungen: 'Angewandte Ersetzungen',
       zeileDauer: 'Dauer',
       dauerSekunden: (sekunden: number): string => `${String(sekunden)} s`,
       zeileWortzahl: 'Wortzahl',

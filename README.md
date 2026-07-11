@@ -49,6 +49,9 @@ echter Windows-Hardware aus, Testberichte sind willkommen (siehe
   Fehltranskriptionen, dazu rein regelbasierte Aufbereitung
   (Interpunktions-Nachschärfung, abschaltbarer Füllwörter-Filter,
   optionale Sprachkommandos) ohne Modell und ohne externen Aufruf.
+  Tatsächlich angewandte Ersetzungen werden je Diktat im
+  Front-Matter-Beleg vermerkt und in der Detailansicht angezeigt:
+  Beleg statt Behauptung bis in die Textaufbereitung.
 - **Export:** Markdown, reiner Text und PDF (Prüfdokument-Layout,
   korrekte Umlaute nachgewiesen), einzeln oder als Stapel; zusätzlich
   verschlüsselter Einzel-Export als `.vwenc` (AES-256-GCM, scrypt)

@@ -104,6 +104,37 @@ describe('createTranscript', () => {
     const entries = await readdir(monthDir);
     expect(entries.filter((entry) => entry.includes('.voicewall-tmp-'))).toEqual([]);
   });
+
+  it('schreibt angewandte Ersetzungen in den Front-Matter-Beleg (E51)', async () => {
+    const belegEintraege = ['Voice Wall -> VoiceWall (2x)', 'Meier -> Meyer (1x)'];
+    const result = await createTranscript(
+      companyDir,
+      { ...INPUT, ersetzungen: belegEintraege },
+      CLOCK,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.meta.ersetzungen).toEqual(belegEintraege);
+    // Round-Trip: die Datei traegt den Beleg und liest ihn schema-validiert.
+    const wieder = await readTranscript(companyDir, result.value.relPfad);
+    expect(wieder.ok).toBe(true);
+    if (wieder.ok) {
+      expect(wieder.value.meta.ersetzungen).toEqual(belegEintraege);
+    }
+  });
+
+  it('ohne angewandte Ersetzungen fehlt das Beleg-Feld (Bestandsformat)', async () => {
+    const result = await createTranscript(companyDir, { ...INPUT, ersetzungen: [] }, CLOCK);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.meta.ersetzungen).toBeUndefined();
+    const raw = await readFile(join(companyDir, result.value.relPfad), 'utf8');
+    expect(raw).not.toContain('ersetzungen:');
+  });
 });
 
 describe('read/update', () => {
@@ -134,6 +165,31 @@ describe('read/update', () => {
     if (readBack.ok) {
       expect(readBack.value.meta.titel).toBe('Angebot Müller (final)');
       expect(readBack.value.body.trim()).toBe('Neuer Text.');
+    }
+  });
+
+  it('updateTranscript erhaelt den Ersetzungs-Beleg (E51)', async () => {
+    const belegEintraege = ['Voice Wall -> VoiceWall (1x)'];
+    const created = await createTranscript(
+      companyDir,
+      { ...INPUT, ersetzungen: belegEintraege },
+      CLOCK,
+    );
+    expect(created.ok).toBe(true);
+    if (!created.ok) {
+      return;
+    }
+    const updated = await updateTranscript(
+      companyDir,
+      created.value.relPfad,
+      { titel: 'Neuer Titel' },
+      { now: () => new Date(2026, 6, 2, 15, 0, 0) },
+    );
+    expect(updated.ok).toBe(true);
+    if (updated.ok) {
+      // Der Beleg beschreibt die urspruengliche Aufbereitung und bleibt
+      // beim Bearbeiten unveraendert erhalten.
+      expect(updated.value.meta.ersetzungen).toEqual(belegEintraege);
     }
   });
 

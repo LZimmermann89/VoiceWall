@@ -139,23 +139,29 @@ function isWordChar(char: string): boolean {
 }
 
 /**
- * Ersetzt EINE Regel wortgrenzen-bewusst im Text. `von` wird strikt als
- * Literal behandelt (indexOf-Scan, kein Regex aus Nutzereingaben). Grenzen:
- * beginnt/endet `von` mit einem Wortzeichen, darf davor/danach kein weiteres
- * Wortzeichen stehen ("Meier" ersetzt nie in "Vermeiden", "Müller" nie in
- * "Müllers"; Entscheidung E36). Der eingesetzte `zu`-Text wird von derselben
- * Regel nicht erneut durchsucht (kein Selbstbezug, terminiert immer).
+ * Ersetzt EINE Regel wortgrenzen-bewusst im Text und zaehlt die Treffer.
+ * `von` wird strikt als Literal behandelt (indexOf-Scan, kein Regex aus
+ * Nutzereingaben). Grenzen: beginnt/endet `von` mit einem Wortzeichen, darf
+ * davor/danach kein weiteres Wortzeichen stehen ("Meier" ersetzt nie in
+ * "Vermeiden", "Müller" nie in "Müllers"; Entscheidung E36). Der eingesetzte
+ * `zu`-Text wird von derselben Regel nicht erneut durchsucht (kein
+ * Selbstbezug, terminiert immer).
  */
-function replaceLiteralWord(text: string, von: string, zu: string): string {
+function replaceLiteralWord(
+  text: string,
+  von: string,
+  zu: string,
+): { text: string; anzahl: number } {
   const startsWordy = isWordChar(von.charAt(0));
   const endsWordy = isWordChar(von.charAt(von.length - 1));
   let result = '';
   let cursor = 0;
+  let anzahl = 0;
   for (;;) {
     const found = text.indexOf(von, cursor);
     if (found === -1) {
       result += text.slice(cursor);
-      return result;
+      return { text: result, anzahl };
     }
     const before = found === 0 ? '' : text.charAt(found - 1);
     const afterIndex = found + von.length;
@@ -165,6 +171,7 @@ function replaceLiteralWord(text: string, von: string, zu: string): string {
     if (grenzeVorne && grenzeHinten) {
       result += text.slice(cursor, found) + zu;
       cursor = afterIndex;
+      anzahl += 1;
     } else {
       // Kein ganzes Wort: ein Zeichen weiter suchen.
       result += text.slice(cursor, found + 1);
@@ -173,8 +180,17 @@ function replaceLiteralWord(text: string, von: string, zu: string): string {
   }
 }
 
+/** Eine tatsaechlich angewandte Ersetzungsregel samt Trefferzahl (E51). */
+export interface AngewandteErsetzung {
+  readonly von: string;
+  readonly zu: string;
+  readonly anzahl: number;
+}
+
 /**
- * Wendet die Ersetzungsliste deterministisch auf einen Text an.
+ * Wendet die Ersetzungsliste deterministisch auf einen Text an und
+ * protokolliert je Regel, ob und wie oft sie tatsaechlich gegriffen hat
+ * (Beleg statt Behauptung bis in die Textaufbereitung, E51).
  *
  * Regeln (Teil A3):
  * - wortgrenzen-bewusst (keine Teilwort-Treffer, Unicode-korrekt),
@@ -183,16 +199,41 @@ function replaceLiteralWord(text: string, von: string, zu: string): string {
  * - `von` ist IMMER ein Literal, nie ein Regex (ReDoS-Regel 3.5),
  * - Regeln laufen sequenziell; das Ergebnis frueherer (laengerer) Regeln
  *   kann von spaeteren Regeln getroffen werden (bewusst, deterministisch).
+ *   Das Protokoll folgt derselben Reihenfolge.
  */
-export function applyErsetzungen(text: string, ersetzungen: readonly Ersetzung[]): string {
+export function applyErsetzungenMitProtokoll(
+  text: string,
+  ersetzungen: readonly Ersetzung[],
+): { text: string; angewandt: readonly AngewandteErsetzung[] } {
   const sortiert = [...ersetzungen]
     .filter((regel) => regel.von.length > 0)
     .sort((a, b) => b.von.length - a.von.length);
   let result = text;
+  const angewandt: AngewandteErsetzung[] = [];
   for (const { von, zu } of sortiert) {
-    result = replaceLiteralWord(result, von, zu);
+    const ersetzt = replaceLiteralWord(result, von, zu);
+    result = ersetzt.text;
+    if (ersetzt.anzahl > 0) {
+      angewandt.push({ von, zu, anzahl: ersetzt.anzahl });
+    }
   }
-  return result;
+  return { text: result, angewandt };
+}
+
+/** Wie applyErsetzungenMitProtokoll, nur ohne Protokoll (Bestandsaufrufer). */
+export function applyErsetzungen(text: string, ersetzungen: readonly Ersetzung[]): string {
+  return applyErsetzungenMitProtokoll(text, ersetzungen).text;
+}
+
+/**
+ * Formatiert eine angewandte Ersetzung fuer den Front-Matter-Beleg des
+ * Diktats (E51): '<von> -> <zu> (Nx)'; ein leeres Ziel wird als [entfernt]
+ * benannt. Maximal 80+80 Zeichen Regelanteil, bleibt unter dem
+ * 200-Zeichen-Schemalimit.
+ */
+export function formatAngewandteErsetzung(ersetzung: AngewandteErsetzung): string {
+  const ziel = ersetzung.zu.length === 0 ? '[entfernt]' : ersetzung.zu;
+  return `${ersetzung.von} -> ${ziel} (${String(ersetzung.anzahl)}x)`;
 }
 
 // ---------------------------------------------------------------------------

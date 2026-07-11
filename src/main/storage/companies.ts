@@ -168,6 +168,8 @@ export interface SaveDictateInput {
   readonly modell: string;
   readonly sprache?: string;
   readonly zielApp?: string;
+  /** Beleg der Textaufbereitung (E51): angewandte Ersetzungen, formatiert. */
+  readonly ersetzungen?: readonly string[];
 }
 
 /**
@@ -603,6 +605,7 @@ export class CompanyManager {
       tags: [],
       quelle: input.quelle,
       ...(input.zielApp === undefined ? {} : { zielApp: input.zielApp }),
+      ...(input.ersetzungen === undefined ? {} : { ersetzungen: input.ersetzungen }),
     });
     if (!created.ok) {
       return { ok: false, message: created.error };

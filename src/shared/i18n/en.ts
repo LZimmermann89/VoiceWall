@@ -462,6 +462,7 @@ export const en: Uebersetzung = {
       zeileGeaendert: 'Modified',
       zeileQuelle: 'Source',
       zeileModell: 'Model',
+      zeileErsetzungen: 'Applied replacements',
       zeileDauer: 'Duration',
       dauerSekunden: (sekunden: number): string => `${String(sekunden)} s`,
       zeileWortzahl: 'Word count',

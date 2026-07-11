@@ -7,8 +7,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyErsetzungen,
+  applyErsetzungenMitProtokoll,
   buildInitialPrompt,
   defaultVokabular,
+  formatAngewandteErsetzung,
   MAX_BEGRIFFE,
   PROMPT_MAX_CHARS,
   vokabularSchema,
@@ -221,5 +223,69 @@ describe('vokabularSchema', () => {
     if (parsed.success) {
       expect((parsed.data as Record<string, unknown>)['zukunft']).toBe('bleibt erhalten');
     }
+  });
+});
+
+describe('applyErsetzungenMitProtokoll (E51, Beleg der Textaufbereitung)', () => {
+  it('protokolliert je Regel die tatsaechliche Trefferzahl', () => {
+    const { text, angewandt } = applyErsetzungenMitProtokoll(
+      'Voice Wall trifft Voice Wall und Herrn Meier.',
+      [
+        { von: 'Meier', zu: 'Meyer' },
+        { von: 'Voice Wall', zu: 'VoiceWall' },
+      ],
+    );
+    expect(text).toBe('VoiceWall trifft VoiceWall und Herrn Meyer.');
+    // Reihenfolge = Anwendungsreihenfolge (laengere von-Strings zuerst).
+    expect(angewandt).toEqual([
+      { von: 'Voice Wall', zu: 'VoiceWall', anzahl: 2 },
+      { von: 'Meier', zu: 'Meyer', anzahl: 1 },
+    ]);
+  });
+
+  it('nicht greifende Regeln erscheinen nicht im Protokoll', () => {
+    const { text, angewandt } = applyErsetzungenMitProtokoll('Nichts zu ersetzen.', [
+      { von: 'Meier', zu: 'Meyer' },
+    ]);
+    expect(text).toBe('Nichts zu ersetzen.');
+    expect(angewandt).toEqual([]);
+  });
+
+  it('Teilwort-Nichttreffer zaehlen nicht ("Müller" nicht in "Müllers")', () => {
+    const { angewandt } = applyErsetzungenMitProtokoll('Müllers Auto, Herr Müller.', [
+      { von: 'Müller', zu: 'Mueller' },
+    ]);
+    expect(angewandt).toEqual([{ von: 'Müller', zu: 'Mueller', anzahl: 1 }]);
+  });
+
+  it('applyErsetzungen bleibt deckungsgleich zur Protokoll-Variante', () => {
+    const regeln = [{ von: 'Voice Wall', zu: 'VoiceWall' }];
+    const eingabe = 'Voice Wall bleibt Voice Wall.';
+    expect(applyErsetzungen(eingabe, regeln)).toBe(
+      applyErsetzungenMitProtokoll(eingabe, regeln).text,
+    );
+  });
+});
+
+describe('formatAngewandteErsetzung (Front-Matter-Beleg, E51)', () => {
+  it('formatiert von, zu und Trefferzahl deterministisch', () => {
+    expect(formatAngewandteErsetzung({ von: 'Voice Wall', zu: 'VoiceWall', anzahl: 2 })).toBe(
+      'Voice Wall -> VoiceWall (2x)',
+    );
+  });
+
+  it('benennt ein leeres Ziel als [entfernt]', () => {
+    expect(formatAngewandteErsetzung({ von: ' dies', zu: '', anzahl: 1 })).toBe(
+      ' dies -> [entfernt] (1x)',
+    );
+  });
+
+  it('bleibt unter dem 200-Zeichen-Schemalimit (80+80-Maximalregel)', () => {
+    const lang = formatAngewandteErsetzung({
+      von: 'a'.repeat(80),
+      zu: 'b'.repeat(80),
+      anzahl: 999,
+    });
+    expect(lang.length).toBeLessThanOrEqual(200);
   });
 });

@@ -75,6 +75,12 @@ export const transcriptMetaSchema = z.object({
   tags: z.array(tagSchema).max(100),
   quelle: transcriptQuelleSchema,
   ziel_app: z.string().min(1).max(200).optional(),
+  /**
+   * Beleg der Textaufbereitung (E51): tatsaechlich angewandte Ersetzungen
+   * im Format '<von> -> <zu> (Nx)'. Nur vorhanden, wenn mindestens eine
+   * Regel gegriffen hat; Bestandsdiktate ohne Feld bleiben gueltig.
+   */
+  ersetzungen: z.array(z.string().min(1).max(200)).max(200).optional(),
   version: z.number().int().min(1),
 });
 export type TranscriptMeta = z.infer<typeof transcriptMetaSchema>;

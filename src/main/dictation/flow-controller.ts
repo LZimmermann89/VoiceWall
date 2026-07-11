@@ -42,7 +42,7 @@ import {
   type UiLanguage,
 } from '../../shared/schema';
 import { aufbereitenText } from '../../shared/textaufbereitung';
-import { applyErsetzungen } from '../../shared/vokabular';
+import { applyErsetzungenMitProtokoll, formatAngewandteErsetzung } from '../../shared/vokabular';
 import type { OverlayStatePayload } from '../../shared/types';
 import type { Result } from '../../shared/result';
 import type { SaveDictateResult } from '../../shared/company';
@@ -96,6 +96,8 @@ export class DictationFlowController {
   private sessionAudioMs = 0;
   /** Audiolaenge des zuletzt zugestellten Diktats (fuer saveLastDictate). */
   private lastAudioMs = 0;
+  /** Angewandte Ersetzungen des zuletzt zugestellten Diktats (Beleg, E51). */
+  private lastErsetzungen: readonly string[] = [];
 
   private overlay: BrowserWindow | null = null;
   private overlayHideTimer: NodeJS.Timeout | null = null;
@@ -260,13 +262,14 @@ export class DictationFlowController {
     this.sessionAudioMs = 0;
     // Stufe 1: Ersetzungsliste (Firma) und Aufbereitung (globale Schalter)
     // auf dem finalen Text, VOR Clipboard/Paste und VOR Speicherung.
-    const text = roh.length === 0 ? '' : await this.processTranscriptText(roh);
-    if (text.length === 0) {
+    const processed =
+      roh.length === 0 ? { text: '', ersetzungen: [] } : await this.processTranscriptText(roh);
+    if (processed.text.length === 0) {
       this.showOverlay({ kind: 'no-speech', message: null }, OVERLAY_DONE_VISIBLE_MS);
       this.dispatch('delivery-complete');
       return;
     }
-    const result = await this.deliverText(text, audioMs);
+    const result = await this.deliverText(processed.text, audioMs, processed.ersetzungen);
     if (result.pasted) {
       this.showOverlay(
         { kind: 'done', message: texte().flow.overlayTextEingefuegt },
@@ -307,21 +310,34 @@ export class DictationFlowController {
    * globaler Schalter, Listen sprachabhaengig je Firmensprache, Paket B1).
    * Reine lokale String-Verarbeitung, KEIN Modell, KEIN externer Aufruf
    * (harte Guardrail). Fehler beim Laden der Ersetzungsliste blockieren die
-   * Zustellung nie.
+   * Zustellung nie. Angewandte Ersetzungen werden formatiert zurueckgegeben
+   * und wandern in den Front-Matter-Beleg des Diktats (E51); geloggt werden
+   * sie nie (Regel 3.6: keine Inhalte im Log).
    */
-  private async processTranscriptText(roh: string): Promise<string> {
+  private async processTranscriptText(
+    roh: string,
+  ): Promise<{ text: string; ersetzungen: readonly string[] }> {
     let text = roh;
+    let ersetzungen: readonly string[] = [];
     const companies = this.deps.companies;
     if (companies !== null) {
       try {
-        text = applyErsetzungen(text, await companies.activeErsetzungen());
+        const protokoll = applyErsetzungenMitProtokoll(
+          text,
+          await companies.activeErsetzungen(),
+        );
+        text = protokoll.text;
+        ersetzungen = protokoll.angewandt.map(formatAngewandteErsetzung);
       } catch (error) {
         this.deps.logger.warn(
           `Ersetzungsliste nicht anwendbar, Text bleibt unverändert: ${error instanceof Error ? error.message : String(error)}`,
         );
       }
     }
-    return aufbereitenText(text, this.config.aufbereitung, await this.activeLanguageLenient());
+    return {
+      text: aufbereitenText(text, this.config.aufbereitung, await this.activeLanguageLenient()),
+      ersetzungen,
+    };
   }
 
   // ---------------------------------------------------------------------
@@ -336,10 +352,15 @@ export class DictationFlowController {
    * aktiven Firma abgelegt (M5; ein Speicherfehler bricht die Zustellung
    * nie ab, er wird geloggt und gemeldet).
    */
-  private async deliverText(text: string, audioMs = 0): Promise<DeliveryResult> {
+  private async deliverText(
+    text: string,
+    audioMs = 0,
+    ersetzungen: readonly string[] = [],
+  ): Promise<DeliveryResult> {
     this.lastTranscript = text;
     this.lastAudioMs = audioMs;
-    await this.autoSaveDictate(text, audioMs);
+    this.lastErsetzungen = ersetzungen;
+    await this.autoSaveDictate(text, audioMs, ersetzungen);
 
     const paste = this.resolvePaste();
     const sequence = await runClipboardSequence(
@@ -378,7 +399,11 @@ export class DictationFlowController {
    * Schalter aktiv ist und eine Firma existiert (Default AN, sobald eine
    * Firma angelegt wurde). Fehler stoppen die Zustellung nie.
    */
-  private async autoSaveDictate(text: string, audioMs: number): Promise<void> {
+  private async autoSaveDictate(
+    text: string,
+    audioMs: number,
+    ersetzungen: readonly string[] = [],
+  ): Promise<void> {
     const companies = this.deps.companies;
     if (companies === null) {
       return;
@@ -394,6 +419,7 @@ export class DictationFlowController {
         quelle: 'diktat',
         sprache,
         modell: transcriptModelNameFor(sprache, this.config.modell),
+        ...(ersetzungen.length === 0 ? {} : { ersetzungen }),
       });
       if (!saved.ok) {
         this.deps.logger.warn(`Diktat konnte nicht gespeichert werden: ${saved.message}`);
@@ -420,6 +446,7 @@ export class DictationFlowController {
       quelle: 'diktat',
       sprache,
       modell: transcriptModelNameFor(sprache, this.config.modell),
+      ...(this.lastErsetzungen.length === 0 ? {} : { ersetzungen: this.lastErsetzungen }),
     });
   }
 
@@ -823,15 +850,15 @@ export class DictationFlowController {
           return { delivered: false, pasted: false, message: texte().flow.ungueltigerText };
         }
         // Wie ein echtes Diktat: Ersetzungen + Aufbereitung vor Zustellung.
-        const text = await this.processTranscriptText(parsed.data);
-        if (text.length === 0) {
+        const processed = await this.processTranscriptText(parsed.data);
+        if (processed.text.length === 0) {
           return {
             delivered: false,
             pasted: false,
             message: texte().flow.aufbereiteterTextLeer,
           };
         }
-        return this.deliverText(text);
+        return this.deliverText(processed.text, 0, processed.ersetzungen);
       },
     );
 
@@ -862,8 +889,8 @@ export class DictationFlowController {
             message: texte().flow.vadStille,
           };
         }
-        const text = await this.processTranscriptText(transcribed.transcript.text);
-        if (text.length === 0) {
+        const processed = await this.processTranscriptText(transcribed.transcript.text);
+        if (processed.text.length === 0) {
           return {
             delivered: false,
             pasted: false,
@@ -871,11 +898,15 @@ export class DictationFlowController {
             message: texte().flow.aufbereiteterTextLeer,
           };
         }
-        const delivery = await this.deliverText(text, transcribed.transcript.audioMs);
+        const delivery = await this.deliverText(
+          processed.text,
+          transcribed.transcript.audioMs,
+          processed.ersetzungen,
+        );
         return {
           delivered: delivery.delivered,
           pasted: delivery.pasted,
-          text,
+          text: processed.text,
           message: delivery.message,
         };
       },
