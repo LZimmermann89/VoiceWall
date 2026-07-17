@@ -1,0 +1,51 @@
+{
+  "name": "voicewall",
+  "version": "1.0.0-rc.2",
+  "private": true,
+  "description": "VoiceWall: 100 Prozent lokales, DSGVO-konformes Sprachdiktiergeraet fuer Mac und Windows.",
+  "license": "MIT",
+  "author": "Lars Zimmermann",
+  "type": "module",
+  "main": "out/main/index.js",
+  "engines": {
+    "node": ">=26 <27"
+  },
+  "scripts": {
+    "dev": "node scripts/ensure-electron-dist.mjs && electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit --composite false -p tsconfig.main.json && tsc --noEmit --composite false -p tsconfig.renderer.json && tsc --noEmit --composite false -p tsconfig.node.json",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:e2e": "node scripts/ensure-electron-dist.mjs && playwright test",
+    "audit": "npm audit --audit-level=high",
+    "sbom": "npm sbom --sbom-format cyclonedx --sbom-type application > sbom.cdx.json",
+    "package": "node scripts/ensure-electron-dist.mjs && node scripts/generate-icon.mjs && electron-vite build && electron-builder --dir"
+  },
+  "dependencies": {
+    "@fugood/whisper.node": "1.0.22",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.61.1",
+    "@types/node": "26.1.0",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "43.0.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "eslint": "10.6.0",
+    "eslint-config-prettier": "10.1.8",
+    "pdf-parse": "1.1.1",
+    "prettier": "3.9.4",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.62.1",
+    "vite": "7.3.6",
+    "vitest": "4.1.9",
+    "zod": "3.25.76"
+  }
+}

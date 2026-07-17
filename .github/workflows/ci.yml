@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node einrichten (Version aus .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Niemals --omit=optional: prebuilt native Binaries (das
+      # Whisper-Addon) kommen ueber optionalDependencies.
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      # Supply-Chain-Gate: SHA-256 der prebuilt nativen
+      # Binaries gegen die fest hinterlegten Konstanten, Versions-Drift,
+      # keine kompilierende binding.gyp im Baum.
+      - name: Native-Binary-Checksummen pruefen
+        run: node scripts/verify-checksums.mjs
+
+      # Rechtstexte-Gate: kein aktives TMG-/TTDSG-Zitat in
+      # src/, README.md, resources/ oder rechtstexte/ (TMG -> DDG, TTDSG -> TDDDG).
+      - name: Rechtsverweis-Gate (TMG/TTDSG verboten)
+        run: node scripts/check-legal-references.mjs
+
+      # Installer-Skript-Syntax-Gate: bash -n auf den Shell-Skripten
+      # (ubuntu/macos) bzw. PowerShell-Parser-Check auf Windows.
+      - name: Installer-Skripte Syntax-Check (bash)
+        if: matrix.os != 'windows-latest'
+        run: |
+          bash -n install/voicewall-setup.sh
+          bash -n install/uninstall.sh
+          bash -n install/voicewall-setup.command
+          bash -n install/uninstall.command
+      - name: Installer-Skripte Syntax-Check (PowerShell)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          foreach ($script in @('install/voicewall-setup.ps1', 'install/uninstall.ps1')) {
+            $tokens = $null; $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }
+            Write-Host "OK: $script"
+          }
+
+      - name: Typpruefung
+        run: npm run typecheck
+
+      - name: Lint (inkl. Modulgrenzen, 0 Warnungen)
+        run: npm run lint
+
+      - name: Formatpruefung
+        run: npm run format:check
+
+      - name: Unit-Tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      # E2E nur auf macOS und Windows: Playwright startet die gebaute
+      # Electron-App mit echtem Fenster, Linux braeuchte xvfb und ist fuer
+      # das Produkt (mac/win) nicht Zielplattform.
+      - name: E2E-Tests (Playwright for Electron)
+        if: matrix.os != 'ubuntu-latest'
+        run: npm run test:e2e
+
+      - name: Supply-Chain-Audit
+        run: npm audit --audit-level=high
+
+      - name: SBOM erzeugen (CycloneDX)
+        run: npm run sbom
+
+      - name: SBOM als Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.os }}
+          path: sbom.cdx.json
+          if-no-files-found: error
+
+      - name: Lockfile-Guard
+        run: git diff --exit-code package-lock.json
+
+  # Packaging-Gate: baut die macOS-App als --dir-Bundle, prueft die
+  # Bundle-Struktur (Bundle-ID, Mikrofon-Text, Icon, entpackte native
+  # Binaries), signiert ad-hoc wie das Setup-Skript und verifiziert die
+  # Signatur. Belegt zugleich, dass electron-builder mit electronDist aus
+  # node_modules ohne Netz-Nachladen auskommt.
+  package-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node einrichten (Version aus .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      # Idempotent: beendet sich sofort, wenn das Electron-Binary schon da
+      # ist; sonst laedt es checksummen-verifiziert nach (Skript-Restriktionen
+      # koennen das electron-Postinstall unterdruecken).
+      - name: Electron-Binary sicherstellen
+        run: node node_modules/electron/install.js
+
+      - name: Packaging (npm run package)
+        run: npm run package
+
+      - name: Bundle-Struktur pruefen
+        run: |
+          APP="$(find dist -maxdepth 2 -name 'VoiceWall.app' | head -1)"
+          test -n "$APP" || { echo 'FEHLER: VoiceWall.app nicht gefunden'; exit 1; }
+          PLIST="$APP/Contents/Info.plist"
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST")"
+          test "$BUNDLE_ID" = "de.der-ki-auditor.voicewall" || { echo "FEHLER: Bundle-ID ist $BUNDLE_ID"; exit 1; }
+          /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' "$PLIST" | grep -q 'ausschliesslich lokal' || { echo 'FEHLER: NSMicrophoneUsageDescription fehlt oder falsch'; exit 1; }
+          test -f "$APP/Contents/Resources/icon.icns" || { echo 'FEHLER: icon.icns fehlt'; exit 1; }
+          find "$APP/Contents/Resources/app.asar.unpacked" -name '*.node' | grep -q . || { echo 'FEHLER: keine entpackte .node im Bundle'; exit 1; }
+          echo "OK: Bundle-Struktur ($APP)"
+
+      - name: Ad-hoc-Signierung und Verifikation (wie Setup-Skript Schritt 5)
+        run: |
+          APP="$(find dist -maxdepth 2 -name 'VoiceWall.app' | head -1)"
+          codesign -s - --force --deep "$APP"
+          codesign -dv "$APP" 2>&1 | grep -q 'Identifier=de.der-ki-auditor.voicewall' || { echo 'FEHLER: Signatur-Identifier falsch'; exit 1; }
+          codesign --verify --deep "$APP"
+          echo 'OK: Ad-hoc-Signatur verifiziert'

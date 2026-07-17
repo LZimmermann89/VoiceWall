@@ -1,0 +1,912 @@
+/**
+ * FlowController des systemweiten Diktats.
+ *
+ * Verdrahtet den kompletten Pfad: globaler Hotkey (Toggle) -> Aufnahme
+ * (Overlay "Ich hoere zu", Tray-Indikator) -> Hotkey -> VAD/Whisper-Flush ->
+ * minimale Nachbearbeitung (trim/join) -> Clipboard-Sequenz ->
+ * Accessibility-Check -> Auto-Paste -> Wiederherstellung der Zwischenablage.
+ *
+ * Grundsaetze:
+ * - Der Fokus der Fremd-App wird nie angefasst (Overlay focusable:false,
+ *   showInactive; das Hauptfenster wird vom Flow nie geoeffnet/fokussiert).
+ * - Kein Text geht verloren: das letzte Transkript bleibt im RAM und ist
+ *   jederzeit ueber Kopieren-Knopf (UI und Overlay) erneut kopierbar.
+ * - Kein Fehlerpfad loest einen externen Request aus; alle Meldungen
+ *   kommen aus dem Text-Katalog (UI-Sprache) und nennen den
+ *   naechsten Schritt.
+ * - Die Zustandslogik selbst ist die reine Maschine in
+ *   shared/dictation-flow.ts (unit-getestet); hier leben nur Seiteneffekte.
+ */
+import { BrowserWindow, clipboard, globalShortcut, ipcMain, powerMonitor } from 'electron';
+import { z } from 'zod';
+import {
+  defaultGlobalConfig,
+  hotkeyAcceleratorSchema,
+  type GlobalConfig,
+} from '../../shared/config';
+import {
+  joinTranscriptSegments,
+  transitionDictationFlow,
+  type DictationFlowAction,
+  type DictationFlowEvent,
+  type DictationFlowState,
+} from '../../shared/dictation-flow';
+import {
+  aufbereitungConfigSchema,
+  modelChoiceSchema,
+  uiLanguageSchema,
+  type ActionResult,
+  type DeliveryResult,
+  type DevDictateResult,
+  type DictationLanguage,
+  type UiLanguage,
+} from '../../shared/schema';
+import { aufbereitenText } from '../../shared/textaufbereitung';
+import { applyErsetzungenMitProtokoll, formatAngewandteErsetzung } from '../../shared/vokabular';
+import type { OverlayStatePayload } from '../../shared/types';
+import type { Result } from '../../shared/result';
+import type { SaveDictateResult } from '../../shared/company';
+import { runClipboardSequence, realDelay } from '../clipboard/transcript-clipboard';
+import { readGlobalConfig } from '../config/config-store';
+import type { GlobalConfigWriter } from '../config/config-writer';
+import { setUiLanguage, texte } from '../i18n';
+import { IpcChannel } from '../ipc/channels';
+import type { Logger } from '../log/logger';
+import { transcriptModelNameFor } from '../model/model-catalog';
+import type { CompanyManager } from '../storage/companies';
+import { createOverlayWindow, showOverlayInactive } from '../overlay/overlay-window';
+import { createPasteAdapter, type PasteAdapter } from '../paste/index';
+import {
+  accessibilityMissingMessage,
+  getAccessibilityState,
+  openAccessibilitySettings,
+  requestAccessibilityGrant,
+} from '../permission/accessibility';
+import { toArrayBuffer, type DictationOrchestrator, type FlowStatus } from '../stt/orchestrator';
+import { createTrayController, type TrayController } from '../tray/tray';
+
+export interface FlowControllerDeps {
+  readonly userDataPath: string;
+  readonly logger: Logger;
+  /** Zentraler, serialisierter Konfig-Schreibpfad. */
+  readonly configWriter: GlobalConfigWriter;
+  readonly orchestrator: DictationOrchestrator;
+  /** Firmenverwaltung: Diktate optional in der aktiven Firma speichern. */
+  readonly companies: CompanyManager | null;
+  /** Hauptfenster oeffnen/in den Vordergrund holen (Tray-Menue). */
+  readonly openMainWindow: () => void;
+  /** App beenden (Tray-Menue). */
+  readonly quitApp: () => void;
+  /** Aktiviert die Dev-/Test-IPC-Kanaele (nie im ausgelieferten Produkt). */
+  readonly enableTestIpc: boolean;
+}
+
+/** Sichtbarkeitsdauer des Overlays nach Abschluss (done/no-speech). */
+const OVERLAY_DONE_VISIBLE_MS = 4000;
+/** Sichtbarkeitsdauer des Overlays nach Fehlern (mehr Lesezeit). */
+const OVERLAY_ERROR_VISIBLE_MS = 10_000;
+
+export class DictationFlowController {
+  private state: DictationFlowState = 'idle';
+  private config: GlobalConfig = defaultGlobalConfig();
+  private hotkeyRegistered = false;
+  private lastTranscript: string | null = null;
+  private sessionSegments: string[] = [];
+  /** Summierte Audiolaenge der Sitzung (fuer `dauer_sekunden`). */
+  private sessionAudioMs = 0;
+  /** Audiolaenge des zuletzt zugestellten Diktats (fuer saveLastDictate). */
+  private lastAudioMs = 0;
+  /** Angewandte Ersetzungen des zuletzt zugestellten Diktats (Beleg). */
+  private lastErsetzungen: readonly string[] = [];
+
+  private overlay: BrowserWindow | null = null;
+  private overlayHideTimer: NodeJS.Timeout | null = null;
+  private tray: TrayController | null = null;
+
+  private pasteAdapter: PasteAdapter | null = null;
+  private pasteUnsupportedMessage: string | null = null;
+
+  // Dev-/Test-Steuerung (nur ueber Test-IPC erreichbar).
+  private mockPasteEnabled = false;
+  private mockPasteCalls = 0;
+  private accessibilityOverride: boolean | null = null;
+
+  constructor(private readonly deps: FlowControllerDeps) {}
+
+  /** Initialisiert Konfig, Hotkey, Tray, Overlay, IPC und powerMonitor. */
+  async init(): Promise<void> {
+    this.config = await readGlobalConfig(this.deps.userDataPath, this.deps.logger);
+    // Main-Katalogsprache aus der persistierten Konfiguration.
+    setUiLanguage(this.config.uiSprache);
+
+    const adapter = createPasteAdapter(process.platform);
+    if (adapter.ok) {
+      this.pasteAdapter = adapter.value;
+    } else {
+      this.pasteUnsupportedMessage = adapter.error;
+      this.deps.logger.warn(adapter.error);
+    }
+
+    this.deps.orchestrator.setTranscriptListener((text, audioMs) => {
+      // Nur Segmente der laufenden Hotkey-Sitzung sammeln; die Test-UI
+      // (Start-/Stop-Knoepfe) liefert weiterhin direkt ins Hauptfenster.
+      if (this.state === 'recording' || this.state === 'transcribing') {
+        this.sessionSegments.push(text);
+        this.sessionAudioMs += audioMs;
+      }
+    });
+    this.deps.orchestrator.setFlowStatusProvider(() => this.flowStatus());
+
+    this.registerIpcHandlers();
+    this.registerHotkey(this.config.hotkey.accelerator);
+
+    this.tray = createTrayController({
+      onToggleDictation: () => {
+        this.toggle();
+      },
+      onOpenWindow: this.deps.openMainWindow,
+      onQuit: this.deps.quitApp,
+    });
+
+    // Overlay sofort (versteckt) erzeugen: die Fokus-Flags sind damit ab
+    // App-Start pruefbar und der erste Hotkey-Druck zeigt es ohne Ladepause.
+    this.overlay = createOverlayWindow();
+
+    // Sperrbildschirm/Suspend: laufende Aufnahme sauber beenden und
+    // verwerfen (nicht transkribieren, nicht in den Sperrbildschirm pasten).
+    powerMonitor.on('lock-screen', () => {
+      this.cancel('Sperrbildschirm');
+    });
+    powerMonitor.on('suspend', () => {
+      this.cancel('Ruhezustand');
+    });
+
+    if (this.deps.enableTestIpc) {
+      this.registerTestIpcHandlers();
+    }
+  }
+
+  /** Diktat-Toggle (Hotkey oder Tray-Menue). */
+  toggle(): void {
+    this.dispatch('toggle');
+  }
+
+  /** Aufnahme von aussen abbrechen (Sperrbildschirm, Suspend). */
+  cancel(reason: string): void {
+    if (this.state === 'recording' || this.state === 'transcribing') {
+      this.deps.logger.info(`Diktat abgebrochen (${reason}), Audio wird verworfen.`);
+    }
+    this.dispatch('cancel');
+  }
+
+  /** Geordnetes Herunterfahren (Hotkey frei, Tray/Overlay weg). */
+  shutdown(): void {
+    globalShortcut.unregisterAll();
+    this.hotkeyRegistered = false;
+    this.clearOverlayHideTimer();
+    if (this.overlay !== null && !this.overlay.isDestroyed()) {
+      this.overlay.destroy();
+      this.overlay = null;
+    }
+    this.tray?.destroy();
+    this.tray = null;
+  }
+
+  // ---------------------------------------------------------------------
+  // Zustandsmaschine: Events -> Aktionen
+  // ---------------------------------------------------------------------
+
+  private dispatch(event: DictationFlowEvent): void {
+    const { next, action } = transitionDictationFlow(this.state, event);
+    if (next !== this.state) {
+      this.deps.logger.debug(`Diktat-Flow: ${this.state} -> ${next} (${event}/${action})`);
+    }
+    this.state = next;
+    this.runAction(action);
+    this.deps.orchestrator.notifyStatusChanged();
+  }
+
+  private runAction(action: DictationFlowAction): void {
+    switch (action) {
+      case 'start-recording':
+        void this.startRecording();
+        return;
+      case 'stop-and-flush':
+        void this.stopAndFlush();
+        return;
+      case 'deliver':
+        void this.deliverSession();
+        return;
+      case 'abort-recording':
+        void this.abortRecording();
+        return;
+      case 'none':
+        return;
+    }
+  }
+
+  private async startRecording(): Promise<void> {
+    this.sessionSegments = [];
+    this.sessionAudioMs = 0;
+    const started = await this.deps.orchestrator.startDictation();
+    if (!started.ok) {
+      // Aufnahme kam nicht zustande: zurueck nach idle, Meldung anzeigen.
+      this.state = 'idle';
+      this.showOverlay({ kind: 'error', message: started.message }, OVERLAY_ERROR_VISIBLE_MS);
+      this.deps.orchestrator.notifyStatusChanged();
+      return;
+    }
+    this.tray?.setRecording(true);
+    this.showOverlay({ kind: 'recording', message: null }, null);
+  }
+
+  private async stopAndFlush(): Promise<void> {
+    this.tray?.setRecording(false);
+    this.showOverlay({ kind: 'transcribing', message: null }, null);
+    await this.deps.orchestrator.stopDictationAndFlush();
+    this.dispatch('flush-complete');
+  }
+
+  private async abortRecording(): Promise<void> {
+    this.tray?.setRecording(false);
+    this.sessionSegments = [];
+    this.sessionAudioMs = 0;
+    this.hideOverlay();
+    await this.deps.orchestrator.abortDictation();
+  }
+
+  private async deliverSession(): Promise<void> {
+    const roh = joinTranscriptSegments(this.sessionSegments);
+    const audioMs = this.sessionAudioMs;
+    this.sessionSegments = [];
+    this.sessionAudioMs = 0;
+    // Stufe 1: Ersetzungsliste (Firma) und Aufbereitung (globale Schalter)
+    // auf dem finalen Text, VOR Clipboard/Paste und VOR Speicherung.
+    const processed =
+      roh.length === 0 ? { text: '', ersetzungen: [] } : await this.processTranscriptText(roh);
+    if (processed.text.length === 0) {
+      this.showOverlay({ kind: 'no-speech', message: null }, OVERLAY_DONE_VISIBLE_MS);
+      this.dispatch('delivery-complete');
+      return;
+    }
+    const result = await this.deliverText(processed.text, audioMs, processed.ersetzungen);
+    if (result.pasted) {
+      this.showOverlay(
+        { kind: 'done', message: texte().flow.overlayTextEingefuegt },
+        OVERLAY_DONE_VISIBLE_MS,
+      );
+    } else {
+      this.showOverlay(
+        { kind: 'error', message: result.message ?? texte().flow.overlayTextInZwischenablage },
+        OVERLAY_ERROR_VISIBLE_MS,
+      );
+    }
+    this.dispatch('delivery-complete');
+  }
+
+  /**
+   * Diktatsprache der aktiven Firma, fehlertolerant: jeder
+   * Lese-Fehler faellt auf Deutsch zurueck und blockiert die Zustellung nie.
+   */
+  private async activeLanguageLenient(): Promise<DictationLanguage> {
+    const companies = this.deps.companies;
+    if (companies === null) {
+      return 'de';
+    }
+    try {
+      return await companies.activeSprache();
+    } catch (error) {
+      this.deps.logger.warn(
+        `Diktatsprache nicht lesbar, es gilt Deutsch: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 'de';
+    }
+  }
+
+  /**
+   * Stufe 1: finaler Text = Ersetzungsliste der aktiven
+   * Firma (deterministisch, Literal, Wortgrenzen), dann regelbasierte
+   * Aufbereitung (Interpunktion immer; Fuellwoerter/Sprachkommandos gemaess
+   * globaler Schalter, Listen sprachabhaengig je Firmensprache).
+   * Reine lokale String-Verarbeitung, KEIN Modell, KEIN externer Aufruf
+   * (harte Guardrail). Fehler beim Laden der Ersetzungsliste blockieren die
+   * Zustellung nie. Angewandte Ersetzungen werden formatiert zurueckgegeben
+   * und wandern in den Front-Matter-Beleg des Diktats; geloggt werden
+   * sie nie (keine Inhalte im Log).
+   */
+  private async processTranscriptText(
+    roh: string,
+  ): Promise<{ text: string; ersetzungen: readonly string[] }> {
+    let text = roh;
+    let ersetzungen: readonly string[] = [];
+    const companies = this.deps.companies;
+    if (companies !== null) {
+      try {
+        const protokoll = applyErsetzungenMitProtokoll(text, await companies.activeErsetzungen());
+        text = protokoll.text;
+        ersetzungen = protokoll.angewandt.map(formatAngewandteErsetzung);
+      } catch (error) {
+        this.deps.logger.warn(
+          `Ersetzungsliste nicht anwendbar, Text bleibt unverändert: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    return {
+      text: aufbereitenText(text, this.config.aufbereitung, await this.activeLanguageLenient()),
+      ersetzungen,
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // Zustellung: Clipboard-Sequenz + Accessibility-Check + Auto-Paste
+  // ---------------------------------------------------------------------
+
+  /**
+   * Stellt einen Text zu. Der Text bleibt unabhaengig vom Ergebnis als
+   * lastTranscript im RAM und in der Zwischenablage verfuegbar, wenn nicht
+   * gepastet wurde (Resilienz-Primaerpfad). Ist Auto-Speichern aktiv und
+   * eine Firma vorhanden, wird der Text zusaetzlich als Diktat in der
+   * aktiven Firma abgelegt (ein Speicherfehler bricht die Zustellung
+   * nie ab, er wird geloggt und gemeldet).
+   */
+  private async deliverText(
+    text: string,
+    audioMs = 0,
+    ersetzungen: readonly string[] = [],
+  ): Promise<DeliveryResult> {
+    this.lastTranscript = text;
+    this.lastAudioMs = audioMs;
+    this.lastErsetzungen = ersetzungen;
+    await this.autoSaveDictate(text, audioMs, ersetzungen);
+
+    const paste = this.resolvePaste();
+    const sequence = await runClipboardSequence(
+      text,
+      {
+        restorePrevious: this.config.clipboard.restorePrevious,
+        restoreDelayMs: this.config.clipboard.restoreDelayMs,
+      },
+      { clipboard, delay: realDelay, paste: paste.fn },
+    );
+
+    // Wiederherstellung laeuft im Hintergrund weiter; Ausgang nur loggen.
+    void sequence.restore.then((outcome) => {
+      this.deps.logger.debug(`Zwischenablage-Wiederherstellung: ${outcome}`);
+    });
+
+    let message: string | null = paste.blockedMessage;
+    let pasted = false;
+    if (sequence.pasteResult !== null) {
+      if (sequence.pasteResult.ok) {
+        pasted = true;
+      } else {
+        message = sequence.pasteResult.error;
+      }
+    }
+    if (message !== null) {
+      this.deps.orchestrator.reportFlowError(message);
+    } else {
+      this.deps.orchestrator.notifyStatusChanged();
+    }
+    return { delivered: true, pasted, message };
+  }
+
+  /**
+   * Auto-Speichern: legt das Diktat in der aktiven Firma ab, wenn der
+   * Schalter aktiv ist und eine Firma existiert (Default AN, sobald eine
+   * Firma angelegt wurde). Fehler stoppen die Zustellung nie.
+   */
+  private async autoSaveDictate(
+    text: string,
+    audioMs: number,
+    ersetzungen: readonly string[] = [],
+  ): Promise<void> {
+    const companies = this.deps.companies;
+    if (companies === null) {
+      return;
+    }
+    try {
+      if (!(await companies.isAutoSaveEnabled())) {
+        return;
+      }
+      const sprache = await this.activeLanguageLenient();
+      const saved = await companies.saveDictate({
+        text,
+        dauerSekunden: Math.round(audioMs / 1000),
+        quelle: 'diktat',
+        sprache,
+        modell: transcriptModelNameFor(sprache, this.config.modell),
+        ...(ersetzungen.length === 0 ? {} : { ersetzungen }),
+      });
+      if (!saved.ok) {
+        this.deps.logger.warn(`Diktat konnte nicht gespeichert werden: ${saved.message}`);
+      }
+    } catch (error) {
+      this.deps.logger.error(
+        `Unerwarteter Fehler beim Diktat-Speichern: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /** Letztes Transkript manuell als Diktat speichern (IPC/Test-UI). */
+  private async saveLastDictate(): Promise<SaveDictateResult> {
+    if (this.deps.companies === null) {
+      return { ok: false, message: texte().flow.firmenverwaltungFehlt };
+    }
+    if (this.lastTranscript === null) {
+      return { ok: false, message: texte().flow.keinDiktatVorhanden };
+    }
+    const sprache = await this.activeLanguageLenient();
+    return this.deps.companies.saveDictate({
+      text: this.lastTranscript,
+      dauerSekunden: Math.round(this.lastAudioMs / 1000),
+      quelle: 'diktat',
+      sprache,
+      modell: transcriptModelNameFor(sprache, this.config.modell),
+      ...(this.lastErsetzungen.length === 0 ? {} : { ersetzungen: this.lastErsetzungen }),
+    });
+  }
+
+  /**
+   * Entscheidet den Paste-Weg VOR dem Versuch: Mock (Test), fehlende
+   * macOS-Bedienungshilfen-Freigabe (kein osascript-Versuch, Hinweis mit
+   * Deep-Link-Anleitung), nicht unterstuetzte Plattform oder echter Adapter.
+   */
+  private resolvePaste(): {
+    fn: (() => Promise<Result<void, string>>) | null;
+    blockedMessage: string | null;
+  } {
+    if (this.mockPasteEnabled) {
+      return {
+        fn: () => {
+          this.mockPasteCalls += 1;
+          return Promise.resolve({ ok: true as const, value: undefined });
+        },
+        blockedMessage: null,
+      };
+    }
+    if (this.effectiveAccessibility() === 'missing') {
+      return { fn: null, blockedMessage: accessibilityMissingMessage() };
+    }
+    if (this.pasteAdapter === null) {
+      return { fn: null, blockedMessage: this.pasteUnsupportedMessage };
+    }
+    const adapter = this.pasteAdapter;
+    return { fn: () => adapter.paste(), blockedMessage: null };
+  }
+
+  private effectiveAccessibility(): 'granted' | 'missing' | 'not-applicable' {
+    if (this.accessibilityOverride !== null) {
+      return this.accessibilityOverride ? 'granted' : 'missing';
+    }
+    return getAccessibilityState();
+  }
+
+  // ---------------------------------------------------------------------
+  // Hotkey
+  // ---------------------------------------------------------------------
+
+  private registerHotkey(accelerator: string): boolean {
+    let registered = false;
+    try {
+      registered = globalShortcut.register(accelerator, () => {
+        this.toggle();
+      });
+    } catch (error) {
+      this.deps.logger.error(
+        `Hotkey-Registrierung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    this.hotkeyRegistered = registered;
+    if (registered) {
+      this.deps.logger.info(`Globaler Diktat-Hotkey registriert: ${accelerator}`);
+    } else {
+      this.deps.orchestrator.reportFlowError(texte().flow.hotkeyBelegt(accelerator));
+    }
+    return registered;
+  }
+
+  private async setHotkey(accelerator: string): Promise<ActionResult> {
+    const parsed = hotkeyAcceleratorSchema.safeParse(accelerator);
+    if (!parsed.success) {
+      // Katalog-Meldung statt zod-Issue: die Schema-Meldung ist statisch
+      // deutsch, der Nutzer bekommt die Meldung in der UI-Sprache.
+      return { ok: false, message: texte().flow.ungueltigeTastenkombination };
+    }
+    const previous = this.config.hotkey.accelerator;
+    if (this.hotkeyRegistered) {
+      globalShortcut.unregister(previous);
+      this.hotkeyRegistered = false;
+    }
+    const registered = this.registerHotkey(parsed.data);
+    if (!registered) {
+      // Alte Kombination reaktivieren, damit das Diktat nicht hotkeylos wird.
+      this.registerHotkey(previous);
+      this.deps.orchestrator.notifyStatusChanged();
+      return {
+        ok: false,
+        message: texte().flow.hotkeyWechselBelegt(parsed.data, previous),
+      };
+    }
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      hotkey: { ...current.hotkey, accelerator: parsed.data },
+    }));
+    this.deps.orchestrator.notifyStatusChanged();
+    return { ok: true };
+  }
+
+  /**
+   * Hotkey-Livetest fuer den Wizard: registriert die
+   * Kandidaten-Kombination kurz systemweit und gibt sie sofort wieder frei.
+   * Persistiert NICHTS (der Wizard schreibt erst bei "Einrichten" ueber
+   * setHotkey). Ist der Kandidat der bereits aktive eigene Hotkey, gilt der
+   * Test als bestanden, ohne die aktive Registrierung anzufassen.
+   */
+  private testHotkey(accelerator: string): ActionResult {
+    const parsed = hotkeyAcceleratorSchema.safeParse(accelerator);
+    if (!parsed.success) {
+      return { ok: false, message: texte().flow.ungueltigeTastenkombination };
+    }
+    if (this.hotkeyRegistered && parsed.data === this.config.hotkey.accelerator) {
+      return { ok: true };
+    }
+    let registered = false;
+    try {
+      registered = globalShortcut.register(parsed.data, () => {
+        // Nur Testregistrierung: ein Druck waehrend des Tests tut nichts.
+      });
+    } catch (error) {
+      this.deps.logger.warn(
+        `Hotkey-Testregistrierung fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (!registered) {
+      return { ok: false, message: texte().flow.hotkeyTestBelegt(parsed.data) };
+    }
+    globalShortcut.unregister(parsed.data);
+    return { ok: true };
+  }
+
+  /**
+   * Whisper-Modellwahl setzen (Wizard Schritt Modell): persistiert die Wahl
+   * in der globalen Konfig und meldet sie dem Orchestrator (der eine ggf.
+   * laufende Engine beendet, damit der naechste Start das gewaehlte Modell
+   * laedt).
+   */
+  private async setModelChoice(choice: GlobalConfig['modell']): Promise<ActionResult> {
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      modell: choice,
+    }));
+    await this.deps.orchestrator.setModelChoice(choice);
+    this.deps.orchestrator.notifyStatusChanged();
+    return { ok: true };
+  }
+
+  private async setClipboardRestore(enabled: boolean): Promise<ActionResult> {
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      clipboard: { ...current.clipboard, restorePrevious: enabled },
+    }));
+    this.deps.orchestrator.notifyStatusChanged();
+    return { ok: true };
+  }
+
+  /**
+   * Schalter der Textaufbereitung setzen (Stufe 1; global).
+   * Persistiert in der globalen Konfig, wirkt ab dem naechsten Diktat.
+   */
+  private async setAufbereitung(next: {
+    fuellwoerterEntfernen: boolean;
+    sprachkommandos: boolean;
+  }): Promise<ActionResult> {
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      aufbereitung: { ...current.aufbereitung, ...next },
+    }));
+    this.deps.orchestrator.notifyStatusChanged();
+    return { ok: true };
+  }
+
+  /**
+   * Sprache der Oberflaeche setzen (global, unabhaengig von der
+   * Diktatsprache der Firmen). Persistiert in der globalen Konfig; der
+   * Renderer wechselt live (Status-Broadcast), das Overlay erhaelt die
+   * Sprache mit dem naechsten Anzeige-Zustand.
+   *
+   * Schreiben laeuft wie ALLE Konfig-Schreiber ueber den zentralen,
+   * serialisierten Writer (Lesen-Aendern-Schreiben): der Sprachwechsel
+   * passiert auch NACH der Firmen-Anlage; ein Schreiben eines veralteten
+   * in-memory-Standes wuerde die vom CompanyManager nachgetragenen Felder
+   * (firmen, aktiveFirma) verlieren.
+   *
+   * Zusaetzlich: der Main-Katalog wechselt sofort mit
+   * (setUiLanguage), das Tray-Menue wird neu aufgebaut.
+   */
+  private async setUiSprache(sprache: UiLanguage): Promise<ActionResult> {
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      uiSprache: sprache,
+    }));
+    setUiLanguage(sprache);
+    this.tray?.refreshLanguage();
+    this.deps.orchestrator.notifyStatusChanged();
+    return { ok: true };
+  }
+
+  // ---------------------------------------------------------------------
+  // Resilienz: Kopieren-Knopf
+  // ---------------------------------------------------------------------
+
+  private copyLastTranscript(): ActionResult {
+    if (this.lastTranscript === null) {
+      return { ok: false, message: texte().flow.keinDiktatVorhanden };
+    }
+    clipboard.writeText(this.lastTranscript);
+    return { ok: true };
+  }
+
+  // ---------------------------------------------------------------------
+  // Overlay
+  // ---------------------------------------------------------------------
+
+  private showOverlay(state: OverlayStatePayload, hideAfterMs: number | null): void {
+    this.clearOverlayHideTimer();
+    const overlay = this.overlay;
+    if (overlay === null || overlay.isDestroyed()) {
+      return;
+    }
+    // Sprache der Oberflaeche anhaengen: das Overlay waehlt damit
+    // seine eigenen Texte; Meldungen aus dem Main-Prozess bleiben unveraendert.
+    const payload: OverlayStatePayload = { ...state, uiSprache: this.config.uiSprache };
+    const sendState = (): void => {
+      overlay.webContents.send(IpcChannel.OverlayState, payload);
+    };
+    if (overlay.webContents.isLoading()) {
+      overlay.webContents.once('did-finish-load', sendState);
+    } else {
+      sendState();
+    }
+    // Nie aktivierend zeigen: die Fremd-App behaelt den Fokus.
+    showOverlayInactive(overlay);
+    if (hideAfterMs !== null) {
+      this.overlayHideTimer = setTimeout(() => {
+        this.hideOverlay();
+      }, hideAfterMs);
+    }
+  }
+
+  private hideOverlay(): void {
+    this.clearOverlayHideTimer();
+    if (this.overlay !== null && !this.overlay.isDestroyed() && this.overlay.isVisible()) {
+      this.overlay.hide();
+    }
+  }
+
+  private clearOverlayHideTimer(): void {
+    if (this.overlayHideTimer !== null) {
+      clearTimeout(this.overlayHideTimer);
+      this.overlayHideTimer = null;
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Status + IPC
+  // ---------------------------------------------------------------------
+
+  private flowStatus(): FlowStatus {
+    return {
+      flowState: this.state,
+      hotkey: {
+        accelerator: this.config.hotkey.accelerator,
+        registered: this.hotkeyRegistered,
+      },
+      accessibility: this.effectiveAccessibility(),
+      lastTranscript: this.lastTranscript,
+      clipboardRestoreEnabled: this.config.clipboard.restorePrevious,
+      aufbereitung: {
+        fuellwoerterEntfernen: this.config.aufbereitung.fuellwoerterEntfernen,
+        sprachkommandos: this.config.aufbereitung.sprachkommandos,
+      },
+      uiLanguage: this.config.uiSprache,
+    };
+  }
+
+  private registerIpcHandlers(): void {
+    ipcMain.handle(IpcChannel.SetHotkey, async (_event, raw: unknown): Promise<ActionResult> => {
+      const parsed = z.string().min(1).safeParse(raw);
+      if (!parsed.success) {
+        return { ok: false, message: texte().flow.eingabeTastenkombination };
+      }
+      return this.setHotkey(parsed.data);
+    });
+
+    ipcMain.handle(
+      IpcChannel.SetClipboardRestore,
+      async (_event, raw: unknown): Promise<ActionResult> => {
+        const parsed = z.boolean().safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, message: texte().flow.eingabeZwischenablage };
+        }
+        return this.setClipboardRestore(parsed.data);
+      },
+    );
+
+    ipcMain.handle(
+      IpcChannel.SetAufbereitung,
+      async (_event, raw: unknown): Promise<ActionResult> => {
+        const parsed = aufbereitungConfigSchema.safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, message: texte().flow.eingabeAufbereitung };
+        }
+        return this.setAufbereitung(parsed.data);
+      },
+    );
+
+    // Sprache der Oberflaeche (global) setzen und persistieren.
+    ipcMain.handle(
+      IpcChannel.SetUiLanguage,
+      async (_event, raw: unknown): Promise<ActionResult> => {
+        const parsed = uiLanguageSchema.safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, message: texte().flow.eingabeUiSprache };
+        }
+        return this.setUiSprache(parsed.data);
+      },
+    );
+
+    ipcMain.handle(IpcChannel.CopyLastTranscript, (): ActionResult => this.copyLastTranscript());
+
+    // Wizard: Hotkey-Livetest ohne Persistenz.
+    ipcMain.handle(IpcChannel.WizardTestHotkey, (_event, raw: unknown): ActionResult => {
+      const parsed = z.string().min(1).max(100).safeParse(raw);
+      if (!parsed.success) {
+        return { ok: false, message: texte().flow.eingabeTastenkombination };
+      }
+      return this.testHotkey(parsed.data);
+    });
+
+    // Wizard: Whisper-Modellwahl persistieren.
+    ipcMain.handle(
+      IpcChannel.SetModelChoice,
+      async (_event, raw: unknown): Promise<ActionResult> => {
+        const parsed = modelChoiceSchema.safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, message: texte().flow.ungueltigeModellwahl };
+        }
+        return this.setModelChoice(parsed.data);
+      },
+    );
+
+    // Letztes Transkript manuell in der aktiven Firma speichern. Der
+    // Handler lebt hier (nicht im CompanyManager), weil nur der Flow das
+    // letzte Transkript im RAM haelt.
+    ipcMain.handle(IpcChannel.DictateSaveLast, async (): Promise<SaveDictateResult> => {
+      try {
+        return await this.saveLastDictate();
+      } catch (error) {
+        this.deps.logger.error(
+          `Unerwarteter Fehler beim Diktat-Speichern: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return { ok: false, message: texte().generisch.internerFehler };
+      }
+    });
+
+    ipcMain.handle(IpcChannel.OpenAccessibilitySettings, async (): Promise<ActionResult> => {
+      const result = await openAccessibilitySettings();
+      return result.ok ? { ok: true } : { ok: false, message: result.error };
+    });
+
+    ipcMain.handle(IpcChannel.RequestAccessibility, (): ActionResult => {
+      const state = requestAccessibilityGrant();
+      if (state === 'granted') {
+        return { ok: true };
+      }
+      return { ok: false, message: texte().freigaben.accessibilityDialogAngezeigt };
+    });
+
+    // Kopieren-Knopf des Overlays (fire-and-forget).
+    ipcMain.on(IpcChannel.OverlayCopyLast, () => {
+      const result = this.copyLastTranscript();
+      if (!result.ok) {
+        this.deps.logger.warn(result.message);
+      }
+    });
+  }
+
+  /** Dev-/Test-IPC: Paste-Mock, Accessibility-Override, Flow-Trigger. */
+  private registerTestIpcHandlers(): void {
+    this.deps.logger.warn('Test-IPC-Kanaele des Diktat-Flows sind AKTIV (nur Dev/Test).');
+
+    ipcMain.handle(IpcChannel.DevMockPaste, (_event, raw: unknown): ActionResult => {
+      const parsed = z.boolean().safeParse(raw);
+      if (!parsed.success) {
+        return { ok: false, message: texte().flow.eingabePasteMock };
+      }
+      this.mockPasteEnabled = parsed.data;
+      return { ok: true };
+    });
+
+    ipcMain.handle(IpcChannel.DevGetPasteCalls, (): number => this.mockPasteCalls);
+
+    ipcMain.handle(IpcChannel.DevSetAccessibility, (_event, raw: unknown): ActionResult => {
+      const parsed = z.boolean().nullable().safeParse(raw);
+      if (!parsed.success) {
+        return { ok: false, message: texte().flow.eingabeAccessibilityOverride };
+      }
+      this.accessibilityOverride = parsed.data;
+      return { ok: true };
+    });
+
+    ipcMain.handle(
+      IpcChannel.DevRunDictationResult,
+      async (_event, raw: unknown): Promise<DeliveryResult> => {
+        const parsed = z.string().min(1).safeParse(raw);
+        if (!parsed.success) {
+          return { delivered: false, pasted: false, message: texte().flow.ungueltigerText };
+        }
+        // Wie ein echtes Diktat: Ersetzungen + Aufbereitung vor Zustellung.
+        const processed = await this.processTranscriptText(parsed.data);
+        if (processed.text.length === 0) {
+          return {
+            delivered: false,
+            pasted: false,
+            message: texte().flow.aufbereiteterTextLeer,
+          };
+        }
+        return this.deliverText(processed.text, 0, processed.ersetzungen);
+      },
+    );
+
+    // Kompletter Diktat-Beweis aus PCM (Stufe 1): Engine-Injektion (mit
+    // Woerterbuch-Prompt und VAD-Schleuse), dann Ersetzungen, Aufbereitung
+    // und echte Zustellung. Stille liefert delivered=false und text=null.
+    ipcMain.handle(
+      IpcChannel.DevDictatePcm,
+      async (_event, raw: unknown): Promise<DevDictateResult> => {
+        const pcm = toArrayBuffer(raw);
+        if (pcm === null) {
+          return {
+            delivered: false,
+            pasted: false,
+            text: null,
+            message: texte().stt.keinPcmPuffer,
+          };
+        }
+        const transcribed = await this.deps.orchestrator.transcribeInjectedPcm(pcm);
+        if (!transcribed.ok) {
+          return { delivered: false, pasted: false, text: null, message: transcribed.message };
+        }
+        if (transcribed.transcript === null) {
+          return {
+            delivered: false,
+            pasted: false,
+            text: null,
+            message: texte().flow.vadStille,
+          };
+        }
+        const processed = await this.processTranscriptText(transcribed.transcript.text);
+        if (processed.text.length === 0) {
+          return {
+            delivered: false,
+            pasted: false,
+            text: null,
+            message: texte().flow.aufbereiteterTextLeer,
+          };
+        }
+        const delivery = await this.deliverText(
+          processed.text,
+          transcribed.transcript.audioMs,
+          processed.ersetzungen,
+        );
+        return {
+          delivered: delivery.delivered,
+          pasted: delivery.pasted,
+          text: processed.text,
+          message: delivery.message,
+        };
+      },
+    );
+  }
+}

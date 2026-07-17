@@ -1,0 +1,15 @@
+# Build- und Tool-Ausgaben
+node_modules/
+out/
+dist/
+playwright-report/
+test-results/
+sbom.cdx.json
+package-lock.json
+
+# Lokale Arbeitsunterlagen und Werkzeuge (eigene Formatierungsregeln)
+ABARBEITUNG.md
+.claude/
+
+# Release-Artefakte (generiert: SBOM und Checksummen, nie umformatieren)
+release/

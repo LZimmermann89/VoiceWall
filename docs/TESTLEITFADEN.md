@@ -1,0 +1,153 @@
+> 🇬🇧 English version: [TESTLEITFADEN.en.md](TESTLEITFADEN.en.md)
+
+# Testleitfaden für externe Tester
+
+Stand: 04.07.2026, Version 1.0.0-rc.2. Zielgruppe: technisch versierte
+Tester (Entwickler), die VoiceWall auf macOS oder Windows unabhängig
+prüfen. Danke fürs Testen: bitte ehrlich und gnadenlos, genau das
+brauchen wir.
+
+## Neu in 1.0.0-rc.2: zweisprachige Oberfläche
+
+Die Oberfläche kann jetzt Deutsch UND Englisch, inklusive aller
+Fehlermeldungen aus dem Main-Prozess. Der Einrichtungs-Assistent fragt
+als ALLERERSTEN Schritt "Sprache / Language" ab (wirkt sofort); in der
+Verwaltung sitzt der Umschalter in der Kopfzeile. Die UI-Sprache ist
+unabhängig von der Diktatsprache der Firmen (die pro Firma Deutsch oder
+Englisch sein kann). Bitte beim Testen einmal auf English umschalten
+und prüfen, ob dir noch deutsche Texte in der englischen Oberfläche
+begegnen (Ausnahme: Rechtstexte bleiben absichtlich deutsch).
+
+## Was VoiceWall ist (30 Sekunden)
+
+Ein zu 100 Prozent lokales Sprachdiktiergerät: globaler Hotkey drücken,
+sprechen, Hotkey drücken, der Text erscheint per automatischem Einfügen
+in der gerade fokussierten Anwendung. Whisper (deutsch optimiert) läuft
+komplett auf dem Rechner, es gibt keinen Server, keine Cloud, keine
+Telemetrie. Das Kernversprechen ist beweisbar, nicht behauptet: siehe
+`docs/NETZWERK-SELBSTTEST.md` und die Beleg-Ansicht in der App.
+
+## Ehrlicher Status vorab
+
+- **macOS (Apple Silicon):** Kernpfad vollständig abgenommen
+  (Einrichtung, Aufnahme, Transkription, Auto-Paste) am 03.07.2026 auf
+  der Referenzmaschine.
+- **Windows:** Der Code ist auf der CI (windows-latest) grün (alle
+  Unit- und E2E-Tests, Paste in der CI gemockt), aber der komplette
+  Ablauf auf ECHTER Windows-Hardware wurde noch nie ausgeführt. Du
+  wärst der Erste. Dein Testprotokoll ist der Abschnitt
+  "Windows-spezifisch" weiter unten in diesem Leitfaden.
+- Es gibt bewusst keine gekauften Code-Signing-Zertifikate
+  (bewusste Produktentscheidung: alles wird lokal aus dem Quellcode
+  gebaut, nichts wird als anonymes Binary verteilt): Rechne unter
+  Windows mit einer SmartScreen-/Defender-Rückfrage, unter macOS mit
+  den üblichen TCC-Freigaben.
+
+## Voraussetzungen
+
+- Node.js 26 (`node --version` muss v26.x zeigen), npm 11. Achtung
+  Fehlpfad: Node 26 ist die "Current"-Linie; der Standard-Button auf
+  <https://nodejs.org/en/download> liefert die ältere LTS-Version, die
+  das Setup ablehnt. Also dort ausdrücklich Version 26 ("Current")
+  wählen; auf macOS geht alternativ `brew install node` (liefert
+  derzeit die 26er-Linie). Kein Compiler, kein Xcode, keine Build-Tools
+  nötig: alle nativen Bausteine kommen prebuilt.
+- Rund 3 GB freier Plattenplatz, Internet für `npm ci` (die
+  Selbst-Installation lädt die Abhängigkeiten online aus der
+  npm-Registry; der Offline-Vendor-Weg ist der
+  Vor-Ort-Dienstleistungsweg) und einmalig für den Modell-Download
+  (574 MB von huggingface.co, SHA-256-verifiziert; danach ist das der
+  einzige Netzwerkzugriff, den du je sehen wirst).
+- Ein Mikrofon.
+
+## Installation
+
+Grundsatz review-then-run: erst Quellcode ansehen, dann ausführen.
+
+**Weg A, das Install-Skript (der Produktweg):**
+
+1. Repo per `git clone` beziehen (bitte nicht als ZIP: macOS setzt auf
+   ZIP-Downloads das Quarantäne-Attribut und Gatekeeper blockiert dann
+   den Doppelklick auf die `.command`-Datei; Ausweg wäre Rechtsklick,
+   "Öffnen"), kurz reinschauen (`install/`, `scripts/`,
+   `package-lock.json`).
+2. macOS: `install/voicewall-setup.command` doppelklicken (oder
+   `bash install/voicewall-setup.sh`). Windows:
+   `install\voicewall-setup.cmd` doppelklicken.
+3. Das Skript arbeitet acht idempotente Schritte ab und startet die
+   App; Log unter `~/.voicewall/logs/`. Zweiter Lauf muss in Sekunden
+   durchlaufen (Idempotenz, bitte mittesten). Deinstallation danach:
+   `install/uninstall.command` beziehungsweise `install\uninstall.cmd`
+   (Firmendaten bleiben immer erhalten).
+
+**Weg B, der Entwicklerweg:**
+
+```bash
+npm ci
+npm run package          # baut dist/<plattform>/VoiceWall
+# macOS zusaetzlich: codesign -s - --force --deep dist/mac-arm64/VoiceWall.app
+```
+
+Danach die gebaute App starten. `npm run dev` funktioniert auch, aber
+die OS-Berechtigungen (Mikrofon, Bedienungshilfen) hängen dann am
+Electron-Binary statt an VoiceWall, für Berechtigungs-Tests immer die
+gepackte App verwenden.
+
+## Der Kern-Testpfad (beide Plattformen)
+
+1. First-Run-Wizard komplett durchgehen (Einwilligung, Firmendaten mit
+   Umlauten im Namen, Speicherort, Modell Q5_0, Hotkey).
+2. Modell-Download abwarten (einmalig; Fortschrittsanzeige).
+3. macOS: Bedienungshilfen über den Knopf "Freigabe anfordern
+   (macOS-Dialog)" erteilen, danach in der App "VoiceWall neu starten"
+   drücken (macOS meldet frische Freigaben erst nach Neustart, das ist
+   dokumentiertes OS-Verhalten).
+4. Cursor in ein Textfeld einer Fremd-App (Word, Mail, Browser,
+   Editor), Hotkey (`Cmd/Strg+Shift+D`), einen deutschen Satz mit
+   Umlauten sprechen, Hotkey. Erwartung: Text erscheint an der
+   Cursor-Position, korrekt mit Umlauten, nach etwa 1 bis 3 Sekunden.
+5. Verwaltung testen: Register (Suche, Filter, Volltext), Detail,
+   Bearbeiten, Tags, Export (MD/TXT/PDF, verschlüsselt als .vwenc),
+   Papierkorb, zweite Firma anlegen und Trennung prüfen.
+6. Den Netzwerk-Selbsttest machen (`docs/NETZWERK-SELBSTTEST.md`):
+   Verbindungsmonitor des OS beobachten, danach die härteste Probe:
+   Netzwerk trennen und weiterdiktieren.
+
+## Windows-spezifisch bitte genau protokollieren
+
+Das sind die offenen Abnahmepunkte:
+
+- Läuft `voicewall-setup.cmd` komplett durch? Wo hakt es? (Log
+  beilegen: `%USERPROFILE%\.voicewall\logs\`)
+- SmartScreen-/Defender-Verhalten beim ersten Start (Screenshot).
+- Funktioniert das automatische Einfügen (SendKeys) in Word, Outlook,
+  Browser? Bekannte Grenze: in als Administrator laufende Programme
+  kann systembedingt nicht eingefügt werden (UIPI), dann greift der
+  Kopieren-Knopf.
+- Latenz: fühlt es sich wie ein Diktiergerät an? CPU-Modell und
+  RAM-Ausstattung bitte mit angeben (wir suchen ausdrücklich auch
+  Ergebnisse von schwächerer Hardware).
+- OneDrive: liegt dein Desktop in OneDrive? Dann muss der Wizard beim
+  Speicherort warnen, bitte prüfen.
+
+## Was du melden solltest (formlos, gern als GitHub-Issue)
+
+OS-Version und Hardware, App-Version/Commit, was du getan hast, was du
+erwartet hast, was passiert ist, Log-Auszug
+(`~/.voicewall/logs/` bzw. App-Support-Ordner `voicewall/logs/`,
+die Logs enthalten by design keine Diktat-Inhalte) und bei UI-Themen
+ein Screenshot. Sicherheitsfunde bitte über den Weg in `SECURITY.md`.
+
+## Bekannte Grenzen (kein Bug-Report nötig)
+
+- Nach jedem Neubau der App verlangt macOS die Freigaben erneut
+  (Folge der Ad-hoc-Signierung, bewusste Entscheidung); der Knopf
+  "Freigabe anfordern" plus App-Neustart ist der vorgesehene Weg.
+- Push-to-talk gibt es nicht (nur Umschalt-Modus): Electrons
+  globaler Hotkey liefert kein Loslass-Ereignis, ein nativer
+  Tastatur-Listener wäre zusätzliche Angriffsfläche.
+- Das Transkript liegt für rund eine Sekunde in der Zwischenablage
+  (danach wird der vorherige Inhalt wiederhergestellt); Clipboard-
+  Manager können es in diesem Fenster sehen, dokumentierte Restgrenze.
+- Die Zwischenablage-Wiederherstellung rettet nur Text-Inhalte,
+  Bilder in der Zwischenablage gehen beim Diktat verloren.

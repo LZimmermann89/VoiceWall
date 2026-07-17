@@ -1,0 +1,41 @@
+# Abhängigkeiten
+node_modules/
+
+# Build-Ausgaben
+out/
+dist/
+
+# Generierte Icon-Artefakte (scripts/generate-icon.mjs erzeugt sie offline
+# und deterministisch beim Packaging; nichts davon gehoert ins Repo)
+resources/build/
+
+# Vendor-Stand fuer die Offline-Vor-Ort-Installation (scripts/prepare-vendor.mjs
+# fuellt diese Ordner VOR dem Termin; Tarballs/Caches werden nie committet)
+vendor/node-runtime/
+vendor/npm-cache/
+vendor/models/
+vendor/electron-cache/
+
+# Test- und Tool-Ausgaben
+playwright-report/
+test-results/
+coverage/
+sbom.cdx.json
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# Session-lokale Werkzeuge
+.claude/
+
+# Arbeitsunterlagen des Betreibers, bleiben lokal
+ABARBEITUNG.md
+ROADMAP.md
+intern/
+release/

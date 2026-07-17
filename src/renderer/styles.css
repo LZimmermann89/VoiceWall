@@ -1,0 +1,1643 @@
+/*
+ * VoiceWall Design-System: Pruefdokument-Aesthetik.
+ *
+ * Gestaltungsrichtung (verbindlich):
+ * Die UI wirkt wie ein praezises Pruefprotokoll eines deutschen ISO-Auditors:
+ * warmer Papier-/Elfenbein-Grund statt reinem Weiss, fast-schwarze Tinte,
+ * EINE Akzentfarbe (tiefes Siegel-Gruen fuer "geprueft/lokal"), sichtbare
+ * feine Linien wie in einem Formular, Serifen-Typografie mit Charakter aus
+ * lokalen System-Fonts (kein Webfont, CSP style-src 'self'), Beleg-Details
+ * (Pruefsummen-/Versionszeile im Footer wie ein Pruefstempel).
+ *
+ * Alle Styles liegen in dieser Datei; Inline-Styles sind durch die CSP
+ * verboten (style-src 'self' ohne 'unsafe-inline'). Dynamische Breiten
+ * (Pegel) laufen ueber diskrete Klassen (.lvl-*).
+ *
+ * Kontrast-Nachweis (WCAG 2.1 AA, gegen Papier #F2EEE3, L = 0.854):
+ *   --ink      #1C1A15  Kontrast 14.9 : 1  (Fliesstext, AA/AAA)
+ *   --ink-soft #5A564A  Kontrast  6.3 : 1  (Sekundaertext, AA)
+ *   --seal     #1E5C45  Kontrast  6.8 : 1  (Akzent-Text/Rahmen, AA)
+ *              Elfenbein #F7F4EA auf --seal (Buttons): 7.0 : 1 (AA)
+ *   --error    #9B2C20  Kontrast  6.5 : 1  (Fehlertext, AA)
+ *   --warn-ink #7C4E0F  Kontrast  6.1 : 1  (Warntext, AA)
+ * Fokus-Indikator: 2px durchgehender --seal-Ring mit 2px Versatz (sichtbar
+ * auf allen interaktiven Elementen, WCAG 2.4.7).
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Papier und Tinte */
+  --paper: #f2eee3;
+  --paper-raised: #f9f6ee;
+  --paper-inset: #ece7d8;
+  --ink: #1c1a15;
+  --ink-soft: #5a564a;
+
+  /* Linienwerk (Formular-Raster) */
+  --rule: #d8d1bd;
+  --rule-strong: #b5ad94;
+
+  /* Siegel-Gruen: die einzige Akzentfarbe */
+  --seal: #1e5c45;
+  --seal-deep: #174936;
+  --seal-wash: #e3e9dd;
+
+  /* Meldungen */
+  --error: #9b2c20;
+  --error-wash: #f0e0dc;
+  --warn-ink: #7c4e0f;
+  --warn-wash: #f0e6d2;
+
+  /* Typografie: lokale System-Fonts mit Charakter, kein Webfont. */
+  --font-display:
+    'Iowan Old Style', 'Sitka Heading', 'Palatino Nova', Palatino, 'Book Antiqua', Georgia, serif;
+  --font-body:
+    'Iowan Old Style', Charter, 'Sitka Text', 'Palatino Nova', Palatino, Cambria, Georgia, serif;
+  --font-mono: 'SF Mono', 'Cascadia Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  /* Feines Papierkorn: zwei hauchduenne Linienraster, wie Buetten. */
+  background-image:
+    repeating-linear-gradient(0deg, rgb(28 26 21 / 0.016) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgb(28 26 21 / 0.011) 0 1px, transparent 1px 3px);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Fokus: sichtbar, konsistent, mit Versatz                                */
+/* ---------------------------------------------------------------------- */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--seal);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Programmatisch fokussierte Ueberschriften (Schrittwechsel-Fokus fuer
+ * Screenreader) brauchen keinen visuellen Ring: sie sind nicht interaktiv. */
+h2[tabindex='-1']:focus,
+h2[tabindex='-1']:focus-visible {
+  outline: none;
+}
+
+/* ---------------------------------------------------------------------- */
+/* App-Rahmen: Kopfzeile, Inhalt, Pruefstempel-Fusszeile                   */
+/* ---------------------------------------------------------------------- */
+.app-frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  padding: 1.05rem 2.2rem 0.85rem;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 1.32rem;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+  margin: 0;
+}
+
+.wordmark .wordmark-dot {
+  color: var(--seal);
+}
+
+.app-header .context-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+}
+
+.app-header .header-spacer {
+  flex: 1;
+}
+
+.local-badge {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--seal);
+  border: 1px solid var(--seal);
+  border-radius: 999px;
+  padding: 0.14rem 0.65rem;
+  white-space: nowrap;
+}
+
+.app-content {
+  flex: 1;
+  width: 100%;
+}
+
+/* Fusszeile als Pruefstempel: Version, Modell-Pruefsumme, Netzwerk-Beleg. */
+.app-footer {
+  border-top: 1px solid var(--rule-strong);
+  padding: 0.55rem 2.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.02em;
+}
+
+.app-footer .stamp-seal {
+  color: var(--seal);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Wizard: Schritt-Register links, Protokollseite rechts                   */
+/* ---------------------------------------------------------------------- */
+.wizard-layout {
+  display: grid;
+  grid-template-columns: 15.5rem 1fr;
+  min-height: 100%;
+}
+
+.wizard-rail {
+  border-right: 1px solid var(--rule-strong);
+  padding: 1.6rem 0 1.6rem 2.2rem;
+}
+
+.wizard-rail-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+  margin: 0 0 1rem;
+}
+
+.wizard-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wizard-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  padding: 0.42rem 1rem 0.42rem 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+}
+
+.wizard-steps li:last-child {
+  border-bottom: none;
+}
+
+.wizard-steps .step-index {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  min-width: 1.5rem;
+  color: var(--ink-soft);
+}
+
+.wizard-steps li.step-current {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.wizard-steps li.step-current .step-index {
+  color: var(--seal);
+  font-weight: 700;
+}
+
+.wizard-steps li.step-done {
+  color: var(--ink-soft);
+}
+
+.wizard-steps .step-check {
+  margin-left: auto;
+  color: var(--seal);
+  font-size: 0.8rem;
+}
+
+.wizard-page {
+  padding: 1.7rem 2.4rem 2.2rem;
+  max-width: 44rem;
+}
+
+.step-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--seal);
+  margin: 0 0 0.3rem;
+}
+
+.wizard-page h2 {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+}
+
+.wizard-page h3 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 1.4rem 0 0.4rem;
+}
+
+.lede {
+  color: var(--ink-soft);
+  margin: 0 0 1.3rem;
+  max-width: 38rem;
+}
+
+/* Navigation am Seitenfuss des Wizards */
+.wizard-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 2rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--rule-strong);
+}
+
+.wizard-nav .nav-spacer {
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Formular-Elemente: Protokollfelder                                      */
+/* ---------------------------------------------------------------------- */
+.field-grid {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+}
+
+.field-label .req {
+  color: var(--seal);
+}
+
+input[type='text'],
+input[type='email'],
+textarea,
+select {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 0.5rem 0.65rem;
+}
+
+input[type='text']:focus-visible,
+input[type='email']:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 0;
+  border-color: var(--seal);
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.field-error {
+  font-size: 0.82rem;
+  color: var(--error);
+  margin: 0;
+}
+
+input[aria-invalid='true'],
+input.invalid {
+  border-color: var(--error);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+/* Ordnername-Vorschau: wie eine gestempelte Registerzeile */
+.folder-preview {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  background: var(--paper-inset);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--seal);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.folder-preview.preview-error {
+  border-left-color: var(--error);
+}
+
+/* Radiokarten (Speicherort, Modellwahl) */
+.choice-list {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.choice-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 0.7rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--paper-raised);
+  padding: 0.75rem 0.9rem;
+  cursor: pointer;
+}
+
+.choice-card:has(input:checked) {
+  border-color: var(--seal);
+  box-shadow: inset 3px 0 0 var(--seal);
+}
+
+.choice-card:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.choice-card input[type='radio'],
+.consent-row input[type='checkbox'],
+.switch-row input[type='checkbox'] {
+  accent-color: var(--seal);
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.2rem;
+}
+
+.choice-title {
+  font-weight: 700;
+}
+
+.choice-title .badge {
+  font-size: 0.68rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--seal);
+  border: 1px solid var(--seal);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  margin-left: 0.5rem;
+  white-space: nowrap;
+}
+
+.choice-desc {
+  grid-column: 2;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.choice-status {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  margin: 0.15rem 0 0;
+}
+
+.choice-status .status-ok {
+  color: var(--seal);
+}
+
+.choice-status .status-missing {
+  color: var(--warn-ink);
+}
+
+/* Einwilligung */
+.consent-row {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-raised);
+  border-radius: 3px;
+  padding: 0.8rem 0.9rem;
+  margin-top: 1.1rem;
+}
+
+.consent-row span {
+  font-size: 0.92rem;
+}
+
+.switch-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  font-size: 0.92rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Knoepfe                                                                 */
+/* ---------------------------------------------------------------------- */
+button {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  border-radius: 3px;
+  padding: 0.5rem 1.05rem;
+  cursor: pointer;
+  border: 1px solid var(--rule-strong);
+  background: var(--paper-raised);
+  color: var(--ink);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--ink-soft);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--seal);
+  border-color: var(--seal-deep);
+  color: #f7f4ea;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--seal-deep);
+}
+
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+button.ghost:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: transparent;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Meldungen                                                               */
+/* ---------------------------------------------------------------------- */
+.note {
+  border: 1px solid var(--rule-strong);
+  border-left: 3px solid var(--seal);
+  background: var(--paper-raised);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.88rem;
+  margin: 0.9rem 0 0;
+}
+
+.note.warn {
+  border-left-color: var(--warn-ink);
+  background: var(--warn-wash);
+  color: var(--ink);
+}
+
+.note.error {
+  border-left-color: var(--error);
+  background: var(--error-wash);
+}
+
+.note p {
+  margin: 0 0 0.4rem;
+}
+
+.note p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Protokoll-Tabellen (Status, Zusammenfassung)                            */
+/* ---------------------------------------------------------------------- */
+.proto-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 1px solid var(--rule-strong);
+  margin: 0.4rem 0 0;
+}
+
+.proto-table th,
+.proto-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.42rem 0.75rem 0.42rem 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.9rem;
+}
+
+.proto-table th {
+  font-weight: 400;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+  width: 13rem;
+  white-space: nowrap;
+}
+
+.proto-table td.value-ok {
+  color: var(--seal);
+  font-weight: 700;
+}
+
+.proto-table td.value-warn {
+  color: var(--warn-ink);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Download-Fortschritt                                                    */
+/* ---------------------------------------------------------------------- */
+progress {
+  width: 100%;
+  height: 0.7rem;
+  accent-color: var(--seal);
+}
+
+.progress-line {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin: 0.3rem 0 0;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Hauptansicht (Uebergang zur vollen Verwaltung)                         */
+/* ---------------------------------------------------------------------- */
+.main-layout {
+  padding: 1.5rem 2.2rem 2rem;
+  max-width: 52rem;
+}
+
+.main-layout h2 {
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  margin: 0 0 0.5rem;
+}
+
+.main-section {
+  border-top: 1px solid var(--rule-strong);
+  padding: 1.1rem 0 1.3rem;
+}
+
+.main-section:first-child {
+  border-top: none;
+  padding-top: 0.2rem;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+
+.section-head .section-no {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--seal);
+  letter-spacing: 0.1em;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.55rem;
+}
+
+.actions label {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.actions input[type='text'] {
+  min-width: 15rem;
+}
+
+.status-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.5rem;
+}
+
+.status-list li {
+  padding: 0.28rem 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.92rem;
+}
+
+.status-list li:last-child {
+  border-bottom: none;
+}
+
+.model-line {
+  margin: 0.1rem 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.placeholder {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.notice {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.warn-text {
+  color: var(--error);
+  font-size: 0.85rem;
+}
+
+.error-box {
+  border: 1px solid var(--error);
+  border-left-width: 3px;
+  border-radius: 3px;
+  padding: 0.75rem 1rem;
+  background: var(--error-wash);
+  margin-top: 1rem;
+}
+
+.error-box h2 {
+  margin-top: 0;
+}
+
+.accessibility-hint {
+  margin-top: 0.75rem;
+  border: 1px solid var(--warn-ink);
+  border-left-width: 3px;
+  border-radius: 3px;
+  padding: 0.75rem 1rem;
+  background: var(--warn-wash);
+  font-size: 0.9rem;
+}
+
+.last-transcript {
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--paper-raised);
+  padding: 0.75rem 1rem;
+  margin-top: 0.5rem;
+}
+
+.transcript-list {
+  padding-left: 1.2rem;
+  margin: 0.5rem 0 0;
+}
+
+.transcript-list li {
+  margin-bottom: 0.5rem;
+}
+
+.transcript-text {
+  display: block;
+}
+
+.transcript-meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+
+.company-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.company-bar .company-active {
+  font-weight: 700;
+}
+
+/* Pegelanzeige: diskrete Breitenklassen (CSP verbietet Inline-Styles). */
+.level-track {
+  width: 100%;
+  max-width: 26rem;
+  height: 0.7rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--paper-inset);
+  margin-top: 0.5rem;
+}
+
+.level-fill {
+  height: 100%;
+  background: var(--seal);
+  transition: width 0.12s linear;
+  width: 0;
+}
+
+.level-fill.lvl-1 {
+  width: 5%;
+}
+.level-fill.lvl-2 {
+  width: 10%;
+}
+.level-fill.lvl-3 {
+  width: 15%;
+}
+.level-fill.lvl-4 {
+  width: 20%;
+}
+.level-fill.lvl-5 {
+  width: 25%;
+}
+.level-fill.lvl-6 {
+  width: 30%;
+}
+.level-fill.lvl-7 {
+  width: 35%;
+}
+.level-fill.lvl-8 {
+  width: 40%;
+}
+.level-fill.lvl-9 {
+  width: 45%;
+}
+.level-fill.lvl-10 {
+  width: 50%;
+}
+.level-fill.lvl-11 {
+  width: 55%;
+}
+.level-fill.lvl-12 {
+  width: 60%;
+}
+.level-fill.lvl-13 {
+  width: 65%;
+}
+.level-fill.lvl-14 {
+  width: 70%;
+}
+.level-fill.lvl-15 {
+  width: 75%;
+}
+.level-fill.lvl-16 {
+  width: 80%;
+}
+.level-fill.lvl-17 {
+  width: 85%;
+}
+.level-fill.lvl-18 {
+  width: 90%;
+}
+.level-fill.lvl-19 {
+  width: 95%;
+}
+.level-fill.lvl-20 {
+  width: 100%;
+}
+
+/* Erfolgsseite: Siegel */
+.success-seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 2px solid var(--seal);
+  border-radius: 3px;
+  color: var(--seal);
+  font-family: var(--font-display);
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  margin: 0.4rem 0 1rem;
+  letter-spacing: 0.02em;
+}
+
+.kurzanleitung {
+  list-style: none;
+  counter-reset: schritt;
+  margin: 0.6rem 0 0;
+  padding: 0;
+}
+
+.kurzanleitung li {
+  counter-increment: schritt;
+  display: flex;
+  gap: 0.8rem;
+  align-items: baseline;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.kurzanleitung li::before {
+  content: counter(schritt, decimal-leading-zero);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--seal);
+}
+
+kbd {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--paper-raised);
+  padding: 0.08rem 0.4rem;
+}
+
+/* Details/Zusammenklappbares (Netzwerk-Selbsttest) */
+details.selftest {
+  margin-top: 1rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--paper-raised);
+}
+
+details.selftest summary {
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+}
+
+details.selftest .selftest-body {
+  padding: 0 0.9rem 0.8rem;
+  font-size: 0.88rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Verwaltungs-UI: Aktenverzeichnis-Aesthetik                             */
+/*                                                                          */
+/* Neue Kontrastwerte (WCAG 2.1 AA, gegen Papier #F2EEE3 bzw. angegebenen   */
+/* Grund):                                                                  */
+/*   Elfenbein #F7F4EA auf --error #9B2C20 (danger-Button): 6.2 : 1  (AA)   */
+/*   --seal auf --seal-wash #E3E9DD (aktive Reiter/Chips):  6.2 : 1  (AA)   */
+/*   --ink-soft auf --paper (Meta/Vorschau, Sekundaertext): 6.3 : 1  (AA)   */
+/*   --ink auf --paper-inset #ECE7D8 (Detailtext):         13.9 : 1  (AAA)  */
+/* Fokus: durchgehender --seal-Ring (global, s. o.) auf allen Bedien-       */
+/* elementen inkl. Reiter, Chips und Dialog-Knoepfen (WCAG 2.4.7).          */
+/* ---------------------------------------------------------------------- */
+.manage-layout {
+  padding: 0 0 2rem;
+}
+
+/* Firmen-Umschalter: prominente Registerzeile oben */
+.company-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.9rem;
+  padding: 0.8rem 2.2rem;
+  border-bottom: 1px solid var(--rule-strong);
+  background: var(--paper-raised);
+}
+
+.company-switcher-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--ink-soft);
+}
+
+.company-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.company-tab {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  padding: 0.28rem 0.75rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.company-tab-active {
+  border-color: var(--seal);
+  background: var(--seal-wash);
+  color: var(--seal-deep);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--seal);
+}
+
+.company-autosave {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.company-notice {
+  padding: 0.4rem 2.2rem 0;
+}
+
+/* Ansichts-Navigation (Reiter) */
+.manage-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  padding: 0.6rem 2.2rem 0;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.manage-nav-tab {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 0.45rem 1rem;
+  margin-bottom: -1px;
+}
+
+.manage-nav-tab:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: transparent;
+}
+
+.manage-nav-tab-active {
+  color: var(--seal-deep);
+  font-weight: 700;
+  background: var(--paper);
+  border-color: var(--rule-strong);
+  border-bottom: 1px solid var(--paper);
+}
+
+.manage-content {
+  padding: 1.5rem 2.2rem 0;
+}
+
+.view-body {
+  max-width: 52rem;
+}
+
+.view-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1.2;
+  margin: 0 0 0.5rem;
+}
+
+.view-body h3 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 1.4rem 0 0.4rem;
+}
+
+/* Filterleiste */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.7rem;
+  margin: 0.6rem 0 0.4rem;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.filter-field label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+}
+
+input[type='date'] {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 0.4rem 0.55rem;
+}
+
+textarea {
+  min-height: 6rem;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* Tag-Filter und Tag-Chips */
+.tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.3rem 0 0.7rem;
+}
+
+.tag-filter-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.76rem;
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+}
+
+.tag-chip-active {
+  border-color: var(--seal);
+  background: var(--seal-wash);
+  color: var(--seal-deep);
+  font-weight: 700;
+}
+
+.tag-chip-static {
+  cursor: default;
+}
+
+.tag-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0 0.1rem;
+  cursor: pointer;
+}
+
+/* Register-Liste als Aktenverzeichnis */
+.register-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.register-list > li {
+  border-top: 1px solid var(--rule);
+}
+
+.register-list > li:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Zeile = Auswahl-Checkbox (Stapel-Export) plus Eintrags-Knopf. */
+.register-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.register-select {
+  margin-top: 0.85rem;
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--seal);
+  flex-shrink: 0;
+}
+
+/* Volltext-Treffer-Snippet (Kontext aus dem Body). */
+.register-snippet {
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: var(--seal-wash);
+  border-left: 3px solid var(--seal);
+  border-radius: 2px;
+  padding: 0.25rem 0.5rem;
+  margin-top: 0.2rem;
+}
+
+/* Volltext-Umschalter unter der Schnellsuche. */
+.volltext-toggle {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+}
+
+/* Stapel-Export-Leiste. */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--paper-raised);
+  padding: 0.55rem 0.8rem;
+  margin-top: 0.8rem;
+  font-size: 0.9rem;
+}
+
+.batch-count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.batch-progress {
+  min-height: 1.2rem;
+  margin: 0.35rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--seal);
+}
+
+/* Backup-Hinweise in der Beleg-Ansicht. */
+.backup-abschnitt h4 {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 700;
+  margin: 0.9rem 0 0.25rem;
+}
+
+.register-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0.7rem 0.4rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.register-row:hover:not(:disabled) {
+  background: var(--paper-raised);
+  border-color: transparent;
+}
+
+.register-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.register-title {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.register-quelle {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--seal);
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  padding: 0.02rem 0.45rem;
+}
+
+.register-meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+}
+
+.register-preview {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.register-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+
+.trash-row {
+  padding: 0.7rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Leerzustand */
+.empty-state {
+  border: 1px solid var(--rule-strong);
+  border-left: 3px solid var(--seal);
+  border-radius: 3px;
+  background: var(--paper-raised);
+  padding: 1.1rem 1.3rem;
+  margin-top: 0.8rem;
+}
+
+.empty-state-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 0.3rem;
+}
+
+/* Detailansicht */
+.detail-topbar {
+  margin-bottom: 0.3rem;
+}
+
+.detail-meta {
+  margin-bottom: 1rem;
+}
+
+.detail-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  line-height: 1.6;
+  background: var(--paper-inset);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: 3px;
+  padding: 0.9rem 1.1rem;
+}
+
+.detail-actions {
+  margin-top: 1.1rem;
+}
+
+.breakable {
+  overflow-wrap: anywhere;
+}
+
+/* Tag-Editor (Bearbeiten) */
+.tag-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--paper-raised);
+  padding: 0.45rem 0.55rem;
+}
+
+.tag-input {
+  flex: 1;
+  min-width: 8rem;
+  border: none;
+  background: transparent;
+  padding: 0.15rem 0.2rem;
+}
+
+.tag-input:focus-visible {
+  outline: none;
+  border: none;
+}
+
+/* Gefahr-Knopf (endgueltig loeschen, Papierkorb) */
+button.danger {
+  background: var(--error);
+  border-color: var(--error);
+  color: #f7f4ea;
+  font-weight: 700;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #7f2119;
+  border-color: #7f2119;
+}
+
+/* Modale Dialoge (Notiz, Bestaetigung) */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(28 26 21 / 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 50;
+}
+
+.modal-card {
+  background: var(--paper);
+  border: 1px solid var(--rule-strong);
+  border-top: 4px solid var(--seal);
+  border-radius: 4px;
+  padding: 1.3rem 1.5rem;
+  max-width: 34rem;
+  width: 100%;
+  box-shadow: 0 12px 40px rgb(28 26 21 / 0.2);
+}
+
+.modal-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  margin: 0 0 0.6rem;
+}
+
+.modal-card .field {
+  margin-bottom: 0.7rem;
+}
+
+/* Beleg-Ansicht */
+.stamp-panel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 2px solid var(--seal);
+  border-radius: 4px;
+  background: var(--seal-wash);
+  padding: 0.9rem 1.2rem;
+  margin: 0.4rem 0 1.2rem;
+}
+
+.stamp-mark {
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--seal-deep);
+  line-height: 1;
+}
+
+.stamp-headline {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--seal-deep);
+  margin: 0 0 0.2rem;
+}
+
+.beleg-models {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0;
+}
+
+.beleg-model {
+  border-top: 1px solid var(--rule);
+  padding: 0.7rem 0;
+}
+
+.beleg-model-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.beleg-model-label {
+  font-weight: 700;
+}
+
+.beleg-model-head .badge {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--seal);
+  border: 1px solid var(--seal);
+  border-radius: 999px;
+  padding: 0.02rem 0.45rem;
+}
+
+.beleg-model-head .status-ok {
+  color: var(--seal);
+  font-size: 0.78rem;
+}
+
+.beleg-model-head .status-missing {
+  color: var(--warn-ink);
+  font-size: 0.78rem;
+}
+
+.beleg-hash,
+.beleg-path {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin: 0.2rem 0 0;
+}
+
+/* Netzwerk-Selbsttest in der Beleg-Ansicht */
+.selftest-list {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.selftest-item {
+  margin-bottom: 0.9rem;
+}
+
+.selftest-title {
+  font-weight: 700;
+  margin: 0 0 0.3rem;
+}
+
+.selftest-steps {
+  margin: 0 0 0.4rem;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+}
+
+.selftest-result {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+/* ----------------------------------------------------------------------
+ * Modelle-Reiter: Modellbestand als Karten-Liste im Formular-Stil.
+ * Farben/Kontraste wie im Kopf dokumentiert (--seal, --warn-ink auf Papier).
+ * ---------------------------------------------------------------------- */
+.model-cards {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+}
+
+.model-card {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--paper-raised);
+  padding: 0.85rem 1.05rem;
+  margin-bottom: 0.7rem;
+}
+
+.model-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.55rem;
+}
+
+.model-card-label {
+  font-weight: 700;
+}
+
+.model-card-head .badge {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--seal);
+  border: 1px solid var(--seal);
+  border-radius: 999px;
+  padding: 0.02rem 0.45rem;
+}
+
+.model-card-head .status-ok {
+  color: var(--seal);
+  font-size: 0.78rem;
+  margin-left: auto;
+}
+
+.model-card-head .status-missing {
+  color: var(--warn-ink);
+  font-size: 0.78rem;
+  margin-left: auto;
+}
+
+.model-card-line {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin: 0.3rem 0 0;
+}
+
+/* ----------------------------------------------------------------------
+ * Toast-Stapel (Sofortmeldungen): fixe Schicht unten
+ * rechts, unabhaengig von Ansicht und Scroll-Position. Papier-Karte mit
+ * feiner Linie; Erfolg traegt Siegel-Gruen, Fehler das Fehlerrot.
+ * Kontrast-Nachweis (gegen --paper-raised #F9F6EE, L = 0.918):
+ *   --ink      #1C1A15  Toast-Text        15.9 : 1 (AAA)
+ *   --seal     #1E5C45  Erfolgs-Kicker     7.3 : 1 (AA)
+ *   --error    #9B2C20  Fehler-Kicker      6.9 : 1 (AA)
+ * ---------------------------------------------------------------------- */
+.toast-stack {
+  position: fixed;
+  right: 1.2rem;
+  bottom: 2.6rem;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-width: 24rem;
+  width: calc(100vw - 2.4rem);
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 0.6rem;
+  background: var(--paper-raised);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: 0.6rem 0.7rem 0.6rem 0.9rem;
+  box-shadow: 0 8px 28px rgb(28 26 21 / 0.22);
+}
+
+.toast-success {
+  border-left: 4px solid var(--seal);
+}
+
+.toast-error {
+  border-left: 4px solid var(--error);
+}
+
+.toast-kicker {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  padding-top: 0.2rem;
+}
+
+.toast-success .toast-kicker {
+  color: var(--seal);
+}
+
+.toast-error .toast-kicker {
+  color: var(--error);
+}
+
+.toast-text {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.toast-close:hover {
+  color: var(--ink);
+  border-color: var(--rule-strong);
+}
+
+/* Screenreader-only (aria-live-Ansagen ohne visuelles Rauschen) */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

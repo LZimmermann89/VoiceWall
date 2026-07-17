@@ -1,0 +1,39 @@
+# Dependabot: woechentliche, gruppierte Dependency-Updates.
+# Lockfile-Diffs werden reviewt, nie blind gemergt; die CI (verify-checksums,
+# npm audit, Tests) ist das Gate fuer jeden Update-PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    # Wartungsmodus: Major-Spruenge (React 19, zod 4, TypeScript 6 usw.)
+    # sind bewusste Projekte mit eigenem Migrationsaufwand, keine
+    # Routine-Wartung. Dependabot schlaegt deshalb nur Minor/Patch vor;
+    # Sicherheitswarnungen erscheinen unabhaengig davon im Security-Tab.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+    groups:
+      npm-dependencies:
+        patterns:
+          - '*'
+        # Das native Whisper-Addon aendert die hinterlegten SHA-256-Konstanten
+        # (scripts/verify-checksums.mjs) und wird deshalb einzeln reviewt.
+        exclude-patterns:
+          - '@fugood/*'
+      whisper-addon:
+        patterns:
+          - '@fugood/*'
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin

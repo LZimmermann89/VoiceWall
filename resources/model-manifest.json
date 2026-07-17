@@ -1,0 +1,58 @@
+{
+  "comment": "Auditfestes Modell-Manifest. Single Source of Truth ist der typgepruefte Katalog src/main/model/model-catalog.ts; diese Datei ist das mitgelieferte, maschinenlesbare Audit-Artefakt. Der Unit-Test tests/unit/model-manifest.test.ts erzwingt die exakte Synchronitaet beider Quellen. mirrorUrls: eigener Mirror als Release-Assets im VoiceWall-Repo, unveraenderte Kopien; jede Quelle wird gegen dieselbe sha256-Konstante verifiziert.",
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "whisper-q5",
+      "fileName": "ggml-model-q5_0.bin",
+      "url": "https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml/resolve/main/ggml-model-q5_0.bin",
+      "mirrorUrls": [
+        "https://github.com/LZimmermann89/VoiceWall/releases/download/modelle-v1/ggml-model-q5_0.bin"
+      ],
+      "byteSize": 574041195,
+      "sha256": "15e92e3db0993c52fffa781513eec9253475331c1be808f8fb409285c9d9d030",
+      "label": "Deutsches Whisper-Modell (large-v3-turbo, Q5_0)",
+      "license": "Apache-2.0",
+      "source": "primeline/whisper-large-v3-turbo-german, GGML/Q5_0-Konvertierung von cstr"
+    },
+    {
+      "id": "whisper-fp16",
+      "fileName": "ggml-model.bin",
+      "url": "https://huggingface.co/cstr/whisper-large-v3-turbo-german-ggml/resolve/main/ggml-model.bin",
+      "mirrorUrls": [
+        "https://github.com/LZimmermann89/VoiceWall/releases/download/modelle-v1/ggml-model.bin"
+      ],
+      "byteSize": 1624555275,
+      "sha256": "6eb2e025198a6cbac7bdb1e86e278f5de002e583aae7bdfcf5183ef8da16decd",
+      "label": "Deutsches Whisper-Modell (large-v3-turbo, fp16, maximale Genauigkeit)",
+      "license": "Apache-2.0",
+      "source": "primeline/whisper-large-v3-turbo-german, GGML-Konvertierung von cstr"
+    },
+    {
+      "id": "turbo-q5_0-multilingual",
+      "fileName": "ggml-large-v3-turbo-q5_0.bin",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
+      "mirrorUrls": [
+        "https://github.com/LZimmermann89/VoiceWall/releases/download/modelle-v1/ggml-large-v3-turbo-q5_0.bin"
+      ],
+      "byteSize": 574041195,
+      "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+      "label": "Englisch / mehrsprachig (large-v3-turbo, Q5_0)",
+      "license": "MIT",
+      "source": "openai/whisper large-v3-turbo (multilingual), GGML/Q5_0-Konvertierung von ggerganov/whisper.cpp (Hugging Face ggerganov/whisper.cpp)"
+    },
+    {
+      "id": "silero-vad",
+      "fileName": "ggml-silero-v5.1.2.bin",
+      "url": "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin",
+      "mirrorUrls": [
+        "https://github.com/LZimmermann89/VoiceWall/releases/download/modelle-v1/ggml-silero-v5.1.2.bin"
+      ],
+      "byteSize": 885098,
+      "sha256": "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf",
+      "label": "Silero-VAD-Modell (v5.1.2)",
+      "license": "MIT",
+      "source": "snakers4/silero-vad v5.1.2, GGML-Konvertierung von ggml-org"
+    }
+  ]
+}
