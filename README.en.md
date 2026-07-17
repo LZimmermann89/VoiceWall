@@ -165,7 +165,9 @@ requests during a complete dictation run for every revision.
   SHA-256 pinning of all six native Whisper binaries
   (`scripts/verify-checksums.mjs`) and of all models
   (`resources/model-manifest.json`), no compiling `binding.gyp` in
-  the tree, Dependabot active. Model downloads have a fallback source
+  the tree. Dependencies are maintained manually on purpose: every
+  update is a decision with a lockfile review, not an automatically
+  opened suggestion. Model downloads have a fallback source
   (our own byte-identical mirror as GitHub release assets, release
   `modelle-v1`); every source is verified against the same compiled-in
   SHA-256 constants, so the choice of source is never a matter of

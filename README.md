@@ -169,7 +169,9 @@ Diktat-Durchlaufs.
   SHA-256-Pinning aller sechs nativen Whisper-Binaries
   (`scripts/verify-checksums.mjs`) und aller Modelle
   (`resources/model-manifest.json`), keine kompilierende `binding.gyp`
-  im Baum, Dependabot aktiv. Modell-Downloads haben eine
+  im Baum. Abhängigkeiten werden bewusst manuell gepflegt: jede
+  Aktualisierung ist eine Entscheidung mit Lockfile-Prüfung, kein
+  automatisch geöffneter Vorschlag. Modell-Downloads haben eine
   Rückfallquelle (eigener, Byte-identischer Mirror als
   GitHub-Release-Asset, Release `modelle-v1`); jede Quelle wird gegen
   dieselben fest einkompilierten SHA-256-Konstanten verifiziert, die

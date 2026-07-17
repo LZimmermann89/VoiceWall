@@ -6,6 +6,15 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Removed
+
+- Dependabot-Konfiguration (`.github/dependabot.yml`) entfernt.
+  Abhängigkeiten werden bewusst manuell gepflegt: jede Aktualisierung
+  ist eine Entscheidung mit Lockfile-Prüfung, kein automatisch
+  geöffneter Vorschlag. Sicherheitswarnungen von GitHub bleiben davon
+  unberührt, sie hängen nicht an dieser Datei. Die Lieferketten-Aussage
+  im README ist entsprechend angepasst.
+
 ### Changed
 
 - README (deutsch und englisch) auf den tatsächlichen Funktionsstand
