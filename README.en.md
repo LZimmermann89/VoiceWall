@@ -3,7 +3,8 @@
 # VoiceWall
 
 > **Something missing? Tell me about it and we will build it in.
-> Everyone benefits from it.**
+> Everyone benefits from it.** Write to info@der-ki-auditor.de or open
+> an issue.
 
 VoiceWall is a 100 percent local, GDPR-friendly voice dictation
 application for Mac and Windows. The entire path from voice to text

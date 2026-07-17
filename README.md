@@ -3,7 +3,8 @@
 # VoiceWall
 
 > **Dir fehlt was? Dann melde dich damit bei mir und wir bauen es ein,
-> davon partizipieren alle.**
+> davon partizipieren alle.** Schreib an info@der-ki-auditor.de oder
+> eröffne ein Issue.
 
 VoiceWall ist ein zu 100 Prozent lokales, DSGVO-freundliches
 Sprachdiktiergerät für Mac und Windows. Der gesamte Weg von der Stimme
