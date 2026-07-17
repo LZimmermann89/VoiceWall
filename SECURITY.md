@@ -10,8 +10,6 @@ vertraulich an den Anbieter (FERNAU Präzisionstechnik GmbH, siehe
 
 - E-Mail: info@der-ki-auditor.de
 - Betreff: `[SECURITY] VoiceWall: <Kurzbeschreibung>`
-- Direkter Kontakt zum Projektverantwortlichen (Ausweichweg):
-  lars.zimmermann89@gmail.com
 
 Bitte nennen Sie: betroffene Version beziehungsweise Commit, Schritte zur
 Reproduktion, erwartetes und tatsächliches Verhalten sowie eine Einschätzung

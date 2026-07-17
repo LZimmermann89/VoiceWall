@@ -10,8 +10,6 @@ confidentially to the provider (FERNAU Präzisionstechnik GmbH, see
 
 - Email: info@der-ki-auditor.de
 - Subject: `[SECURITY] VoiceWall: <short description>`
-- Direct contact to the project lead (fallback channel):
-  lars.zimmermann89@gmail.com
 
 Please state: the affected version or commit, steps to reproduce,
 expected and actual behaviour, and an assessment of the impact.
