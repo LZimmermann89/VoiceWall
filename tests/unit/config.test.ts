@@ -138,10 +138,11 @@ describe('globalConfigSchema: UI-Sprache', () => {
 });
 
 describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
-  it('hat die Default-Schalter Fuellwoerter AN, Sprachkommandos AUS', () => {
+  it('hat die Default-Schalter Fuellwoerter AN, Wortdopplungen AUS, Sprachkommandos AUS', () => {
     const config = defaultGlobalConfig();
     expect(config.aufbereitung).toEqual({
       fuellwoerterEntfernen: true,
+      wortdopplungenEntfernen: false,
       sprachkommandos: false,
     });
   });
@@ -154,8 +155,22 @@ describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
     if (parsed.success) {
       expect(parsed.data.aufbereitung).toEqual({
         fuellwoerterEntfernen: true,
+        wortdopplungenEntfernen: false,
         sprachkommandos: false,
       });
+    }
+  });
+
+  it('ergaenzt in einer Alt-Konfig ohne wortdopplungenEntfernen den sicheren Default AUS', () => {
+    // Eine bestehende Konfiguration kennt das neue Feld nicht. Sie muss gueltig
+    // bleiben und den sicheren Standard (kein stiller Kollaps) erhalten.
+    const parsed = globalConfigSchema.safeParse({
+      ...defaultGlobalConfig(),
+      aufbereitung: { fuellwoerterEntfernen: true, sprachkommandos: false },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.aufbereitung.wortdopplungenEntfernen).toBe(false);
     }
   });
 

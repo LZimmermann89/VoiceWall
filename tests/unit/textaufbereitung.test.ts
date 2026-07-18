@@ -10,13 +10,26 @@ import {
   aufbereitenText,
   defaultAufbereitungOptions,
   entferneFuellwoerter,
+  entferneWortdopplungen,
   ersetzeSprachkommandos,
   schaerfeInterpunktion,
 } from '../../src/shared/textaufbereitung';
 
-const AN = { fuellwoerterEntfernen: true, sprachkommandos: false } as const;
-const ALLES_AN = { fuellwoerterEntfernen: true, sprachkommandos: true } as const;
-const ALLES_AUS = { fuellwoerterEntfernen: false, sprachkommandos: false } as const;
+const AN = {
+  fuellwoerterEntfernen: true,
+  wortdopplungenEntfernen: false,
+  sprachkommandos: false,
+} as const;
+const ALLES_AN = {
+  fuellwoerterEntfernen: true,
+  wortdopplungenEntfernen: true,
+  sprachkommandos: true,
+} as const;
+const ALLES_AUS = {
+  fuellwoerterEntfernen: false,
+  wortdopplungenEntfernen: false,
+  sprachkommandos: false,
+} as const;
 
 describe('schaerfeInterpunktion', () => {
   it('zieht doppelte Leerzeichen zusammen', () => {
@@ -128,31 +141,40 @@ describe('entferneFuellwoerter', () => {
     expect(entferneFuellwoerter('Der Lehm im Rahmen bleibt.')).toBe('Der Lehm im Rahmen bleibt.');
   });
 
+  it('zieht KEINE Wortdopplung mehr zusammen (das ist ein eigener Schalter)', () => {
+    // Der Kollaps wurde bewusst herausgeloest: er faelscht Inhalt und haengt
+    // jetzt an entferneWortdopplungen (Default AUS). Der Fuellwort-Filter
+    // laesst Dopplungen unberuehrt.
+    expect(entferneFuellwoerter('Ich denke das das reicht.')).toBe('Ich denke das das reicht.');
+  });
+});
+
+describe('entferneWortdopplungen', () => {
   it('zieht direkte Wortdopplung zusammen ("das das")', () => {
-    expect(entferneFuellwoerter('Ich denke das das reicht.')).toBe('Ich denke das reicht.');
+    expect(entferneWortdopplungen('Ich denke das das reicht.')).toBe('Ich denke das reicht.');
   });
 
   it('zieht auch dreifache Dopplung zusammen', () => {
-    expect(entferneFuellwoerter('das das das reicht')).toBe('das reicht');
+    expect(entferneWortdopplungen('das das das reicht')).toBe('das reicht');
   });
 
   it('behandelt Dopplungen case-insensitiv und behaelt das erste Vorkommen', () => {
-    expect(entferneFuellwoerter('Das das war gut.')).toBe('Das war gut.');
+    expect(entferneWortdopplungen('Das das war gut.')).toBe('Das war gut.');
   });
 
   it('laesst legitime Dopplung mit Komma ("sehr, sehr") unangetastet', () => {
-    expect(entferneFuellwoerter('Das war sehr, sehr gut.')).toBe('Das war sehr, sehr gut.');
+    expect(entferneWortdopplungen('Das war sehr, sehr gut.')).toBe('Das war sehr, sehr gut.');
   });
 
   it('laesst Dopplungen ueber Zeilenumbrueche unangetastet', () => {
-    expect(entferneFuellwoerter('Ende\nEnde gut.')).toBe('Ende\nEnde gut.');
+    expect(entferneWortdopplungen('Ende\nEnde gut.')).toBe('Ende\nEnde gut.');
   });
 
   it('dokumentierte Grenze: "dass das das Problem ist" wird mitgetroffen', () => {
-    // Bewusste, ehrlich dokumentierte Grenze des Dopplungs-Filters
-    // (Modulkommentar textaufbereitung.ts): der Filter kann seltene
-    // legitime direkte Dopplungen nicht von Versprechern unterscheiden.
-    expect(entferneFuellwoerter('Ich weiß, dass das das Problem ist.')).toBe(
+    // Bewusste, ehrlich dokumentierte Grenze des Kollaps (deshalb Default AUS):
+    // er kann seltene legitime direkte Dopplungen nicht von Versprechern
+    // unterscheiden. Genau darum ist er nicht mehr Teil des Standardwegs.
+    expect(entferneWortdopplungen('Ich weiß, dass das das Problem ist.')).toBe(
       'Ich weiß, dass das Problem ist.',
     );
   });
@@ -202,9 +224,20 @@ describe('ersetzeSprachkommandos', () => {
     );
   });
 
-  it('dokumentierte Unschaerfe: normale Verwendung von "Punkt" wird getroffen', () => {
-    // Genau deshalb ist der Schalter standardmaessig AUS.
-    expect(ersetzeSprachkommandos('Der Punkt ist wichtig.')).toBe('Der. ist wichtig.');
+  it('laesst ein Nomen nach Artikel unangetastet ("Der Punkt ist wichtig")', () => {
+    // Kernverbesserung: "Punkt" nach "Der" ist ein Nomen, kein Kommando, und
+    // bleibt stehen. Frueher wurde daraus "Der. ist wichtig."
+    expect(ersetzeSprachkommandos('Der Punkt ist wichtig.')).toBe('Der Punkt ist wichtig.');
+    expect(ersetzeSprachkommandos('Ein Komma fehlt hier.')).toBe('Ein Komma fehlt hier.');
+    expect(ersetzeSprachkommandos('Wir kommen zum Punkt.')).toBe('Wir kommen zum Punkt.');
+  });
+
+  it('setzt ein echtes Kommando auch vor kleingeschriebener Fortsetzung um', () => {
+    // Anders als eine reine Satzgrenzen-Regel verliert die Nomen-Erkennung echte
+    // Kommandos nicht, wenn das Folgewort klein ist.
+    expect(ersetzeSprachkommandos('Das war gut Punkt es geht weiter')).toBe(
+      'Das war gut. es geht weiter',
+    );
   });
 });
 
@@ -289,8 +322,10 @@ describe('Sprachkommandos: Whisper-Interpunktion und Aliasse (Praxistest)', () =
     );
   });
 
-  it('dokumentierte Unschaerfe: normales Wort "Absatz" wird bei AN getroffen', () => {
-    expect(ersetzeSprachkommandos('Der Absatz gefällt mir.')).toBe('Der\n\ngefällt mir.');
+  it('laesst das Nomen "Absatz" nach Artikel unangetastet ("Der Absatz gefällt mir")', () => {
+    // Auch Umbruch-Kommandos werden nach einem Artikel als Nomen erkannt.
+    // Frueher wurde daraus "Der\n\ngefällt mir."
+    expect(ersetzeSprachkommandos('Der Absatz gefällt mir.')).toBe('Der Absatz gefällt mir.');
   });
 
   it('EN: Whisper-Interpunktion um "period" wird geschluckt (", period.")', () => {
@@ -318,9 +353,10 @@ describe('Sprachkommandos: Whisper-Interpunktion und Aliasse (Praxistest)', () =
 });
 
 describe('aufbereitenText (Pipeline)', () => {
-  it('Default-Schalter: Fuellwoerter AN, Sprachkommandos AUS', () => {
+  it('Default-Schalter: Fuellwoerter AN, Wortdopplungen AUS, Sprachkommandos AUS', () => {
     expect(defaultAufbereitungOptions()).toEqual({
       fuellwoerterEntfernen: true,
+      wortdopplungenEntfernen: false,
       sprachkommandos: false,
     });
   });
@@ -354,6 +390,7 @@ describe('aufbereitenText (Pipeline)', () => {
     expect(
       aufbereitenText('Zeile eins neue Zeile hier gehts weiter', {
         fuellwoerterEntfernen: false,
+        wortdopplungenEntfernen: false,
         sprachkommandos: true,
       }),
     ).toBe('Zeile eins\nhier gehts weiter');

@@ -6,13 +6,13 @@
  * Status-/Event-Kommunikation mit dem Hauptfenster.
  *
  * Datenfluss Aufnahme:
- *   Capture-Fenster (PCM) --IPC--> hier: RMS berechnen (Pegel), Chunk in den
- *   RAM-Ringpuffer (DoS-Schutz) kopieren, Original-ArrayBuffer an die Engine
- *   transferieren. Die Engine macht VAD-Endpointing und Transkription. Ergebnis
- *   kommt als Event zurueck und geht an das Hauptfenster.
+ *   Capture-Fenster (PCM) --IPC--> hier: RMS berechnen (Pegel), den PCM-Chunk an
+ *   die Engine uebergeben. Die Engine macht VAD-Endpointing und Transkription.
+ *   Ergebnis kommt als Event zurueck und geht an das Hauptfenster.
  *
- * Kein Audio auf Platte: PCM existiert nur als ArrayBuffer im RAM. Nach jedem
- * Segment werden Ringpuffer und Engine-Pending aktiv genullt.
+ * Kein Audio auf Platte: PCM existiert nur als ArrayBuffer im RAM. Der Main-
+ * Prozess haelt selbst keinen Audiopuffer; nur die Engine akkumuliert das
+ * laufende Segment und nullt es nach jeder Transkription.
  */
 import { app, BrowserWindow, ipcMain, type IpcMainEvent } from 'electron';
 import { z } from 'zod';
@@ -30,7 +30,6 @@ import {
   type UiLanguage,
 } from '../../shared/schema';
 import { createCaptureWindow } from '../audio/capture-window';
-import { DEFAULT_MAX_SAMPLES, PcmRingBuffer } from '../audio/ring-buffer';
 import { rmsFromInt16 } from '../../shared/pcm';
 import {
   CONSENT_TEXT_VERSION,
@@ -97,7 +96,11 @@ const DEFAULT_FLOW_STATUS: FlowStatus = {
   accessibility: 'not-applicable',
   lastTranscript: null,
   clipboardRestoreEnabled: true,
-  aufbereitung: { fuellwoerterEntfernen: true, sprachkommandos: false },
+  aufbereitung: {
+    fuellwoerterEntfernen: true,
+    wortdopplungenEntfernen: false,
+    sprachkommandos: false,
+  },
   uiLanguage: 'de',
 };
 
@@ -137,20 +140,10 @@ export class DictationOrchestrator {
 
   private engine: WhisperEngineManager | null = null;
   private captureWindow: BrowserWindow | null = null;
-  private readonly ringBuffer: PcmRingBuffer;
   /** Laeuft gerade ein Einzel-Download des Modelle-Reiters (seriell)? */
   private modelDownloadActive = false;
 
-  constructor(private readonly deps: OrchestratorDeps) {
-    this.ringBuffer = new PcmRingBuffer({
-      maxSamples: DEFAULT_MAX_SAMPLES,
-      onOverflow: (dropped) => {
-        this.deps.logger.warn(
-          `RAM-Ringpuffer-Obergrenze erreicht, aelteste ${String(dropped)} Samples verworfen (DoS-Schutz).`,
-        );
-      },
-    });
-  }
+  constructor(private readonly deps: OrchestratorDeps) {}
 
   /**
    * Faengt unerwartete Fehler eines invoke-Handlers ab: geloggt wird lokal,
@@ -682,8 +675,6 @@ export class DictationOrchestrator {
           });
           // Der FlowController sammelt Segmente des Hotkey-Diktats.
           this.transcriptListener?.(event.text, event.audioMs);
-          // Segment fertig: Ringpuffer aktiv nullen (kein Rohaudio im RAM halten).
-          this.ringBuffer.clear();
         },
         onSilence: () => {
           this.deps.logger.debug('VAD: Stille, kein Text erzeugt.');
@@ -734,7 +725,6 @@ export class DictationOrchestrator {
     }
     this.engine?.setContext(context);
     this.engine?.reset();
-    this.ringBuffer.clear();
     this.lastError = null;
 
     const window = this.ensureCaptureWindow();
@@ -756,9 +746,8 @@ export class DictationOrchestrator {
     if (this.captureWindow !== null && !this.captureWindow.isDestroyed()) {
       this.captureWindow.webContents.send(IpcChannel.CaptureStop);
     }
-    // Letztes akkumuliertes Segment verarbeiten, dann Ringpuffer nullen.
+    // Letztes akkumuliertes Segment verarbeiten.
     this.engine?.flush();
-    this.ringBuffer.clear();
     this.dictationActive = false;
     await this.broadcastStatus();
     return { ok: true };
@@ -776,19 +765,17 @@ export class DictationOrchestrator {
     this.dictationActive = false;
     await this.broadcastStatus();
     await this.engine?.flushAndWait(FLUSH_TIMEOUT_MS);
-    this.ringBuffer.clear();
   }
 
   /**
    * Aufnahme abbrechen, ohne zu transkribieren (Sperrbildschirm/Suspend):
-   * Capture stoppen, akkumuliertes Audio in Engine und Ringpuffer verwerfen.
+   * Capture stoppen, akkumuliertes Audio in der Engine verwerfen.
    */
   async abortDictation(): Promise<void> {
     if (this.captureWindow !== null && !this.captureWindow.isDestroyed()) {
       this.captureWindow.webContents.send(IpcChannel.CaptureStop);
     }
     this.engine?.reset();
-    this.ringBuffer.clear();
     this.dictationActive = false;
     await this.broadcastStatus();
   }
@@ -799,10 +786,9 @@ export class DictationOrchestrator {
     const rms = rmsFromInt16(view);
     this.sendToMain(IpcChannel.AudioLevel, { rms });
 
-    // Kopie in den RAM-Ringpuffer (DoS-Schutz, feste Obergrenze).
-    this.ringBuffer.append(Int16Array.from(view));
-
-    // Original-ArrayBuffer an die Engine transferieren (zero-copy Handoff).
+    // Den PCM-Chunk an die Engine geben. Sie uebergibt ihn per strukturiertem
+    // Klonen an den utilityProcess (keine echte Transfer-Liste fuer ArrayBuffer,
+    // siehe engine-manager). Der Main-Prozess selbst haelt kein Rohaudio.
     this.engine?.sendAudioChunk(pcm);
   }
 
@@ -855,7 +841,6 @@ export class DictationOrchestrator {
 
   /** Geordnetes Herunterfahren (Engine-Kind beenden). */
   async shutdown(): Promise<void> {
-    this.ringBuffer.clear();
     if (this.engine !== null) {
       await this.engine.shutdown();
       this.engine = null;

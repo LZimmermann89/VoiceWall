@@ -158,10 +158,17 @@ export const globalConfigSchema = z
     aufbereitung: z
       .object({
         fuellwoerterEntfernen: z.boolean().default(true),
+        // Neuer Schalter, Default AUS. Alte Konfigurationen ohne dieses Feld
+        // erhalten damit den sicheren Standard (kein stiller Wortdopplungs-Kollaps).
+        wortdopplungenEntfernen: z.boolean().default(false),
         sprachkommandos: z.boolean().default(false),
       })
       .passthrough()
-      .default({ fuellwoerterEntfernen: true, sprachkommandos: false }),
+      .default({
+        fuellwoerterEntfernen: true,
+        wortdopplungenEntfernen: false,
+        sprachkommandos: false,
+      }),
     /**
      * Sprache der Oberflaeche: 'de' ist der
      * Standard. Die UI-Sprache ist bewusst UNABHAENGIG von der Diktatsprache
@@ -190,7 +197,11 @@ export function defaultGlobalConfig(): GlobalConfig {
     diktatAutoSpeichern: true,
     modell: 'q5_0',
     modellPfade: {},
-    aufbereitung: { fuellwoerterEntfernen: true, sprachkommandos: false },
+    aufbereitung: {
+      fuellwoerterEntfernen: true,
+      wortdopplungenEntfernen: false,
+      sprachkommandos: false,
+    },
     uiSprache: 'de',
   };
 }

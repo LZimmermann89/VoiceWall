@@ -707,6 +707,7 @@ export class DictationFlowController {
       clipboardRestoreEnabled: this.config.clipboard.restorePrevious,
       aufbereitung: {
         fuellwoerterEntfernen: this.config.aufbereitung.fuellwoerterEntfernen,
+        wortdopplungenEntfernen: this.config.aufbereitung.wortdopplungenEntfernen,
         sprachkommandos: this.config.aufbereitung.sprachkommandos,
       },
       uiLanguage: this.config.uiSprache,

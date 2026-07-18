@@ -415,9 +415,11 @@ export const de = {
     woerterbuchHinweis:
       'Alles hier ist reine, lokale Regelverarbeitung: kein Sprachmodell, kein externer Aufruf. Jede Regel ist deterministisch und nachvollziehbar.',
     fuellwoerterLabel:
-      'Füllwörter entfernen: eigenständige "äh", "ähm", "öhm", "hm" und direkte Wortdopplungen ("das das"). Konservativ; seltene legitime Dopplungen können mitgetroffen werden.',
+      'Füllwörter entfernen: eigenständige "äh", "ähm", "öhm", "hm". Konservativ und inhaltsschonend.',
+    wortdopplungenLabel:
+      'Wortdopplungen zusammenziehen: direkte Wiederholungen wie "das das" werden zu "das". Standardmäßig aus, weil dies in seltenen Fällen legitimes Deutsch verändern kann ("die Frau, die die Blumen kaufte"). Nur einschalten, wenn häufiges Stottern im Diktat das größere Problem ist.',
     sprachkommandosLabel:
-      'Sprachkommandos umsetzen: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz" (englisches Diktat: "period", "comma", "new line", "new paragraph", "paragraph"). Satzzeichen, die die Spracherkennung selbst um ein Kommandowort setzt, werden mitentfernt ("Test, Punkt." wird zu "Test."). Manchmal wandelt die Erkennung ein gesprochenes "Punkt" auch direkt in ein Satzzeichen um; dann steht kein Kommandowort im Text und das Ergebnis stimmt trotzdem. Standardmäßig aus, weil die Regel auch die normale Verwendung von Wörtern wie "Punkt" oder "Absatz" trifft.',
+      'Sprachkommandos umsetzen: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz" (englisches Diktat: "period", "comma", "new line", "new paragraph", "paragraph"). Ein Kommandowort direkt nach einem Artikel ("der Punkt", "ein Komma") wird als normales Wort erkannt und bleibt stehen. Satzzeichen, die die Spracherkennung selbst um ein Kommandowort setzt, werden mitentfernt ("Test, Punkt." wird zu "Test."). Standardmäßig aus.',
     fachwoerterbuchTitel: 'Fach-Wörterbuch der aktiven Firma',
     fachwoerterbuchKeineFirma:
       'Noch keine Firma angelegt. Das Fach-Wörterbuch gehört zur Firma und liegt auditierbar in deren Ordner (.voicewall/vokabular.json).',

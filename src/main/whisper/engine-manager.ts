@@ -7,8 +7,9 @@
  * - Absturz-Isolation: das `exit`-Event wird ueberwacht; bei unerwartetem
  *   Ende wird die Engine automatisch neu gestartet (max. 3 Versuche), danach
  *   eine Katalog-Fehlermeldung (UI-Sprache) an die UI.
- * - Getypte, zod-validierte Nachrichten in beide Richtungen. PCM wird als
- *   ArrayBuffer transferiert (zero-copy, aktiver Handoff).
+ * - Getypte, zod-validierte Nachrichten in beide Richtungen. PCM geht per
+ *   strukturiertem Klonen an den utilityProcess (eine echte Transfer-Liste
+ *   gibt es fuer ArrayBuffer hier nicht, siehe Hinweis bei sendAudioChunk).
  */
 import { join } from 'node:path';
 import { utilityProcess, type UtilityProcess } from 'electron';

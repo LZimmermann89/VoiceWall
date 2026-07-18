@@ -65,6 +65,38 @@ export async function detectSpeech(
 }
 
 /**
+ * Transkribiert einen bereits als Sprache erkannten PCM-Bereich. Diese Funktion
+ * ist die EINZIGE Stelle im Code, die transcribeData aufruft: sowohl die
+ * VAD-Schleuse (transcribeWithVadGate) als auch der kontinuierliche Worker-Pfad
+ * gehen hier durch. So gibt es nur eine Optionskonstruktion und keine zwei
+ * Pfade, die auseinanderlaufen koennen.
+ *
+ * Der Puffer wird bewusst NICHT auf den Sprachbereich zugeschnitten. Ein
+ * VAD-basierter Zuschnitt der Rand-Stille wurde gemessen (WER-Messstand,
+ * npm run wer) und verwarf sich selbst: Er verschlechterte die WER (0.105 gegen
+ * 0.085) und war nicht schneller. whisper.cpp verarbeitet die Stille selbst gut,
+ * ein Zuschnitt riskiert nur Wortraender. Deshalb geht der volle Puffer an das
+ * Modell.
+ */
+export async function transcribeSpeech(
+  whisper: WhisperContext,
+  pcm: ArrayBuffer,
+  context?: TranscriptionContext,
+): Promise<{ text: string; durationMs: number }> {
+  const prompt = context?.prompt;
+  const started = Date.now();
+  const { promise } = whisper.transcribeData(pcm, {
+    language: context?.language ?? 'de',
+    temperature: 0,
+    ...(prompt === undefined || prompt.length === 0 ? {} : { prompt }),
+  });
+  const result = await promise;
+  const durationMs = Date.now() - started;
+  // Nur den primitiven Text uebernehmen, nie das Napi-Ergebnisobjekt.
+  return { text: result.result.trim(), durationMs };
+}
+
+/**
  * VAD-Schleuse plus Transkription. Findet der VAD keine Sprache, wird nicht
  * transkribiert und hadSpeech=false zurueckgegeben (kein Halluzinationstext).
  *
@@ -86,17 +118,8 @@ export async function transcribeWithVadGate(
   if (speechSegments.length === 0) {
     return { speechSegments, hadSpeech: false, text: '', durationMs: 0, audioMs };
   }
-  const prompt = context?.prompt;
-  const started = Date.now();
-  const { promise } = whisper.transcribeData(pcm, {
-    language: context?.language ?? 'de',
-    temperature: 0,
-    ...(prompt === undefined || prompt.length === 0 ? {} : { prompt }),
-  });
-  const result = await promise;
-  const durationMs = Date.now() - started;
-  // Nur den primitiven Text uebernehmen, nie das Napi-Ergebnisobjekt.
-  return { speechSegments, hadSpeech: true, text: result.result.trim(), durationMs, audioMs };
+  const { text, durationMs } = await transcribeSpeech(whisper, pcm, context);
+  return { speechSegments, hadSpeech: true, text, durationMs, audioMs };
 }
 
 /**

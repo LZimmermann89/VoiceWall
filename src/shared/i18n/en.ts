@@ -385,9 +385,11 @@ export const en: Uebersetzung = {
     woerterbuchHinweis:
       'Everything here is pure, local rule-based processing: no language model, no external call. Every rule is deterministic and traceable.',
     fuellwoerterLabel:
-      'Remove filler words: standalone "uh", "um", "erm", "hm" and direct word doublings ("the the"). Conservative; rare legitimate doublings may be affected.',
+      'Remove filler words: standalone "uh", "um", "erm", "hm". Conservative and content-preserving.',
+    wortdopplungenLabel:
+      'Collapse word doublings: direct repetitions like "the the" become "the". Off by default because in rare cases this can alter legitimate text. Only enable it if frequent stuttering in dictation is the bigger problem.',
     sprachkommandosLabel:
-      'Apply voice commands: "period", "comma", "new line", "new paragraph", "paragraph" (German dictation additionally: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz"). Punctuation the speech recognition itself places around a command word is removed as well ("test, period." becomes "test."). Sometimes the recognition turns a spoken "period" directly into punctuation; the command word then never appears in the text and the result is still correct. Off by default because the rule also affects the ordinary use of words like "period" or "paragraph".',
+      'Apply voice commands: "period", "comma", "new line", "new paragraph", "paragraph" (German dictation additionally: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz"). A command word right after an article ("the period", "a comma") is recognized as an ordinary word and left untouched. Punctuation the speech recognition itself places around a command word is removed as well ("test, period." becomes "test."). Off by default.',
     fachwoerterbuchTitel: 'Specialist dictionary of the active company',
     fachwoerterbuchKeineFirma:
       'No company created yet. The specialist dictionary belongs to the company and is stored auditable in its folder (.voicewall/vokabular.json).',

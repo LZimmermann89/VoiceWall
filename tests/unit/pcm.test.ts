@@ -85,6 +85,47 @@ describe('resampleLinear', () => {
   it('wirft bei nicht-positiven Raten', () => {
     expect(() => resampleLinear(new Float32Array([1]), 0, 16_000)).toThrow();
   });
+
+  /**
+   * Kernpruefung des Anti-Aliasing: Ein Ton oberhalb der Ziel-Nyquistfrequenz
+   * muss beim Heruntertasten stark gedaempft werden, ein Ton klar darunter darf
+   * es nicht. Ohne den Tiefpass wuerde der hohe Ton als Aliasing ins Sprachband
+   * zurueckfalten, statt zu verschwinden.
+   */
+  function effektivwert(signal: Float32Array): number {
+    let summe = 0;
+    for (let i = 0; i < signal.length; i += 1) {
+      const wert = signal[i] ?? 0;
+      summe += wert * wert;
+    }
+    return signal.length === 0 ? 0 : Math.sqrt(summe / signal.length);
+  }
+
+  function sinus(frequenz: number, rate: number, sekunden: number): Float32Array {
+    const n = Math.round(rate * sekunden);
+    const s = new Float32Array(n);
+    for (let i = 0; i < n; i += 1) {
+      s[i] = Math.sin((2 * Math.PI * frequenz * i) / rate);
+    }
+    return s;
+  }
+
+  it('daempft beim Downsampling einen Ton oberhalb der Ziel-Nyquistfrequenz stark', () => {
+    // 12 kHz liegt oberhalb von 8 kHz (Nyquist bei 16 kHz Ziel). Nach dem
+    // Heruntertasten von 48 kHz muss davon fast nichts uebrig sein.
+    const hoch = sinus(12_000, 48_000, 0.25);
+    const aus = resampleLinear(hoch, 48_000, 16_000);
+    expect(effektivwert(aus)).toBeLessThan(0.1);
+  });
+
+  it('laesst beim Downsampling einen Ton klar unterhalb der Grenze passieren', () => {
+    // 1 kHz ist mitten im Sprachband und muss erhalten bleiben.
+    const tief = sinus(1_000, 48_000, 0.25);
+    const aus = resampleLinear(tief, 48_000, 16_000);
+    // Der Effektivwert eines Sinus ist etwa 0,707; deutlich mehr als die
+    // Daempfungsschwelle des hohen Tons.
+    expect(effektivwert(aus)).toBeGreaterThan(0.5);
+  });
 });
 
 describe('rmsFromInt16', () => {

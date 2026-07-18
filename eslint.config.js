@@ -56,6 +56,8 @@ export default tseslint.config(
       'playwright-report/**',
       'test-results/**',
       'sbom.cdx.json',
+      // Interne, gitignorete Arbeitsdateien (u. a. der WER-Korpus-Generator).
+      'intern/**',
     ],
   },
   eslint.configs.recommended,

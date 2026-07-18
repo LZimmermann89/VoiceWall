@@ -32,6 +32,7 @@ import { workerCommandSchema, type WorkerCommand, type WorkerEvent } from './pro
 import {
   detectSpeech,
   isEndpointReached,
+  transcribeSpeech,
   transcribeWithVadGate,
   type VadTuning,
 } from './segmenter';
@@ -156,15 +157,12 @@ async function tryEndpoint(active: EngineState): Promise<void> {
     return;
   }
 
-  const started = Date.now();
-  const { promise } = active.whisper.transcribeData(pcm, {
+  // Ueber dieselbe gemeinsame Funktion wie die VAD-Schleuse: EIN
+  // transcribeData-Aufruf im ganzen Code, eine Optionskonstruktion.
+  const { text, durationMs } = await transcribeSpeech(active.whisper, pcm, {
     language: dictationLanguage,
-    temperature: 0,
     ...(initialPrompt === null ? {} : { prompt: initialPrompt }),
   });
-  const result = await promise;
-  const durationMs = Date.now() - started;
-  const text = result.result.trim();
   const audioMs = totalSec * 1000;
   clearPending();
   if (text.length > 0) {

@@ -157,6 +157,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   const clipboardRestoreEnabled = status?.clipboardRestoreEnabled ?? true;
   const aufbereitung = status?.aufbereitung ?? {
     fuellwoerterEntfernen: true,
+    wortdopplungenEntfernen: false,
     sprachkommandos: false,
   };
   const flowState = status?.flowState ?? 'idle';
@@ -445,13 +446,32 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
               onChange={(event) =>
                 void runAction(() =>
                   window.voicewall.setAufbereitung({
+                    ...aufbereitung,
                     fuellwoerterEntfernen: event.target.checked,
-                    sprachkommandos: aufbereitung.sprachkommandos,
                   }),
                 )
               }
             />{' '}
             {t.fuellwoerterLabel}
+          </label>
+        </div>
+        <div className="actions">
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              data-testid="switch-wortdopplungen"
+              checked={aufbereitung.wortdopplungenEntfernen}
+              disabled={busy}
+              onChange={(event) =>
+                void runAction(() =>
+                  window.voicewall.setAufbereitung({
+                    ...aufbereitung,
+                    wortdopplungenEntfernen: event.target.checked,
+                  }),
+                )
+              }
+            />{' '}
+            {t.wortdopplungenLabel}
           </label>
         </div>
         <div className="actions">
@@ -464,7 +484,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
               onChange={(event) =>
                 void runAction(() =>
                   window.voicewall.setAufbereitung({
-                    fuellwoerterEntfernen: aufbereitung.fuellwoerterEntfernen,
+                    ...aufbereitung,
                     sprachkommandos: event.target.checked,
                   }),
                 )

@@ -10,6 +10,7 @@
   "include": [
     "electron.vite.config.ts",
     "vitest.config.ts",
+    "vitest.wer.config.ts",
     "playwright.config.ts",
     "tests/**/*.ts"
   ]

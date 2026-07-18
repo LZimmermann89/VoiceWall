@@ -103,8 +103,13 @@ export type HotkeyStatus = z.infer<typeof hotkeyStatusSchema>;
  * Globale Schalter der regelbasierten Textaufbereitung (Stufe 1).
  */
 export const aufbereitungConfigSchema = z.object({
-  /** Fuellwoerter ("äh", "ähm", ...) und direkte Wortdopplungen entfernen. */
+  /** Fuellwoerter ("äh", "ähm", ...) entfernen. */
   fuellwoerterEntfernen: z.boolean(),
+  /**
+   * Direkte Wortdopplungen ("das das" -> "das") zusammenziehen. Eigener
+   * Schalter, Default AUS: der Kollaps kann Inhalt verfaelschen.
+   */
+  wortdopplungenEntfernen: z.boolean(),
   /** Gesprochene Kommandos ("Punkt", "neue Zeile", ...) umsetzen (Opt-in). */
   sprachkommandos: z.boolean(),
 });

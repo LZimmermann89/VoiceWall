@@ -44,15 +44,30 @@ import type { DictationLanguage } from './schema';
 
 /** Schalter der Aufbereitung (globale Konfiguration). */
 export interface AufbereitungOptions {
-  /** Fuellwoerter ("aeh", "aehm", ...) und direkte Wortdopplungen entfernen. */
+  /** Nur Fuellwoerter ("aeh", "aehm", ...) entfernen. */
   readonly fuellwoerterEntfernen: boolean;
+  /**
+   * Direkte Wortdopplungen zusammenziehen ("das das" -> "das"). Bewusst ein
+   * EIGENER Schalter und standardmaessig AUS: Der Kollaps aendert den Inhalt und
+   * kann legitimes Deutsch verfaelschen ("die Frau, die die Blumen kaufte").
+   * Eine stillschweigende Inhaltsaenderung ist gerade bei Diktaten von Anwaelten
+   * oder Aerzten schlimmer als ein Fuellwort zu viel.
+   */
+  readonly wortdopplungenEntfernen: boolean;
   /** Gesprochene Kommandos ("Punkt", "neue Zeile", ...) umsetzen. */
   readonly sprachkommandos: boolean;
 }
 
-/** Standardwerte der Schalter (Fuellwoerter AN, Kommandos AUS). */
+/**
+ * Standardwerte der Schalter: Fuellwoerter AN, Wortdopplungs-Kollaps AUS (er
+ * faelscht Inhalt), Kommandos AUS.
+ */
 export function defaultAufbereitungOptions(): AufbereitungOptions {
-  return { fuellwoerterEntfernen: true, sprachkommandos: false };
+  return {
+    fuellwoerterEntfernen: true,
+    wortdopplungenEntfernen: false,
+    sprachkommandos: false,
+  };
 }
 
 /**
@@ -146,13 +161,14 @@ function fuellwortAlternation(sprache: DictationLanguage): string {
 }
 
 /**
- * Fuellwoerter-Filter (Regel 2, Schalter, Default AN):
- * - entfernt eigenstaendige Fuellwoerter der Diktatsprache (deutsch:
- *   "aeh"/"aehm"/"oehm"/"hm"; englisch: "uh"/"um"/"erm"; nur ganze Woerter,
- *   case-insensitiv, Unicode-Wortgrenzen) inklusive eines direkt folgenden
- *   Kommas und der Leerzeichen-Bereinigung,
- * - zieht direkte Wortdopplungen zusammen ("das das" -> "das"); Dopplungen
- *   mit Komma ("sehr, sehr") bleiben erhalten. Grenzen siehe Modulkommentar.
+ * Fuellwoerter-Filter (Regel 2, Schalter fuellwoerterEntfernen, Default AN):
+ * entfernt eigenstaendige Fuellwoerter der Diktatsprache (deutsch:
+ * "aeh"/"aehm"/"oehm"/"hm"; englisch: "uh"/"um"/"erm"; nur ganze Woerter,
+ * case-insensitiv, Unicode-Wortgrenzen) inklusive eines direkt folgenden
+ * Kommas und der Leerzeichen-Bereinigung.
+ *
+ * Der Wortdopplungs-Kollaps ist bewusst NICHT mehr Teil dieser Funktion: er
+ * aendert den Inhalt und haengt an einem eigenen Schalter (entferneWortdopplungen).
  */
 export function entferneFuellwoerter(text: string, sprache: DictationLanguage = 'de'): string {
   const alternation = fuellwortAlternation(sprache);
@@ -172,24 +188,36 @@ export function entferneFuellwoerter(text: string, sprache: DictationLanguage = 
   // Satzzeichen/Leerraum am Anfang stammen aus der Entfernung ("Ähm." -> "").
   if (beginntMitFuellwort) {
     result = result.replace(/^[ \t]*[.,!?;:]*[ \t]*/, '');
+    // Ein am Textanfang entferntes Fuellwort war eindeutig Satzanfang: den
+    // nachrueckenden Buchstaben grossschreiben.
+    result = result.replace(/^\p{Ll}/u, (klein) => klein.toUpperCase());
   }
+  return result;
+}
 
+/**
+ * Wortdopplungs-Kollaps (Regel 2b, EIGENER Schalter wortdopplungenEntfernen,
+ * Default AUS): zieht direkte Wortdopplungen zusammen ("das das" -> "das"),
+ * iterativ fuer "das das das". Dopplungen mit Komma ("sehr, sehr") bleiben
+ * erhalten.
+ *
+ * WARNUNG, deshalb Default AUS: Das kann legitimes Deutsch verfaelschen, etwa
+ * "die Frau, die die Blumen kaufte" (das Komma schuetzt hier nicht, weil die
+ * Woerter direkt aufeinanderfolgen). Nur einschalten, wenn haeufiges Stottern
+ * im Diktat das kleinere Uebel gegenueber solchen seltenen Faellen ist.
+ */
+export function entferneWortdopplungen(text: string): string {
   // Direkte Wortdopplungen (durch genau ein Leerzeichen getrennt) einmalig
-  // zusammenziehen, iterativ fuer "das das das". Case-insensitiver Vergleich,
-  // das erste Vorkommen bleibt erhalten.
+  // zusammenziehen, iterativ. Case-insensitiver Vergleich, das erste Vorkommen
+  // bleibt erhalten.
   const dopplung = /(?<=^|[^\p{L}])(\p{L}+) \1(?=[^\p{L}]|$)/giu;
+  let result = text;
   for (let schutz = 0; schutz < 50; schutz += 1) {
     const naechste = result.replace(dopplung, '$1');
     if (naechste === result) {
       break;
     }
     result = naechste;
-  }
-
-  // Ein am Textanfang entferntes Fuellwort war eindeutig Satzanfang: den
-  // nachrueckenden Buchstaben grossschreiben.
-  if (beginntMitFuellwort) {
-    result = result.replace(/^\p{Ll}/u, (klein) => klein.toUpperCase());
   }
   return result;
 }
@@ -248,6 +276,97 @@ function istWortzeichen(char: string): boolean {
 const WHISPER_SATZZEICHEN = /[.,!?;:]/;
 
 /**
+ * Artikel, Possessiv- und Demonstrativbegleiter, nach denen ein Kommandowort
+ * fast sicher ein Nomen ist und kein Kommando: "der Punkt", "ein Komma", "zum
+ * Absatz". Kleingeschrieben verglichen. Bewusst konservativ: die Liste soll
+ * Falschtreffer verhindern, nicht jeden Nominalkontext erkennen.
+ */
+const NOMEN_BEGLEITER = new Set([
+  'der',
+  'die',
+  'das',
+  'den',
+  'dem',
+  'des',
+  'ein',
+  'eine',
+  'einen',
+  'einem',
+  'einer',
+  'eines',
+  'kein',
+  'keine',
+  'keinen',
+  'keinem',
+  'keiner',
+  'keines',
+  'mein',
+  'meine',
+  'dein',
+  'deine',
+  'sein',
+  'seine',
+  'ihr',
+  'ihre',
+  'unser',
+  'unsere',
+  'dieser',
+  'diese',
+  'dieses',
+  'diesen',
+  'diesem',
+  'jeder',
+  'jede',
+  'jedes',
+  'jeden',
+  'jedem',
+  'welcher',
+  'welche',
+  'welches',
+  'zum',
+  'zur',
+  'beim',
+  'vom',
+  'im',
+  'am',
+  // Englische Begleiter, fuer die englische Kommandoliste (period/comma).
+  'the',
+  'a',
+  'an',
+  'this',
+  'that',
+  'my',
+  'your',
+  'his',
+  'her',
+  'its',
+  'our',
+]);
+
+/**
+ * Prueft, ob unmittelbar vor dem Kommandowort ein Artikel oder Begleiter steht.
+ * Dann ist das Wort ein Nomen ("der Punkt", "ein Komma") und darf NICHT als
+ * Kommando umgesetzt werden. Das ist der Kern der verbesserten Erkennung: Es
+ * verhindert genau die haeufigste Verstuemmelung ("Der Punkt ist wichtig"),
+ * ohne echte Kommandos zu verlieren, auch wenn danach ein kleingeschriebenes
+ * Wort folgt ("gut Punkt es geht weiter").
+ */
+function istNomenKontext(text: string, found: number): boolean {
+  let ende = found;
+  while (ende > 0 && (text.charAt(ende - 1) === ' ' || text.charAt(ende - 1) === '\t')) {
+    ende -= 1;
+  }
+  let anfang = ende;
+  while (anfang > 0 && istWortzeichen(text.charAt(anfang - 1))) {
+    anfang -= 1;
+  }
+  if (anfang === ende) {
+    return false;
+  }
+  return NOMEN_BEGLEITER.has(text.slice(anfang, ende).toLowerCase());
+}
+
+/**
  * Ersetzt EIN Kommando (case-insensitiv, nur als isoliertes Wort/Phrase mit
  * Unicode-Wortgrenzen). Von Whisper um das Kommandowort gesetzte Satzzeichen
  * gehoeren zum Treffer (Interpunktions-Toleranz):
@@ -275,6 +394,15 @@ function ersetzeKommando(text: string, kommando: Sprachkommando): string {
     const grenzeVorne = before === '' || !istWortzeichen(before);
     const grenzeHinten = after >= text.length || !istWortzeichen(text.charAt(after));
     if (!grenzeVorne || !grenzeHinten) {
+      result += text.slice(cursor, found + 1);
+      cursor = found + 1;
+      continue;
+    }
+    // Steht unmittelbar ein Artikel oder Begleiter davor ("der Punkt", "ein
+    // Komma", "der Absatz"), ist das Wort ein Nomen und kein Kommando. Dann
+    // nicht umsetzen, damit legitimer Text unangetastet bleibt. Das ist die
+    // Kernverbesserung gegen die haeufigste Verstuemmelung.
+    if (istNomenKontext(text, found)) {
       result += text.slice(cursor, found + 1);
       cursor = found + 1;
       continue;
@@ -343,6 +471,9 @@ export function aufbereitenText(
   let result = schaerfeInterpunktion(text);
   if (options.fuellwoerterEntfernen) {
     result = entferneFuellwoerter(result, sprache);
+  }
+  if (options.wortdopplungenEntfernen) {
+    result = entferneWortdopplungen(result);
   }
   if (options.sprachkommandos) {
     result = ersetzeSprachkommandos(result, sprache);
