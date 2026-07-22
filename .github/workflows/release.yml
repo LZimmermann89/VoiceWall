@@ -1,0 +1,91 @@
+name: Release
+
+# Baut ein signiertes VoiceWall-Paket fuer das Cockpit. Ausloesbar von Hand
+# (workflow_dispatch) oder ueber einen Versions-Tag. Erzeugt ein tar.gz der
+# gebauten App plus ein Ed25519-signiertes Manifest und haengt beides an ein
+# GitHub-Release. Der private Signier-Schluessel liegt als Secret MANIFEST_SIGN_KEY.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  macos-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: 'npm'
+
+      - name: Abhaengigkeiten
+        run: npm ci
+
+      - name: Paket bauen
+        run: npm run package
+
+      - name: Version ermitteln
+        id: version
+        run: echo "wert=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: App einsammeln und archivieren
+        id: archiv
+        run: |
+          set -euo pipefail
+          APP="$(find dist -maxdepth 2 -name '*.app' -type d | head -1)"
+          if [ -z "$APP" ]; then echo "Keine gebaute .app unter dist/ gefunden"; exit 1; fi
+          echo "Gefundene App: $APP"
+          mkdir -p stage
+          cp -R "$APP" stage/
+          NAME="voicewall-macos-arm64.tar.gz"
+          # gnutar/bsdtar auf macOS bewahrt die internen Symlinks der .app.
+          tar -C stage -czf "$NAME" "$(basename "$APP")"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Archiv: $NAME ($(du -h "$NAME" | cut -f1))"
+
+      - name: Manifest signieren
+        env:
+          MANIFEST_SIGN_KEY: ${{ secrets.MANIFEST_SIGN_KEY }}
+        run: |
+          set -euo pipefail
+          node scripts/signiere-paket.mjs \
+            --werkzeug voicewall \
+            --quelle ${{ github.repository }} \
+            --commit ${{ github.sha }} \
+            --paketVersion "${{ steps.version.outputs.wert }}" \
+            --ausgabe manifest-macos-arm64.json \
+            --artefakt "macos-arm64:${{ steps.archiv.outputs.name }}"
+
+      - name: Selbstpruefung (Archiv-Pruefsumme gegen Manifest)
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { createHash } from "node:crypto";
+            const manifest = JSON.parse(readFileSync("manifest-macos-arm64.json", "utf8"));
+            const art = manifest.artefakte.find((a) => a.plattform === "macos-arm64");
+            const ist = createHash("sha256").update(readFileSync(art.dateiname)).digest("hex");
+            if (ist !== art.sha256) { console.error("Pruefsumme weicht ab"); process.exit(1); }
+            console.log("Selbstpruefung ok: Manifest passt zum Archiv.");
+          '
+
+      - name: Release anlegen oder ergaenzen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ steps.version.outputs.wert }}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "${{ github.sha }}" \
+              --title "VoiceWall $TAG" \
+              --notes "Signiertes Paket fuer Der KI-Auditor Cockpit."
+          fi
+          gh release upload "$TAG" \
+            "${{ steps.archiv.outputs.name }}" manifest-macos-arm64.json --clobber
