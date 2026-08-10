@@ -446,6 +446,17 @@ export const de = {
     kontakteHinzufuegen: 'Kontakt hinzufügen',
     kontakteEntfernen: 'Entfernen',
     kontakteSpeichern: 'Kontaktverzeichnis speichern',
+    kontakteImport: 'Aus CSV importieren',
+    kontakteExport: 'Als CSV speichern',
+    kontakteImportHinweis:
+      'Für die Bearbeitung in Excel: „Als CSV speichern", dort bearbeiten, dann „Aus CSV importieren". Semikolon und Komma werden beide erkannt, ebenso Umlaute aus älteren Excel-Fassungen. Ein Import ersetzt nichts: gleiche Namen werden aktualisiert, neue kommen hinzu.',
+    kontakteImportErfolg: (neu: number, aktualisiert: number, verworfen: number): string => {
+      const teile = [`${String(neu)} neu`, `${String(aktualisiert)} aktualisiert`];
+      if (verworfen > 0) {
+        teile.push(`${String(verworfen)} verworfen`);
+      }
+      return `Kontakte importiert: ${teile.join(', ')}.`;
+    },
     kontakteGespeichert: 'Kontaktverzeichnis gespeichert.',
     kontakteLeer: 'Noch keine Kontakte angelegt.',
     kontakteNichtGespeichert: 'Noch nicht gespeichert.',
@@ -986,6 +997,31 @@ export const de = {
         'Für den Mail-Befehl wird eine aktive Firma mit Kontaktverzeichnis benötigt. Der Text liegt in der Zwischenablage.',
       mailFehler: (detail: string): string =>
         `Das Mailprogramm konnte nicht geöffnet werden (${detail}). Der Text liegt in der Zwischenablage.`,
+      importDialogTitel: 'Kontakte aus CSV-Datei importieren',
+      importDialogKnopf: 'Importieren',
+      importDialogFilter: 'CSV-Datei',
+      importAbgebrochen: 'Es wurde keine Datei ausgewählt.',
+      importZuGross:
+        'Die Datei ist größer als 5 MB. Ein Kontaktverzeichnis ist eine Namensliste; bitte die richtige Datei wählen.',
+      importNichtLesbar: 'Die Datei ist nicht lesbar. Bitte Dateirechte prüfen.',
+      importOhneEintraege: (verworfen: number): string =>
+        verworfen === 0
+          ? 'In der Datei stand kein gültiger Kontakt. Erwartet werden zwei Spalten: Name und E-Mail-Adresse.'
+          : `In der Datei stand kein gültiger Kontakt (${String(verworfen)} Zeilen verworfen). Erwartet werden zwei Spalten: Name und E-Mail-Adresse.`,
+      importErfolg: (neu: number, aktualisiert: number, verworfen: number): string => {
+        const teile = [`${String(neu)} neu`, `${String(aktualisiert)} aktualisiert`];
+        if (verworfen > 0) {
+          teile.push(`${String(verworfen)} verworfen`);
+        }
+        return `Kontakte importiert: ${teile.join(', ')}.`;
+      },
+      exportDialogTitel: 'Kontakte als CSV-Datei speichern',
+      exportDialogKnopf: 'Speichern',
+      exportAbgebrochen: 'Es wurde kein Speicherort ausgewählt.',
+      exportFehler: (detail: string): string =>
+        `Die CSV-Datei konnte nicht geschrieben werden: ${detail}`,
+      importHinweis:
+        'Excel: „Speichern unter" und als CSV UTF-8 ablegen, dann hier importieren. Semikolon und Komma werden beide erkannt, ebenso Umlaute aus älteren Excel-Fassungen. Ein Import ersetzt nichts: gleiche Namen werden aktualisiert, neue kommen hinzu.',
       overlayVorbereitet: (name: string): string =>
         `Mail an ${name} vorbereitet. Bitte prüfen und senden.`,
     },

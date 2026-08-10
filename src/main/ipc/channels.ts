@@ -97,6 +97,8 @@ export const IpcChannel = {
   /** Kontaktverzeichnis der aktiven Firma (Mail-Befehl). */
   KontakteGet: 'kontakte:get',
   KontakteSave: 'kontakte:save',
+  KontakteImportCsv: 'kontakte:import-csv',
+  KontakteExportCsv: 'kontakte:export-csv',
   SetAufbereitung: 'config:set-aufbereitung',
 
   // Modelle-Reiter der Verwaltung: Detailstatus aller Katalog-Modelle

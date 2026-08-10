@@ -807,9 +807,42 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             {kontakte.length > 0 ? (
               <ul className="status-list" data-testid="kontakte-liste">
                 {kontakte.map((kontakt, index) => (
-                  <li key={`${String(index)}-${kontakt.name}`}>
-                    <span className="mono">{kontakt.name}</span> {'->'}{' '}
-                    <span className="mono">{kontakt.adresse}</span>{' '}
+                  // Der Index als Schluessel ist hier richtig: die Zeilen sind
+                  // direkt editierbar, ein Schluessel aus dem Inhalt wuerde das
+                  // Feld bei jedem Tastendruck neu aufbauen.
+                  <li key={`kontakt-${String(index)}`}>
+                    <input
+                      type="text"
+                      aria-label={t.kontakteNameLabel}
+                      data-testid={`kontakt-name-${String(index)}`}
+                      maxLength={80}
+                      value={kontakt.name}
+                      disabled={busy}
+                      onChange={(event) => {
+                        const wert = event.target.value;
+                        setKontakte((prev) =>
+                          prev.map((eintrag, i) =>
+                            i === index ? { ...eintrag, name: wert } : eintrag,
+                          ),
+                        );
+                      }}
+                    />{' '}
+                    <input
+                      type="email"
+                      aria-label={t.kontakteAdresseLabel}
+                      data-testid={`kontakt-adresse-${String(index)}`}
+                      maxLength={254}
+                      value={kontakt.adresse}
+                      disabled={busy}
+                      onChange={(event) => {
+                        const wert = event.target.value;
+                        setKontakte((prev) =>
+                          prev.map((eintrag, i) =>
+                            i === index ? { ...eintrag, adresse: wert } : eintrag,
+                          ),
+                        );
+                      }}
+                    />{' '}
                     <button
                       type="button"
                       disabled={busy}
@@ -897,6 +930,55 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
                   {t.kontakteNichtGespeichert}
                 </span>
               )}
+            </div>
+            <p className="notice">{t.kontakteImportHinweis}</p>
+            <div className="actions">
+              <button
+                type="button"
+                data-testid="kontakte-import"
+                disabled={busy}
+                onClick={() =>
+                  void runAction(async () => {
+                    setKontakteError(null);
+                    setKontakteNotice(null);
+                    const result = await window.voicewall.importKontakteCsv();
+                    if (result.ok) {
+                      // Nach dem Import den gespeicherten Stand neu laden:
+                      // zusammengefuehrt wurde im Main-Prozess.
+                      const geladen = await window.voicewall.getKontakte();
+                      if (geladen.ok) {
+                        setKontakte([...geladen.kontakte.kontakte]);
+                        setKontakteStand(JSON.stringify(geladen.kontakte.kontakte));
+                      }
+                      const meldung = t.kontakteImportErfolg(
+                        result.neu,
+                        result.aktualisiert,
+                        result.verworfen.length,
+                      );
+                      setKontakteNotice(
+                        result.verworfen.length === 0
+                          ? meldung
+                          : `${meldung} ${result.verworfen.join(' ')}`,
+                      );
+                      showSuccess(meldung);
+                    } else {
+                      setKontakteError(result.message);
+                      showError(result.message);
+                    }
+                    return { ok: true };
+                  })
+                }
+              >
+                {t.kontakteImport}
+              </button>{' '}
+              <button
+                type="button"
+                data-testid="kontakte-export"
+                disabled={busy}
+                onClick={() => void runAction(() => window.voicewall.exportKontakteCsv())}
+              >
+                {t.kontakteExport}
+              </button>
             </div>
             {kontakteNotice !== null && (
               <p className="notice" data-testid="kontakte-notice">

@@ -99,6 +99,22 @@ export const kontakteGetResultSchema = z.discriminatedUnion('ok', [
 ]);
 export type KontakteGetResult = z.infer<typeof kontakteGetResultSchema>;
 
+/**
+ * Ergebnis eines CSV-Imports. Die verworfenen Zeilen werden ausgewiesen,
+ * nicht still geschluckt: wer 200 Zeilen importiert, muss erfahren, dass drei
+ * davon fehlen.
+ */
+export const kontakteImportResultSchema = z.discriminatedUnion('ok', [
+  z.object({
+    ok: z.literal(true),
+    neu: z.number().int().min(0),
+    aktualisiert: z.number().int().min(0),
+    verworfen: z.array(z.string()).max(500),
+  }),
+  z.object({ ok: z.literal(false), message: z.string() }),
+]);
+export type KontakteImportResult = z.infer<typeof kontakteImportResultSchema>;
+
 // ---------------------------------------------------------------------------
 // Erkennung des gesprochenen Befehls
 // ---------------------------------------------------------------------------

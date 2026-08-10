@@ -416,6 +416,17 @@ export const en: Uebersetzung = {
     kontakteHinzufuegen: 'Add contact',
     kontakteEntfernen: 'Remove',
     kontakteSpeichern: 'Save contact directory',
+    kontakteImport: 'Import from CSV',
+    kontakteExport: 'Save as CSV',
+    kontakteImportHinweis:
+      'To edit in Excel: "Save as CSV", edit there, then "Import from CSV". Both semicolon and comma are recognized, as are umlauts from older Excel versions. An import replaces nothing: identical names are updated, new ones are added.',
+    kontakteImportErfolg: (neu: number, aktualisiert: number, verworfen: number): string => {
+      const teile = [`${String(neu)} new`, `${String(aktualisiert)} updated`];
+      if (verworfen > 0) {
+        teile.push(`${String(verworfen)} discarded`);
+      }
+      return `Contacts imported: ${teile.join(', ')}.`;
+    },
     kontakteGespeichert: 'Contact directory saved.',
     kontakteLeer: 'No contacts yet.',
     kontakteNichtGespeichert: 'Not saved yet.',
@@ -982,6 +993,30 @@ export const en: Uebersetzung = {
         'The mail command needs an active company with a contact directory. The text is in the clipboard.',
       mailFehler: (detail: string): string =>
         `The mail program could not be opened (${detail}). The text is in the clipboard.`,
+      importDialogTitel: 'Import contacts from a CSV file',
+      importDialogKnopf: 'Import',
+      importDialogFilter: 'CSV file',
+      importAbgebrochen: 'No file was selected.',
+      importZuGross:
+        'The file is larger than 5 MB. A contact directory is a list of names; please choose the right file.',
+      importNichtLesbar: 'The file cannot be read. Please check the file permissions.',
+      importOhneEintraege: (verworfen: number): string =>
+        verworfen === 0
+          ? 'The file contained no valid contact. Two columns are expected: name and email address.'
+          : `The file contained no valid contact (${String(verworfen)} rows discarded). Two columns are expected: name and email address.`,
+      importErfolg: (neu: number, aktualisiert: number, verworfen: number): string => {
+        const teile = [`${String(neu)} new`, `${String(aktualisiert)} updated`];
+        if (verworfen > 0) {
+          teile.push(`${String(verworfen)} discarded`);
+        }
+        return `Contacts imported: ${teile.join(', ')}.`;
+      },
+      exportDialogTitel: 'Save contacts as a CSV file',
+      exportDialogKnopf: 'Save',
+      exportAbgebrochen: 'No location was selected.',
+      exportFehler: (detail: string): string => `The CSV file could not be written: ${detail}`,
+      importHinweis:
+        'In Excel choose "Save as" and store the file as CSV UTF-8, then import it here. Both semicolon and comma are recognized, as are umlauts from older Excel versions. An import replaces nothing: identical names are updated, new ones are added.',
       overlayVorbereitet: (name: string): string =>
         `Mail to ${name} prepared. Please review and send.`,
     },

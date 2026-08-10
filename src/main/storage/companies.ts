@@ -114,12 +114,14 @@ import {
 } from '../../shared/vokabular';
 import { readVokabular, writeVokabular } from './vokabular-store';
 import { readKontakte, writeKontakte } from './kontakte-store';
+import { baueKontakteCsv, parseKontakteCsv } from '../../shared/kontakte-csv';
 import {
   defaultKontakte,
   KONTAKTE_SCHEMA_VERSION,
   type Kontakt,
   type Kontakte,
   type KontakteGetResult,
+  type KontakteImportResult,
   kontakteSaveInputSchema,
 } from '../../shared/mailbefehl';
 import {
@@ -209,6 +211,23 @@ export function titleFromText(text: string): string {
     title = candidate;
   }
   return title.length === 0 ? texte().diktate.titelFallback : title;
+}
+
+/**
+ * Dekodiert CSV-Bytes zu Text. Excel schreibt je nach Version UTF-8 (oft mit
+ * BOM) oder Windows-1252. Erkannt wird zuerst am BOM, danach ueber einen
+ * strikten UTF-8-Versuch: schlaegt er fehl, sind es sehr wahrscheinlich
+ * Windows-1252-Bytes. Ohne diesen Schritt werden aus Umlauten Fragezeichen.
+ */
+function dekodiereCsv(bytes: Buffer): string {
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return new TextDecoder('utf-8').decode(bytes.subarray(3));
+  }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder('windows-1252').decode(bytes);
+  }
 }
 
 export class CompanyManager {
@@ -1169,6 +1188,110 @@ export class CompanyManager {
   }
 
   /**
+   * Importiert Kontakte aus einer CSV-Datei, die der Nutzer im nativen
+   * Dialog waehlt (nie ein roher Renderer-Pfad).
+   *
+   * Kodierung: Excel schreibt je nach Version UTF-8 mit BOM oder
+   * Windows-1252. Erkannt wird am BOM und daran, ob die Bytes als UTF-8
+   * aufgehen; sonst gilt Windows-1252. Ohne diesen Schritt kommen aus
+   * Umlauten Fragezeichen, und der Import ist praktisch wertlos.
+   *
+   * Die Datei ERSETZT das Verzeichnis nicht, sie ergaenzt es: bestehende
+   * Namen werden aktualisiert, neue kommen dazu. Ein Import soll nichts
+   * loeschen, was der Nutzer nicht sieht.
+   */
+  async importKontakteCsv(): Promise<KontakteImportResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return { ok: false, message: active.message };
+    }
+    const chosen = await dialog.showOpenDialog({
+      title: texte().kontakte.importDialogTitel,
+      buttonLabel: texte().kontakte.importDialogKnopf,
+      filters: [{ name: texte().kontakte.importDialogFilter, extensions: ['csv', 'txt'] }],
+      properties: ['openFile'],
+    });
+    const quelle = chosen.filePaths[0];
+    if (chosen.canceled || quelle === undefined) {
+      return { ok: false, message: texte().kontakte.importAbgebrochen };
+    }
+
+    let bytes: Buffer;
+    try {
+      const info = await stat(quelle);
+      // Eine Namensliste ist klein; alles darueber ist ein Versehen.
+      if (info.size > 5 * 1024 * 1024) {
+        return { ok: false, message: texte().kontakte.importZuGross };
+      }
+      bytes = await readFile(quelle);
+    } catch {
+      return { ok: false, message: texte().kontakte.importNichtLesbar };
+    }
+
+    const inhalt = dekodiereCsv(bytes);
+    const gelesen = parseKontakteCsv(inhalt);
+    if (gelesen.kontakte.length === 0) {
+      return {
+        ok: false,
+        message: texte().kontakte.importOhneEintraege(gelesen.verworfen.length),
+      };
+    }
+
+    // Zusammenfuehren: gleicher Name (ohne Ruecksicht auf Schreibweise)
+    // bedeutet Aktualisierung, alles andere kommt hinzu.
+    const vorhanden = await this.activeKontakteLenient();
+    const zusammen = [...vorhanden];
+    let neu = 0;
+    let aktualisiert = 0;
+    for (const kontakt of gelesen.kontakte) {
+      const index = zusammen.findIndex(
+        (eintrag) => eintrag.name.toLowerCase().trim() === kontakt.name.toLowerCase().trim(),
+      );
+      if (index === -1) {
+        zusammen.push(kontakt);
+        neu += 1;
+      } else {
+        zusammen[index] = kontakt;
+        aktualisiert += 1;
+      }
+    }
+    const gespeichert = await this.saveKontakte({ kontakte: zusammen });
+    if (!gespeichert.ok) {
+      return { ok: false, message: gespeichert.message };
+    }
+    return { ok: true, neu, aktualisiert, verworfen: [...gelesen.verworfen] };
+  }
+
+  /**
+   * Schreibt das Verzeichnis als CSV an einen vom Nutzer gewaehlten Ort.
+   * Gedacht als halbe Strecke des Kreislaufs: exportieren, in Excel
+   * bearbeiten, wieder importieren.
+   */
+  async exportKontakteCsv(): Promise<ActionResult> {
+    const kontakte = await this.activeKontakteLenient();
+    const chosen = await dialog.showSaveDialog({
+      title: texte().kontakte.exportDialogTitel,
+      buttonLabel: texte().kontakte.exportDialogKnopf,
+      defaultPath: 'kontakte.csv',
+      filters: [{ name: texte().kontakte.importDialogFilter, extensions: ['csv'] }],
+    });
+    if (chosen.canceled || chosen.filePath.length === 0) {
+      return { ok: false, message: texte().kontakte.exportAbgebrochen };
+    }
+    try {
+      await writeFileAtomic(chosen.filePath, baueKontakteCsv(kontakte));
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        message: texte().kontakte.exportFehler(
+          error instanceof Error ? error.message : String(error),
+        ),
+      };
+    }
+  }
+
+  /**
    * Kontakte der aktiven Firma fuer den Diktatfluss: eine kaputte Datei wird
    * geloggt und wie ein leeres Verzeichnis behandelt, damit ein Diktat nie
    * daran scheitert. Ohne Kontakte findet der Mail-Befehl schlicht niemanden
@@ -1555,5 +1678,15 @@ export class CompanyManager {
         this.saveKontakte(parsed.data),
       );
     });
+
+    ipcMain.handle(IpcChannel.KontakteImportCsv, () =>
+      guard<KontakteImportResult>({ ok: false, message: internalError() }, () =>
+        this.importKontakteCsv(),
+      ),
+    );
+
+    ipcMain.handle(IpcChannel.KontakteExportCsv, () =>
+      guard<ActionResult>({ ok: false, message: internalError() }, () => this.exportKontakteCsv()),
+    );
   }
 }

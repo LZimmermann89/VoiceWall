@@ -47,7 +47,7 @@ import type {
   UiLanguage,
 } from './schema';
 import type { VokabularGetResult, VokabularSaveInput } from './vokabular';
-import type { KontakteGetResult, KontakteSaveInput } from './mailbefehl';
+import type { KontakteGetResult, KontakteImportResult, KontakteSaveInput } from './mailbefehl';
 
 /** Funktion zum Abmelden eines Event-Listeners. */
 export type Unsubscribe = () => void;
@@ -181,6 +181,10 @@ export interface VoiceWallBridge {
   readonly getKontakte: () => Promise<KontakteGetResult>;
   /** Kontaktverzeichnis der aktiven Firma speichern (validiert, atomar). */
   readonly saveKontakte: (input: KontakteSaveInput) => Promise<ActionResult>;
+  /** Kontakte aus einer CSV-Datei importieren (Dialog im Main-Prozess). */
+  readonly importKontakteCsv: () => Promise<KontakteImportResult>;
+  /** Kontakte als CSV-Datei speichern (Dialog im Main-Prozess). */
+  readonly exportKontakteCsv: () => Promise<ActionResult>;
   /** Globale Aufbereitungs-Schalter setzen (Fuellwoerter, Sprachkommandos). */
   readonly setAufbereitung: (config: AufbereitungConfig) => Promise<ActionResult>;
 

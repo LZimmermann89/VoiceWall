@@ -45,6 +45,14 @@ echter Windows-Hardware aus, Testberichte sind willkommen (siehe
   der Zwischenablage. Das Verzeichnis liegt auditierbar im Firmenordner
   (`.voicewall/kontakte.json`), bewusst getrennt vom Fach-Wörterbuch, weil
   es personenbezogene Daten sind. Standardmäßig aus.
+  Die Liste lässt sich in der App direkt bearbeiten, und für größere
+  Bestände gibt es CSV in beide Richtungen: „Als CSV speichern", in Excel
+  bearbeiten, „Aus CSV importieren". Deutsches Excel trennt mit Semikolon
+  und schreibt je nach Version Windows-1252 statt UTF-8; beides wird
+  erkannt, damit aus Umlauten keine Fragezeichen werden. Ein Import
+  ersetzt nichts, er führt zusammen: gleiche Namen werden aktualisiert,
+  neue kommen hinzu, ungültige Zeilen werden einzeln mit Zeilennummer
+  gemeldet statt still verschluckt.
 - **Zielanwendung starten:** Ist das genannte Programm nicht offen, kann
   VoiceWall es auf Wunsch öffnen (eigener Schalter, standardmäßig aus) und
   wartet dann, bis es bereit ist. Beachten Sie: ein frisch gestartetes

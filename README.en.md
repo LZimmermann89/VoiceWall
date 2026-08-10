@@ -45,6 +45,13 @@ welcome (see the test guide `docs/TESTLEITFADEN.md`, English version:
   auditable in the company folder (`.voicewall/kontakte.json`),
   deliberately separate from the specialist dictionary because these are
   personal data. Off by default.
+  The list can be edited directly in the app, and for larger sets there is
+  CSV in both directions: "Save as CSV", edit in Excel, "Import from CSV".
+  German Excel separates with semicolons and writes Windows-1252 instead of
+  UTF-8 depending on the version; both are detected so that umlauts do not
+  turn into question marks. An import replaces nothing, it merges: identical
+  names are updated, new ones are added, and invalid rows are reported
+  individually with their line number instead of being silently dropped.
 - **Start the target application:** if the named program is not open,
   VoiceWall can open it on request (separate switch, off by default) and
   then waits until it is ready. Note: a freshly started program often shows

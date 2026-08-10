@@ -34,6 +34,27 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   bei genau einer erklärungsbedürftigen Berechtigung statt einer pro
   Zielprogramm. Standardmäßig aus.
 
+- **Kontakte bearbeiten und als CSV austauschen:** Die Liste ist in der
+  App direkt editierbar, dazu gibt es Export und Import als CSV. Der
+  gedachte Weg ist der Kreislauf: exportieren, in Excel bearbeiten, wieder
+  importieren.
+
+  Bewusst CSV und nicht `.xlsx`: Ein echter Excel-Leser hieße, einen ZIP-
+  und XML-Verarbeiter in ein Produkt zu holen, das mit schlanker
+  Lieferkette wirbt. Die verbreitete Bibliothek dafür liegt auf npm seit
+  Jahren unverändert mit bekannten Lücken, unter anderem Prototype
+  Pollution beim Lesen präparierter Dateien; die reparierten Fassungen
+  gibt es nur am Paketmanager vorbei, was Sperrdatei und Prüfsummen
+  aushebeln würde. Für eine Liste aus Name und Adresse ist das ein
+  schlechtes Geschäft. Der CSV-Weg kommt ohne jede neue Abhängigkeit aus.
+
+  Zwei Eigenheiten, die in der Praxis jeden zweiten Import zerlegen, sind
+  ausdrücklich abgefangen: Deutsches Excel trennt mit Semikolon statt
+  Komma, und es schreibt je nach Version Windows-1252 statt UTF-8. Beides
+  wird erkannt, sonst kämen aus Umlauten Fragezeichen. Ein Import ersetzt
+  nichts, er führt zusammen; ungültige Zeilen werden einzeln mit
+  Zeilennummer gemeldet statt still verschluckt.
+
 - **Mail diktieren, mit Kontaktverzeichnis je Firma:** Beginnt das
   Diktat mit „Verfasse eine Mail an Lars mit folgendem Text: …", wird der
   Name im Verzeichnis der aktiven Firma nachgeschlagen und ein fertiges
