@@ -33,6 +33,18 @@ welcome (see the test guide `docs/TESTLEITFADEN.md`, English version:
   themselves in the meantime, their content is left untouched. If the
   machine locks or suspends, a running dictation is aborted and the
   audio is discarded rather than transcribed.
+- **Dictate a mail:** if the dictation begins with "Write a mail to Lars
+  with the following text: …", the name is looked up in the company's
+  contact directory and a ready-made compose window opens in your default
+  mail program, with recipient and text filled in. You review and send;
+  **VoiceWall never sends by itself**. A subject can be dictated with "with
+  subject …". The recipient address comes **solely from the directory**,
+  never from the spoken text: a misheard address would be a mail to a
+  stranger. If the name is unknown or ambiguous, nothing happens beyond a
+  message, and the text stays in the clipboard. The directory lives
+  auditable in the company folder (`.voicewall/kontakte.json`),
+  deliberately separate from the specialist dictionary because these are
+  personal data. Off by default.
 - **Start the target application:** if the named program is not open,
   VoiceWall can open it on request (separate switch, off by default) and
   then waits until it is ready. Note: a freshly started program often shows

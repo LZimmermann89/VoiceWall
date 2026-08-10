@@ -29,6 +29,7 @@ interface ZielBridge {
       sprachkommandos: boolean;
       zielanwendung: boolean;
       zielanwendungStarten: boolean;
+      mailbefehl: boolean;
     }) => Promise<{ ok: boolean; message?: string }>;
     devMockPaste: (enabled: boolean) => Promise<{ ok: boolean }>;
     devSetAccessibility: (trusted: boolean | null) => Promise<{ ok: boolean }>;
@@ -45,6 +46,7 @@ const SCHALTER_AUS = {
   sprachkommandos: false,
   zielanwendung: false,
   zielanwendungStarten: false,
+  mailbefehl: false,
 };
 
 function bridge(window: Page): ZielBridge['voicewall'] {

@@ -146,6 +146,7 @@ describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
       sprachkommandos: false,
       zielanwendung: false,
       zielanwendungStarten: false,
+      mailbefehl: false,
     });
   });
 
@@ -161,6 +162,7 @@ describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
         sprachkommandos: false,
         zielanwendung: false,
         zielanwendungStarten: false,
+        mailbefehl: false,
       });
     }
   });

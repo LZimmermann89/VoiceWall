@@ -33,6 +33,18 @@ echter Windows-Hardware aus, Testberichte sind willkommen (siehe
   bleibt sein Inhalt unangetastet. Sperrt sich der Rechner oder geht er
   in den Ruhezustand, bricht ein laufendes Diktat ab und das Audio wird
   verworfen, statt noch verschriftet zu werden.
+- **Mail diktieren:** Beginnt das Diktat mit „Verfasse eine Mail an Lars
+  mit folgendem Text: …", wird der Name im Kontaktverzeichnis der Firma
+  nachgeschlagen und ein fertiges Verfassen-Fenster im
+  Standard-Mailprogramm geöffnet, mit Empfänger und Text. Sie prüfen und
+  senden; **VoiceWall verschickt nie selbst**. Ein Betreff lässt sich mit
+  „mit Betreff …" ansagen. Die Empfängeradresse kommt **ausschließlich aus
+  dem Verzeichnis**, nie aus dem Gesprochenen: eine falsch verstandene
+  Adresse wäre eine Mail an einen Fremden. Ist der Name unbekannt oder
+  mehrdeutig, passiert nichts außer einer Meldung, und der Text bleibt in
+  der Zwischenablage. Das Verzeichnis liegt auditierbar im Firmenordner
+  (`.voicewall/kontakte.json`), bewusst getrennt vom Fach-Wörterbuch, weil
+  es personenbezogene Daten sind. Standardmäßig aus.
 - **Zielanwendung starten:** Ist das genannte Programm nicht offen, kann
   VoiceWall es auf Wunsch öffnen (eigener Schalter, standardmäßig aus) und
   wartet dann, bis es bereit ist. Beachten Sie: ein frisch gestartetes

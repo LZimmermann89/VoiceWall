@@ -94,6 +94,9 @@ export const IpcChannel = {
   // globalen Aufbereitungs-Schalter setzen.
   VocabGet: 'vocab:get',
   VocabSave: 'vocab:save',
+  /** Kontaktverzeichnis der aktiven Firma (Mail-Befehl). */
+  KontakteGet: 'kontakte:get',
+  KontakteSave: 'kontakte:save',
   SetAufbereitung: 'config:set-aufbereitung',
 
   // Modelle-Reiter der Verwaltung: Detailstatus aller Katalog-Modelle

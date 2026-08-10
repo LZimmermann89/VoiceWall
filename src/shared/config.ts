@@ -178,6 +178,10 @@ export const globalConfigSchema = z
         // Default AUS: ein Diktat, das ungefragt Programme oeffnet, waere
         // eine Ueberraschung.
         zielanwendungStarten: z.boolean().default(false),
+        // Mail-Befehl am Diktatanfang ("Verfasse eine Mail an ... "). Default
+        // AUS: er oeffnet ein Mailfenster und braucht ein gepflegtes
+        // Kontaktverzeichnis, um ueberhaupt sinnvoll zu sein.
+        mailbefehl: z.boolean().default(false),
       })
       .passthrough()
       .default({
@@ -186,6 +190,7 @@ export const globalConfigSchema = z
         sprachkommandos: false,
         zielanwendung: false,
         zielanwendungStarten: false,
+        mailbefehl: false,
       }),
     /**
      * Sprache der Oberflaeche: 'de' ist der
@@ -221,6 +226,7 @@ export function defaultGlobalConfig(): GlobalConfig {
       sprachkommandos: false,
       zielanwendung: false,
       zielanwendungStarten: false,
+      mailbefehl: false,
     },
     uiSprache: 'de',
   };

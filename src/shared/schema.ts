@@ -127,6 +127,8 @@ export const aufbereitungConfigSchema = z.object({
   zielanwendung: z.boolean(),
   /** Eine geschlossene Zielanwendung starten statt melden (Opt-in). */
   zielanwendungStarten: z.boolean(),
+  /** Mail-Befehl am Diktatanfang erkennen und Mailfenster oeffnen (Opt-in). */
+  mailbefehl: z.boolean(),
 });
 export type AufbereitungConfig = z.infer<typeof aufbereitungConfigSchema>;
 

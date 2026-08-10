@@ -40,6 +40,7 @@ import {
   transcriptPayloadSchema,
 } from '../shared/schema';
 import { vokabularGetResultSchema } from '../shared/vokabular';
+import { kontakteGetResultSchema } from '../shared/mailbefehl';
 import type { Unsubscribe, VoiceWallBridge } from '../shared/types';
 
 /** Meldet einen validierenden Listener an einen Main-zu-Renderer-Kanal an. */
@@ -169,6 +170,10 @@ const bridge: VoiceWallBridge = {
     vokabularGetResultSchema.parse(await ipcRenderer.invoke(IpcChannel.VocabGet)),
   saveVokabular: async (input) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.VocabSave, input)),
+  getKontakte: async () =>
+    kontakteGetResultSchema.parse(await ipcRenderer.invoke(IpcChannel.KontakteGet)),
+  saveKontakte: async (input) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.KontakteSave, input)),
   setAufbereitung: async (config) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetAufbereitung, config)),
   setUiLanguage: async (sprache) =>

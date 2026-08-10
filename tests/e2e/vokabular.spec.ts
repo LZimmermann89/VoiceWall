@@ -141,6 +141,7 @@ test('Stufe 1: Wörterbuch-Editor, Schalter-Persistenz und korrigierte Zustellun
             sprachkommandos: boolean;
             zielanwendung: boolean;
             zielanwendungStarten: boolean;
+            mailbefehl: boolean;
           };
         };
         return config.aufbereitung;
@@ -154,6 +155,7 @@ test('Stufe 1: Wörterbuch-Editor, Schalter-Persistenz und korrigierte Zustellun
         // Zielanwendung am Satzende, ebenfalls Default AUS.
         zielanwendung: false,
         zielanwendungStarten: false,
+        mailbefehl: false,
       });
     // Zuruecksetzen (der Zustellungs-Test unten laeuft mit Kommandos AUS).
     await window.getByTestId('switch-sprachkommandos').click();

@@ -34,6 +34,35 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   bei genau einer erklärungsbedürftigen Berechtigung statt einer pro
   Zielprogramm. Standardmäßig aus.
 
+- **Mail diktieren, mit Kontaktverzeichnis je Firma:** Beginnt das
+  Diktat mit „Verfasse eine Mail an Lars mit folgendem Text: …", wird der
+  Name im Verzeichnis der aktiven Firma nachgeschlagen und ein fertiges
+  Verfassen-Fenster im Standard-Mailprogramm geöffnet. Der Mensch prüft
+  und sendet; VoiceWall verschickt nie selbst.
+
+  Die wichtigste Entscheidung dahinter: Die Empfängeradresse wird
+  niemals aus dem Diktat gelesen. Gesprochen wird „L Punkt Zimmermann at
+  fernau minus GmbH punkt de", und die Erkennung schreibt das mal so, mal
+  anders. Eine falsch verstandene Adresse wäre keine Unbequemlichkeit,
+  sondern eine Mail an einen Fremden. Deshalb kommt die Adresse
+  ausschließlich aus dem Verzeichnis, und aus dem Gesprochenen kommt nur
+  der Name. Ist er unbekannt oder mehrdeutig, wird nichts vorbereitet und
+  auch nichts ersatzweise eingefügt.
+
+  Das Verzeichnis liegt als eigene Datei im Firmenordner
+  (`.voicewall/kontakte.json`), getrennt vom Fach-Wörterbuch. Diese
+  Trennung ist Absicht: Kontakte sind personenbezogene Daten,
+  Fachbegriffe sind es nicht, und getrennte Dateien lassen sich getrennt
+  löschen, sichern und im Verarbeitungsverzeichnis beschreiben.
+
+  Für die Übergabe an das Mailprogramm gibt es jetzt einen dritten
+  `openExternal`-Aufruf im Quellbaum. Er ist die einzige Stelle mit
+  dynamischem Anteil und an vier Bedingungen gebunden: festes Schema,
+  Adresse ausschließlich aus dem geprüften Verzeichnis, vollständige
+  Kodierung von Betreff und Text, begrenzte Länge. Der
+  Sicherheits-Invariantentest zählt diese Stellen und wurde entsprechend
+  erweitert statt stillschweigend hochgezählt. Standardmäßig aus.
+
 - **Geschlossene Zielanwendung starten** (eigener Schalter, standardmäßig
   aus): Ist das genannte Programm nicht offen, wird es geöffnet, und
   VoiceWall wartet, bis es bereit ist, statt nach fester Zeit blind

@@ -106,6 +106,7 @@ const DEFAULT_FLOW_STATUS: FlowStatus = {
     sprachkommandos: false,
     zielanwendung: false,
     zielanwendungStarten: false,
+    mailbefehl: false,
   },
   uiLanguage: 'de',
 };

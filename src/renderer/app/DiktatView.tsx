@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from 'rea
 import type { CompanyListView } from '../../shared/company';
 import type { AppStatus, ModelProgress, SystemInfo, TranscriptPayload } from '../../shared/schema';
 import type { Ersetzung } from '../../shared/vokabular';
+import type { Kontakt } from '../../shared/mailbefehl';
 import { zieleFuerPlattform } from '../../shared/zielanwendung';
 import { formatAccelerator, formatBytes } from './format';
 import { useSprache } from './i18n';
@@ -70,6 +71,14 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   // "Wörterbuch speichern").
   const [gespeicherterStand, setGespeicherterStand] = useState<string>(vokabularStand([], []));
 
+  // Kontaktverzeichnis der aktiven Firma (Empfaenger des Mail-Befehls).
+  const [kontakte, setKontakte] = useState<Kontakt[]>([]);
+  const [kontaktNameInput, setKontaktNameInput] = useState('');
+  const [kontaktAdresseInput, setKontaktAdresseInput] = useState('');
+  const [kontakteError, setKontakteError] = useState<string | null>(null);
+  const [kontakteNotice, setKontakteNotice] = useState<string | null>(null);
+  const [kontakteStand, setKontakteStand] = useState<string>('[]');
+
   useEffect(() => {
     const offTranscript = window.voicewall.onTranscript((payload: TranscriptPayload) => {
       setTranscripts((previous) => [
@@ -106,12 +115,27 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
     let cancelled = false;
     setVokabularError(null);
     setVokabularNotice(null);
+    setKontakteError(null);
+    setKontakteNotice(null);
     if (aktiveFirma === null) {
       setBegriffe([]);
       setErsetzungen([]);
       setGespeicherterStand(vokabularStand([], []));
+      setKontakte([]);
+      setKontakteStand('[]');
       return;
     }
+    void window.voicewall.getKontakte().then((result) => {
+      if (cancelled) {
+        return;
+      }
+      if (result.ok) {
+        setKontakte([...result.kontakte.kontakte]);
+        setKontakteStand(JSON.stringify(result.kontakte.kontakte));
+      } else {
+        setKontakteError(result.message);
+      }
+    });
     void window.voicewall.getVokabular().then((result) => {
       if (cancelled) {
         return;
@@ -164,6 +188,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
     sprachkommandos: false,
     zielanwendung: false,
     zielanwendungStarten: false,
+    mailbefehl: false,
   };
   const flowState = status?.flowState ?? 'idle';
   const platform = systemInfo?.platform ?? 'darwin';
@@ -598,6 +623,25 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
               .join(', ')}
           </p>
         )}
+        <div className="actions">
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              data-testid="switch-mailbefehl"
+              checked={aufbereitung.mailbefehl}
+              disabled={busy}
+              onChange={(event) =>
+                void runAction(() =>
+                  window.voicewall.setAufbereitung({
+                    ...aufbereitung,
+                    mailbefehl: event.target.checked,
+                  }),
+                )
+              }
+            />{' '}
+            {t.mailbefehlLabel}
+          </label>
+        </div>
         <h4>{t.fachwoerterbuchTitel}</h4>
         {!hasCompany ? (
           <p className="placeholder">{t.fachwoerterbuchKeineFirma}</p>
@@ -749,6 +793,119 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             {vokabularError !== null && (
               <p className="warn-text" data-testid="vocab-error">
                 {vokabularError}
+              </p>
+            )}
+          </>
+        )}
+
+        <h4>{t.kontakteTitel}</h4>
+        {!hasCompany ? (
+          <p className="placeholder">{t.kontakteKeineFirma}</p>
+        ) : (
+          <>
+            <p className="notice">{t.kontakteHinweis}</p>
+            {kontakte.length > 0 ? (
+              <ul className="status-list" data-testid="kontakte-liste">
+                {kontakte.map((kontakt, index) => (
+                  <li key={`${String(index)}-${kontakt.name}`}>
+                    <span className="mono">{kontakt.name}</span> {'->'}{' '}
+                    <span className="mono">{kontakt.adresse}</span>{' '}
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        setKontakte((prev) => prev.filter((_, i) => i !== index));
+                      }}
+                    >
+                      {t.kontakteEntfernen}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="placeholder">{t.kontakteLeer}</p>
+            )}
+            <div className="actions">
+              <label htmlFor="kontakt-name-input">{t.kontakteNameLabel}</label>
+              <input
+                id="kontakt-name-input"
+                data-testid="kontakt-name-input"
+                type="text"
+                maxLength={80}
+                value={kontaktNameInput}
+                onChange={(event) => {
+                  setKontaktNameInput(event.target.value);
+                }}
+              />
+              <label htmlFor="kontakt-adresse-input">{t.kontakteAdresseLabel}</label>
+              <input
+                id="kontakt-adresse-input"
+                data-testid="kontakt-adresse-input"
+                type="email"
+                maxLength={254}
+                value={kontaktAdresseInput}
+                onChange={(event) => {
+                  setKontaktAdresseInput(event.target.value);
+                }}
+              />
+              <button
+                type="button"
+                data-testid="kontakt-add"
+                disabled={
+                  busy ||
+                  kontaktNameInput.trim().length === 0 ||
+                  kontaktAdresseInput.trim().length === 0
+                }
+                onClick={() => {
+                  setKontakte((prev) => [
+                    ...prev,
+                    { name: kontaktNameInput.trim(), adresse: kontaktAdresseInput.trim() },
+                  ]);
+                  setKontaktNameInput('');
+                  setKontaktAdresseInput('');
+                }}
+              >
+                {t.kontakteHinzufuegen}
+              </button>
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                data-testid="kontakte-save"
+                disabled={busy}
+                onClick={() =>
+                  void runAction(async () => {
+                    setKontakteError(null);
+                    setKontakteNotice(null);
+                    const result = await window.voicewall.saveKontakte({ kontakte });
+                    if (result.ok) {
+                      setKontakteNotice(t.kontakteGespeichert);
+                      setKontakteStand(JSON.stringify(kontakte));
+                      showSuccess(t.kontakteGespeichert);
+                    } else {
+                      setKontakteError(result.message);
+                      showError(result.message);
+                    }
+                    return { ok: true };
+                  })
+                }
+              >
+                {t.kontakteSpeichern}
+              </button>
+              {JSON.stringify(kontakte) !== kontakteStand && (
+                <span className="warn-text" data-testid="kontakte-dirty" aria-live="polite">
+                  {t.kontakteNichtGespeichert}
+                </span>
+              )}
+            </div>
+            {kontakteNotice !== null && (
+              <p className="notice" data-testid="kontakte-notice">
+                {kontakteNotice}
+              </p>
+            )}
+            {kontakteError !== null && (
+              <p className="warn-text" data-testid="kontakte-error">
+                {kontakteError}
               </p>
             )}
           </>

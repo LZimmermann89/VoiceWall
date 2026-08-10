@@ -434,6 +434,21 @@ export const de = {
     zielanwendungStartenLabel:
       'Geschlossene Zielanwendung starten, statt es nur zu melden. VoiceWall wartet dann, bis das Programm bereit ist, und fügt erst danach ein. Bedenken Sie: ein frisch gestartetes Programm zeigt oft nur seinen Startbildschirm und noch kein Eingabefeld, dann findet der Text kein Ziel. Standardmäßig aus.',
     zielanwendungVerfuegbar: 'Auf diesem Rechner ansteuerbar:',
+    mailbefehlLabel:
+      'Mail-Befehl am Diktatanfang erkennen: Beginnt das Diktat mit „Verfasse eine Mail an <Name> mit folgendem Text: …", wird der Name im Kontaktverzeichnis dieser Firma nachgeschlagen und ein fertiges Verfassen-Fenster im Standard-Mailprogramm geöffnet. VoiceWall verschickt nie selbst, Sie prüfen und senden. Die Adresse kommt ausschließlich aus dem Verzeichnis, nie aus dem Gesprochenen: eine falsch verstandene Adresse wäre eine Mail an einen Fremden. Unbekannter oder mehrdeutiger Name bedeutet: keine Mail, nur eine Meldung. Standardmäßig aus.',
+    kontakteTitel: 'Kontaktverzeichnis der aktiven Firma',
+    kontakteHinweis:
+      'Die Empfänger des Mail-Befehls. Liegt auditierbar im Firmenordner (.voicewall/kontakte.json), getrennt vom Fach-Wörterbuch, weil es personenbezogene Daten sind. Im Diktat sagen Sie nur den Namen.',
+    kontakteKeineFirma:
+      'Noch keine Firma angelegt. Das Kontaktverzeichnis gehört zur Firma und liegt in deren Ordner.',
+    kontakteNameLabel: 'Name (so wie gesprochen):',
+    kontakteAdresseLabel: 'E-Mail-Adresse:',
+    kontakteHinzufuegen: 'Kontakt hinzufügen',
+    kontakteEntfernen: 'Entfernen',
+    kontakteSpeichern: 'Kontaktverzeichnis speichern',
+    kontakteGespeichert: 'Kontaktverzeichnis gespeichert.',
+    kontakteLeer: 'Noch keine Kontakte angelegt.',
+    kontakteNichtGespeichert: 'Noch nicht gespeichert.',
     fachwoerterbuchTitel: 'Fach-Wörterbuch der aktiven Firma',
     fachwoerterbuchKeineFirma:
       'Noch keine Firma angelegt. Das Fach-Wörterbuch gehört zur Firma und liegt auditierbar in deren Ordner (.voicewall/vokabular.json).',
@@ -954,6 +969,27 @@ export const de = {
     },
 
     // storage/vokabular-store.ts + Handler
+    kontakte: {
+      nichtLesbar: 'Die Datei kontakte.json ist nicht lesbar. Bitte Dateirechte prüfen.',
+      keinJson:
+        'Die Datei kontakte.json ist kein gültiges JSON. Bitte die Datei korrigieren oder das Kontaktverzeichnis in VoiceWall neu speichern.',
+      schemaVerletzt: (detail: string): string =>
+        `Die Datei kontakte.json verletzt das Schema: ${detail}`,
+      speichernFehler: (detail: string): string =>
+        `Das Kontaktverzeichnis konnte nicht gespeichert werden: ${detail}`,
+      eingabe: 'Ungültige Eingabe für das Kontaktverzeichnis.',
+      unbekannterEmpfaenger: (name: string): string =>
+        `„${name}" steht nicht im Kontaktverzeichnis dieser Firma. Es wurde keine Mail vorbereitet, der Text liegt in der Zwischenablage. Legen Sie den Kontakt an, dann klappt es beim nächsten Mal.`,
+      mehrdeutigerEmpfaenger: (name: string): string =>
+        `„${name}" steht mehrfach im Kontaktverzeichnis. Es wurde keine Mail vorbereitet, damit sie nicht an die falsche Person geht. Bitte die Einträge eindeutig benennen.`,
+      keineFirma:
+        'Für den Mail-Befehl wird eine aktive Firma mit Kontaktverzeichnis benötigt. Der Text liegt in der Zwischenablage.',
+      mailFehler: (detail: string): string =>
+        `Das Mailprogramm konnte nicht geöffnet werden (${detail}). Der Text liegt in der Zwischenablage.`,
+      overlayVorbereitet: (name: string): string =>
+        `Mail an ${name} vorbereitet. Bitte prüfen und senden.`,
+    },
+
     woerterbuch: {
       nichtLesbar: 'Die Datei vokabular.json ist nicht lesbar. Bitte Dateirechte prüfen.',
       keinJson:

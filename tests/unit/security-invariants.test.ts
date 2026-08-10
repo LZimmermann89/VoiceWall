@@ -1,10 +1,11 @@
 /**
  * Grep-basierte Sicherheits-Invarianten ueber den Quellbaum:
- * 1. `shell.openExternal` existiert genau ZWEIMAL, ausschliesslich mit
- *    statischen Konstanten: Accessibility-Deep-Link in
- *    permission/accessibility.ts und Impressums-Quelle in
- *    ipc/handlers.ts. Jede weitere Stelle braucht eine dokumentierte
- *    Begruendung UND eine Erweiterung dieses Tests.
+ * 1. `shell.openExternal` existiert genau DREIMAL. Zwei Aufrufe verwenden
+ *    ausschliesslich statische Konstanten (Accessibility-Deep-Link in
+ *    permission/accessibility.ts, Impressums-Quelle in ipc/handlers.ts).
+ *    Der dritte ist die einzige Stelle mit dynamischem Anteil und unten
+ *    ausfuehrlich begruendet. Jede WEITERE Stelle braucht wiederum eine
+ *    dokumentierte Begruendung UND eine Erweiterung dieses Tests.
  * 2. Kein `innerHTML`/`dangerouslySetInnerHTML`/`document.write` fuer
  *    Nutzerinhalte im Renderer (Output-Encoding).
  * 3. Kein `exec(`/`execSync(` mit Shell-String; ausschliesslich `execFile`
@@ -42,9 +43,9 @@ function filesMatching(pattern: RegExp): string[] {
 }
 
 describe('Sicherheits-Invarianten im Quellbaum', () => {
-  it('shell.openExternal existiert genau zweimal (statische Ausnahmen)', () => {
+  it('shell.openExternal existiert genau dreimal (zwei statisch, eine begruendet)', () => {
     const hits = filesMatching(/openExternal\s*\(/).sort();
-    expect(hits.length).toBe(2);
+    expect(hits.length).toBe(3);
 
     const accessibilityPath = hits.find((hit) =>
       hit.includes(join('permission', 'accessibility.ts')),
@@ -66,6 +67,30 @@ describe('Sicherheits-Invarianten im Quellbaum', () => {
     expect(impressumConst?.content).toContain(
       "export const IMPRESSUM_QUELLE_URL = 'https://der-ki-auditor.de/impressum';",
     );
+
+    // Dritte Stelle: der Mail-Befehl im FlowController. Sie ist die einzige
+    // mit dynamischem Anteil und deshalb an vier Bedingungen gebunden:
+    //  1. Das Schema ist fest einkompiliert (mailto:), es kann nie ein
+    //     anderes werden.
+    //  2. Die Empfaengeradresse stammt aus dem zod-geprueften
+    //     Kontaktverzeichnis der Firma, NIE aus dem Diktat. Genau dafuer
+    //     gibt es das Verzeichnis.
+    //  3. Betreff und Text werden vollstaendig prozentkodiert; ein Diktat
+    //     kann damit weder einen weiteren Parameter noch ein anderes Ziel
+    //     einschleusen (tests/unit/mailbefehl.test.ts belegt das).
+    //  4. Die Gesamtlaenge ist begrenzt.
+    // Der Aufruf uebergibt ausschliesslich das Ergebnis von baueMailtoUrl,
+    // nie eine selbst zusammengesetzte Zeichenkette.
+    const mailPath = hits.find((hit) => hit.includes(join('dictation', 'flow-controller.ts')));
+    expect(mailPath).toBeDefined();
+    const mailFile = sources.find((source) => source.path === mailPath);
+    expect(mailFile?.content).toContain('shell.openExternal(baueMailtoUrl(');
+
+    // Und die Bau-Funktion selbst haelt das Schema als Literal.
+    const mailbefehl = sources.find((source) =>
+      source.path.endsWith(join('shared', 'mailbefehl.ts')),
+    );
+    expect(mailbefehl?.content).toContain("`mailto:${lokal}@${domain}?${parameter.join('&')}`");
   });
 
   it('kein innerHTML/dangerouslySetInnerHTML/document.write im Quellbaum', () => {

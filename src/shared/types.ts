@@ -47,6 +47,7 @@ import type {
   UiLanguage,
 } from './schema';
 import type { VokabularGetResult, VokabularSaveInput } from './vokabular';
+import type { KontakteGetResult, KontakteSaveInput } from './mailbefehl';
 
 /** Funktion zum Abmelden eines Event-Listeners. */
 export type Unsubscribe = () => void;
@@ -176,6 +177,10 @@ export interface VoiceWallBridge {
   readonly getVokabular: () => Promise<VokabularGetResult>;
   /** Vokabular der aktiven Firma speichern (zod-validiert, atomar). */
   readonly saveVokabular: (input: VokabularSaveInput) => Promise<ActionResult>;
+  /** Kontaktverzeichnis der aktiven Firma lesen (Mail-Befehl). */
+  readonly getKontakte: () => Promise<KontakteGetResult>;
+  /** Kontaktverzeichnis der aktiven Firma speichern (validiert, atomar). */
+  readonly saveKontakte: (input: KontakteSaveInput) => Promise<ActionResult>;
   /** Globale Aufbereitungs-Schalter setzen (Fuellwoerter, Sprachkommandos). */
   readonly setAufbereitung: (config: AufbereitungConfig) => Promise<ActionResult>;
 

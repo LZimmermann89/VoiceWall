@@ -113,6 +113,15 @@ import {
   type VokabularGetResult,
 } from '../../shared/vokabular';
 import { readVokabular, writeVokabular } from './vokabular-store';
+import { readKontakte, writeKontakte } from './kontakte-store';
+import {
+  defaultKontakte,
+  KONTAKTE_SCHEMA_VERSION,
+  type Kontakt,
+  type Kontakte,
+  type KontakteGetResult,
+  kontakteSaveInputSchema,
+} from '../../shared/mailbefehl';
 import {
   checkSyncExposure,
   createDesktopLink,
@@ -1116,6 +1125,68 @@ export class CompanyManager {
     return result.value;
   }
 
+  // ------------------------------------------------------------------
+  // Kontaktverzeichnis: kontakte.json der aktiven Firma. Eigene Datei,
+  // weil es personenbezogene Daten sind (siehe kontakte-store.ts).
+  // ------------------------------------------------------------------
+
+  /** Kontaktverzeichnis der aktiven Firma (fuer den Editor). */
+  async getKontakte(): Promise<KontakteGetResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const result = await readKontakte(active.dir);
+    if (!result.ok) {
+      return { ok: false, message: result.error };
+    }
+    return { ok: true, kontakte: result.value };
+  }
+
+  /** Speichert das Kontaktverzeichnis der aktiven Firma (validiert, atomar). */
+  async saveKontakte(input: { kontakte: readonly Kontakt[] }): Promise<ActionResult> {
+    const active = await this.requireActiveDir();
+    if (!active.ok) {
+      return active;
+    }
+    const kontakte: Kontakte = {
+      schemaVersion: KONTAKTE_SCHEMA_VERSION,
+      kontakte: input.kontakte.map((eintrag) => ({
+        name: eintrag.name,
+        adresse: eintrag.adresse,
+      })),
+    };
+    const written = await writeKontakte(active.dir, kontakte);
+    if (!written.ok) {
+      return { ok: false, message: written.error };
+    }
+    // Anzahl ja, Inhalte nie: Adressen sind personenbezogen und haben im
+    // Betriebslog nichts verloren.
+    this.deps.logger.info('Kontaktverzeichnis gespeichert.', {
+      kontakte: kontakte.kontakte.length,
+    });
+    return { ok: true };
+  }
+
+  /**
+   * Kontakte der aktiven Firma fuer den Diktatfluss: eine kaputte Datei wird
+   * geloggt und wie ein leeres Verzeichnis behandelt, damit ein Diktat nie
+   * daran scheitert. Ohne Kontakte findet der Mail-Befehl schlicht niemanden
+   * und meldet das.
+   */
+  async activeKontakteLenient(): Promise<readonly Kontakt[]> {
+    const companyDir = await this.activeCompanyDir();
+    if (companyDir === null) {
+      return defaultKontakte().kontakte;
+    }
+    const result = await readKontakte(companyDir);
+    if (!result.ok) {
+      this.deps.logger.warn(`Kontaktverzeichnis nicht nutzbar: ${result.error}`);
+      return defaultKontakte().kontakte;
+    }
+    return result.value.kontakte;
+  }
+
   /**
    * Initial-Prompt fuer Whisper aus den Begriffen der aktiven Firma
    * (Stufe 1, Teil A2). Eine Kappung wird geloggt (NUR Anzahlen, nie
@@ -1465,6 +1536,23 @@ export class CompanyManager {
       }
       return guard<ActionResult>({ ok: false, message: internalError() }, () =>
         this.saveVokabular(parsed.data),
+      );
+    });
+
+    ipcMain.handle(IpcChannel.KontakteGet, () =>
+      guard<KontakteGetResult>({ ok: false, message: internalError() }, () => this.getKontakte()),
+    );
+
+    ipcMain.handle(IpcChannel.KontakteSave, (_event, raw: unknown) => {
+      const parsed = kontakteSaveInputSchema.safeParse(raw);
+      if (!parsed.success) {
+        return Promise.resolve<ActionResult>({
+          ok: false,
+          message: texte().kontakte.eingabe,
+        });
+      }
+      return guard<ActionResult>({ ok: false, message: internalError() }, () =>
+        this.saveKontakte(parsed.data),
       );
     });
   }

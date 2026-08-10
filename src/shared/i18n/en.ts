@@ -404,6 +404,21 @@ export const en: Uebersetzung = {
     zielanwendungStartenLabel:
       'Start a closed target application instead of only reporting it. VoiceWall then waits until the program is ready and inserts afterwards. Bear in mind: a freshly started program often shows only its start screen and no input field yet, in which case the text finds no target. Off by default.',
     zielanwendungVerfuegbar: 'Available on this computer:',
+    mailbefehlLabel:
+      'Detect a mail command at the start of the dictation: if it begins with "Write a mail to <name> with the following text: …", the name is looked up in this company\'s contact directory and a ready-made compose window opens in your default mail program. VoiceWall never sends by itself, you review and send. The address comes solely from the directory, never from the spoken text: a misheard address would be a mail to a stranger. An unknown or ambiguous name means no mail, only a message. Off by default.',
+    kontakteTitel: 'Contact directory of the active company',
+    kontakteHinweis:
+      'The recipients for the mail command. Stored auditable in the company folder (.voicewall/kontakte.json), separate from the specialist dictionary because these are personal data. In the dictation you only say the name.',
+    kontakteKeineFirma:
+      'No company created yet. The contact directory belongs to the company and is stored in its folder.',
+    kontakteNameLabel: 'Name (as spoken):',
+    kontakteAdresseLabel: 'Email address:',
+    kontakteHinzufuegen: 'Add contact',
+    kontakteEntfernen: 'Remove',
+    kontakteSpeichern: 'Save contact directory',
+    kontakteGespeichert: 'Contact directory saved.',
+    kontakteLeer: 'No contacts yet.',
+    kontakteNichtGespeichert: 'Not saved yet.',
     fachwoerterbuchTitel: 'Specialist dictionary of the active company',
     fachwoerterbuchKeineFirma:
       'No company created yet. The specialist dictionary belongs to the company and is stored auditable in its folder (.voicewall/vokabular.json).',
@@ -948,6 +963,27 @@ export const en: Uebersetzung = {
         `The metadata would be invalid after the rename: ${detail}`,
       schreibFehler: (detail: string): string => `The file could not be written: ${detail}`,
       eingabe: 'Invalid input for the tag rename.',
+    },
+
+    kontakte: {
+      nichtLesbar: 'The file kontakte.json cannot be read. Please check the file permissions.',
+      keinJson:
+        'The file kontakte.json is not valid JSON. Please correct the file or save the contact directory again in VoiceWall.',
+      schemaVerletzt: (detail: string): string =>
+        `The file kontakte.json violates the schema: ${detail}`,
+      speichernFehler: (detail: string): string =>
+        `The contact directory could not be saved: ${detail}`,
+      eingabe: 'Invalid input for the contact directory.',
+      unbekannterEmpfaenger: (name: string): string =>
+        `"${name}" is not in this company's contact directory. No mail was prepared, the text is in the clipboard. Add the contact and it will work next time.`,
+      mehrdeutigerEmpfaenger: (name: string): string =>
+        `"${name}" appears more than once in the contact directory. No mail was prepared, so that it does not go to the wrong person. Please make the entries unambiguous.`,
+      keineFirma:
+        'The mail command needs an active company with a contact directory. The text is in the clipboard.',
+      mailFehler: (detail: string): string =>
+        `The mail program could not be opened (${detail}). The text is in the clipboard.`,
+      overlayVorbereitet: (name: string): string =>
+        `Mail to ${name} prepared. Please review and send.`,
     },
 
     woerterbuch: {

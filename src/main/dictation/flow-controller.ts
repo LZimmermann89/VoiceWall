@@ -17,7 +17,7 @@
  * - Die Zustandslogik selbst ist die reine Maschine in
  *   shared/dictation-flow.ts (unit-getestet); hier leben nur Seiteneffekte.
  */
-import { BrowserWindow, clipboard, globalShortcut, ipcMain, powerMonitor } from 'electron';
+import { BrowserWindow, clipboard, globalShortcut, ipcMain, powerMonitor, shell } from 'electron';
 import { z } from 'zod';
 import {
   defaultGlobalConfig,
@@ -44,6 +44,7 @@ import {
 import { aufbereitenText } from '../../shared/textaufbereitung';
 import { applyErsetzungenMitProtokoll, formatAngewandteErsetzung } from '../../shared/vokabular';
 import { erkenneZielbefehl, type Zielanwendung } from '../../shared/zielanwendung';
+import { baueMailtoUrl, erkenneMailbefehl, findeKontakt } from '../../shared/mailbefehl';
 import type { OverlayStatePayload } from '../../shared/types';
 import { err, type Result } from '../../shared/result';
 import type { SaveDictateResult } from '../../shared/company';
@@ -351,6 +352,21 @@ export class DictationFlowController {
     audioMs: number,
     ersetzungen: readonly string[],
   ): Promise<ZielZustellung> {
+    // Der Mail-Befehl geht vor: er beschreibt einen anderen Zweck als das
+    // Einfuegen und schliesst es aus.
+    if (this.config.aufbereitung.mailbefehl) {
+      const mail = erkenneMailbefehl(text, await this.activeLanguageLenient());
+      if (mail !== null) {
+        return this.zustellenAlsMail(
+          mail.empfaenger,
+          mail.betreff,
+          mail.text,
+          audioMs,
+          ersetzungen,
+        );
+      }
+    }
+
     const zielbefehl = this.config.aufbereitung.zielanwendung
       ? erkenneZielbefehl(text, await this.activeLanguageLenient())
       : null;
@@ -570,6 +586,73 @@ export class DictationFlowController {
       { kind: 'error', message: texte().flow.notizNichtGespeichert(gespeichert.message) },
       OVERLAY_ERROR_VISIBLE_MS,
     );
+  }
+
+  /**
+   * Bereitet eine Mail vor: Empfaenger im Kontaktverzeichnis der aktiven Firma
+   * nachschlagen, Text und Betreff in eine mailto-Adresse geben, das
+   * Standard-Mailprogramm oeffnen. VoiceWall verschickt NIE selbst; der
+   * Mensch liest gegen und drueckt Senden.
+   *
+   * Jeder Fehlerpfad endet gleich: Es wird nichts eingefuegt und nichts
+   * verschickt, der Text ist ueber Zwischenablage und Speicherung gesichert,
+   * und die Meldung sagt, woran es lag. Ein unbekannter oder mehrdeutiger
+   * Name fuehrt bewusst NICHT zu einem Versand an irgendwen.
+   */
+  private async zustellenAlsMail(
+    empfaengerName: string,
+    betreff: string | null,
+    nachricht: string,
+    audioMs: number,
+    ersetzungen: readonly string[],
+  ): Promise<ZielZustellung> {
+    const scheitern = async (meldung: string): Promise<ZielZustellung> => {
+      await this.bewahreOhneEinfuegen(nachricht, audioMs, ersetzungen);
+      this.showOverlay({ kind: 'error', message: meldung }, OVERLAY_ERROR_VISIBLE_MS);
+      return { zielId: 'mail', pasted: false, message: meldung };
+    };
+
+    const companies = this.deps.companies;
+    if (companies === null) {
+      return scheitern(texte().kontakte.keineFirma);
+    }
+    const kontakte = await companies.activeKontakteLenient();
+    const kontakt = findeKontakt(empfaengerName, kontakte);
+    if (kontakt === null) {
+      // Zwischen unbekannt und mehrdeutig unterscheiden, weil die naechste
+      // Handlung des Nutzers eine andere ist.
+      const gleichnamige = kontakte.filter(
+        (eintrag) =>
+          eintrag.name.toLowerCase().replace(/\s+/g, ' ').trim() ===
+          empfaengerName.toLowerCase().replace(/\s+/g, ' ').trim(),
+      ).length;
+      return scheitern(
+        gleichnamige > 1
+          ? texte().kontakte.mehrdeutigerEmpfaenger(empfaengerName)
+          : texte().kontakte.unbekannterEmpfaenger(empfaengerName),
+      );
+    }
+
+    try {
+      await shell.openExternal(baueMailtoUrl(kontakt.adresse, betreff, nachricht));
+    } catch (error) {
+      return scheitern(
+        texte().kontakte.mailFehler(error instanceof Error ? error.message : String(error)),
+      );
+    }
+
+    // Erfolgreich vorbereitet: der Text wird trotzdem gespeichert (er ist ein
+    // Diktat wie jedes andere), aber nicht eingefuegt.
+    this.lastTranscript = nachricht;
+    this.lastAudioMs = audioMs;
+    this.lastErsetzungen = ersetzungen;
+    await this.autoSaveDictate(nachricht, audioMs, ersetzungen);
+    this.deps.orchestrator.notifyStatusChanged();
+    this.showOverlay(
+      { kind: 'done', message: texte().kontakte.overlayVorbereitet(kontakt.name) },
+      OVERLAY_DONE_VISIBLE_MS,
+    );
+    return { zielId: 'mail', pasted: false, message: null };
   }
 
   /**
@@ -994,6 +1077,7 @@ export class DictationFlowController {
         sprachkommandos: this.config.aufbereitung.sprachkommandos,
         zielanwendung: this.config.aufbereitung.zielanwendung,
         zielanwendungStarten: this.config.aufbereitung.zielanwendungStarten,
+        mailbefehl: this.config.aufbereitung.mailbefehl,
       },
       uiLanguage: this.config.uiSprache,
     };
