@@ -186,3 +186,42 @@ describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
     }
   });
 });
+
+describe('globalConfigSchema: Schnellnotiz-Hotkey', () => {
+  it('ist standardmaessig nicht vergeben', () => {
+    // Bewusst Opt-in: ein vorbelegter zweiter globaler Hotkey wuerde dem
+    // Nutzer ungefragt eine Tastenkombination wegnehmen.
+    expect(defaultGlobalConfig().hotkey.notizAccelerator).toBeNull();
+  });
+
+  it('ergaenzt in einer Alt-Konfig ohne das Feld den Wert null', () => {
+    const alt = { ...defaultGlobalConfig(), hotkey: { accelerator: 'CommandOrControl+Shift+D' } };
+    const parsed = globalConfigSchema.safeParse(alt);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.hotkey.notizAccelerator).toBeNull();
+    }
+  });
+
+  it('uebernimmt eine gueltige Kombination', () => {
+    const parsed = globalConfigSchema.safeParse({
+      ...defaultGlobalConfig(),
+      hotkey: {
+        accelerator: 'CommandOrControl+Shift+D',
+        notizAccelerator: 'CommandOrControl+Shift+N',
+      },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.hotkey.notizAccelerator).toBe('CommandOrControl+Shift+N');
+    }
+  });
+
+  it('lehnt eine ungueltige Kombination ab (dieselbe Pruefung wie beim Diktat-Hotkey)', () => {
+    const parsed = globalConfigSchema.safeParse({
+      ...defaultGlobalConfig(),
+      hotkey: { accelerator: 'CommandOrControl+Shift+D', notizAccelerator: 'N' },
+    });
+    expect(parsed.success).toBe(false);
+  });
+});

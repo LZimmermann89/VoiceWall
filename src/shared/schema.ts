@@ -100,6 +100,17 @@ export const hotkeyStatusSchema = z.object({
 export type HotkeyStatus = z.infer<typeof hotkeyStatusSchema>;
 
 /**
+ * Zustand des optionalen Schnellnotiz-Hotkeys. `accelerator` ist null, solange
+ * der Nutzer keinen vergeben hat (Default): die Schnellnotiz ist dann nur ueber
+ * das Tray-Menue erreichbar, nicht ueber die Tastatur.
+ */
+export const notizHotkeyStatusSchema = z.object({
+  accelerator: z.string().nullable(),
+  registered: z.boolean(),
+});
+export type NotizHotkeyStatus = z.infer<typeof notizHotkeyStatusSchema>;
+
+/**
  * Globale Schalter der regelbasierten Textaufbereitung (Stufe 1).
  */
 export const aufbereitungConfigSchema = z.object({
@@ -133,6 +144,8 @@ export const appStatusSchema = z.object({
   /** Systemweites Diktat. */
   flowState: dictationFlowStateSchema,
   hotkey: hotkeyStatusSchema,
+  /** Optionaler Schnellnotiz-Hotkey (Diktat nur speichern, nicht einfuegen). */
+  notizHotkey: notizHotkeyStatusSchema,
   accessibility: accessibilityStateSchema,
   /** Letztes Transkript (RAM-only, fuer den Kopieren-Knopf). */
   lastTranscript: z.string().nullable(),

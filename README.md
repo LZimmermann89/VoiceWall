@@ -33,6 +33,17 @@ echter Windows-Hardware aus, Testberichte sind willkommen (siehe
   bleibt sein Inhalt unangetastet. Sperrt sich der Rechner oder geht er
   in den Ruhezustand, bricht ein laufendes Diktat ab und das Audio wird
   verworfen, statt noch verschriftet zu werden.
+- **Schnellnotiz (nur speichern):** ein zweiter, optionaler Hotkey nimmt
+  genauso auf wie das Diktat, fügt den Text aber nirgends ein: er wird
+  ausschließlich als Notiz in der aktiven Firma gespeichert, und die
+  Zwischenablage bleibt unangetastet. Gedacht für den Gedanken zwischendurch,
+  wenn gerade kein Textfeld offen ist. Das Tastenkürzel ist im
+  Auslieferungszustand bewusst **nicht** vergeben, damit VoiceWall keine
+  Kombination belegt, die in Ihren Programmen schon etwas bedeutet; ohne
+  Kürzel ist die Schnellnotiz über das Menüleisten-Symbol erreichbar. Lässt
+  sich die Notiz nicht speichern (noch keine Firma eingerichtet), landet der
+  Text in der Zwischenablage und die Meldung sagt es: auch hier geht kein
+  diktierter Text verloren.
 - **Deutsche Spracherkennung lokal:** whisper.cpp mit dem deutschen
   Modell whisper-large-v3-turbo-german (Q5_0 als Standard, fp16 als
   Option für starke Hardware) plus Silero-VAD-Segmentierung. Die

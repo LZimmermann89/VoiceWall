@@ -90,6 +90,8 @@ const bridge: VoiceWallBridge = {
     ),
   setHotkey: async (accelerator) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetHotkey, accelerator)),
+  setNotizHotkey: async (accelerator) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetNotizHotkey, accelerator)),
   setClipboardRestore: async (enabled) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.SetClipboardRestore, enabled)),
   copyLastTranscript: async () =>
@@ -214,6 +216,8 @@ const bridge: VoiceWallBridge = {
   },
   devRunDictationResult: async (text) =>
     deliveryResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevRunDictationResult, text)),
+  devRunNoteResult: async (text) =>
+    actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevRunNoteResult, text)),
   devDictatePcm: async (pcm) => {
     try {
       return devDictateResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevDictatePcm, pcm));

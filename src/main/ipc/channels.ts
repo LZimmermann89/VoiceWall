@@ -21,6 +21,8 @@ export const IpcChannel = {
 
   // Systemweites Diktat: Konfiguration und Resilienz.
   SetHotkey: 'config:set-hotkey',
+  /** Optionaler Schnellnotiz-Hotkey; null loescht ihn wieder. */
+  SetNotizHotkey: 'config:set-notiz-hotkey',
   SetClipboardRestore: 'config:set-clipboard-restore',
   CopyLastTranscript: 'dictation:copy-last',
   OpenAccessibilitySettings: 'system:open-accessibility',
@@ -116,6 +118,12 @@ export const IpcChannel = {
   DevGetPasteCalls: 'dev:get-paste-calls',
   DevSetAccessibility: 'dev:set-accessibility',
   DevRunDictationResult: 'dev:run-dictation-result',
+  /**
+   * Nur Dev/Test: dieselbe Zustellung wie eine Schnellnotiz (speichern statt
+   * einfuegen). Belegt zusammen mit DevGetPasteCalls, dass dieser Weg NICHT
+   * in die Zielanwendung schreibt.
+   */
+  DevRunNoteResult: 'dev:run-note-result',
   /**
    * Nur Dev/Test: kompletter Diktat-Beweis aus PCM: Injektion durch die
    * VAD-/Whisper-Engine (mit aktivem Woerterbuch-Prompt), dann Ersetzungen,

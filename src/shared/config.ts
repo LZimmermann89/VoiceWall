@@ -117,6 +117,14 @@ export const globalConfigSchema = z
       .object({
         /** Electron-Accelerator des Diktat-Toggles. */
         accelerator: hotkeyAcceleratorSchema,
+        /**
+         * Zweiter, optionaler Accelerator fuer die Schnellnotiz: das Diktat
+         * wird dann NUR im Firmenordner gespeichert und nirgends eingefuegt.
+         * Default null, also bewusst Opt-in. Ein vorbelegter zweiter globaler
+         * Hotkey wuerde dem Nutzer ungefragt eine Tastenkombination wegnehmen,
+         * die in seinen Programmen schon etwas bedeutet.
+         */
+        notizAccelerator: hotkeyAcceleratorSchema.nullable().default(null),
       })
       .passthrough(),
     clipboard: z
@@ -187,7 +195,7 @@ export type GlobalConfig = z.infer<typeof globalConfigSchema>;
 export function defaultGlobalConfig(): GlobalConfig {
   return {
     schemaVersion: CONFIG_SCHEMA_VERSION,
-    hotkey: { accelerator: DEFAULT_HOTKEY_ACCELERATOR },
+    hotkey: { accelerator: DEFAULT_HOTKEY_ACCELERATOR, notizAccelerator: null },
     clipboard: {
       restorePrevious: true,
       restoreDelayMs: DEFAULT_CLIPBOARD_RESTORE_DELAY_MS,

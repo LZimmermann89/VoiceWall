@@ -52,7 +52,11 @@ describe('config-store', () => {
   it('Roundtrip erhaelt Werte und unbekannte Felder (0600-Rechte)', async () => {
     const config = {
       ...defaultGlobalConfig(),
-      hotkey: { accelerator: 'CommandOrControl+Alt+D', zukunft: 'bleibt' },
+      hotkey: {
+        accelerator: 'CommandOrControl+Alt+D',
+        notizAccelerator: null,
+        zukunft: 'bleibt',
+      },
       erweiterung: { later: true },
     };
     await writeGlobalConfig(dir, config);

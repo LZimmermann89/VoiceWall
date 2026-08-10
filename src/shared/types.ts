@@ -88,6 +88,11 @@ export interface VoiceWallBridge {
   readonly onError: (listener: (message: string) => void) => Unsubscribe;
   /** Hotkey des systemweiten Diktats aendern (validiert, persistiert). */
   readonly setHotkey: (accelerator: string) => Promise<ActionResult>;
+  /**
+   * Schnellnotiz-Hotkey setzen oder mit null wieder loeschen (persistiert).
+   * Die Schnellnotiz speichert das Diktat nur, sie fuegt es nirgends ein.
+   */
+  readonly setNotizHotkey: (accelerator: string | null) => Promise<ActionResult>;
   /** Zwischenablage-Wiederherstellung an-/abschalten (persistiert). */
   readonly setClipboardRestore: (enabled: boolean) => Promise<ActionResult>;
   /** Letztes Transkript (erneut) in die Zwischenablage kopieren. */
@@ -213,6 +218,11 @@ export interface VoiceWallBridge {
    * einen gegebenen Text aus.
    */
   readonly devRunDictationResult: (text: string) => Promise<DeliveryResult>;
+  /**
+   * Nur Dev/Test: Zustellung als Schnellnotiz (nur speichern). Zusammen mit
+   * devGetPasteCalls der Beleg, dass dieser Weg nichts einfuegt.
+   */
+  readonly devRunNoteResult: (text: string) => Promise<ActionResult>;
   /**
    * Nur Dev/Test: kompletter Diktat-Beweis aus PCM (Engine-Injektion mit
    * Woerterbuch-Prompt, VAD-Schleuse, Ersetzungen, Aufbereitung, Zustellung).

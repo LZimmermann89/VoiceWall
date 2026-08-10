@@ -33,6 +33,15 @@ welcome (see the test guide `docs/TESTLEITFADEN.md`, English version:
   themselves in the meantime, their content is left untouched. If the
   machine locks or suspends, a running dictation is aborted and the
   audio is discarded rather than transcribed.
+- **Quick note (save only):** a second, optional hotkey records exactly like
+  a dictation but never inserts the text anywhere: it is saved solely as a
+  note in the active company, and the clipboard stays untouched. Made for the
+  thought in between, when no text field is open. The shortcut is
+  deliberately **not** assigned out of the box, so VoiceWall never claims a
+  combination that already means something in your programs; without a
+  shortcut the quick note is available from the menu bar icon. If the note
+  cannot be saved (no company set up yet), the text goes to the clipboard and
+  the message says so: no dictated text is lost here either.
 - **Local German speech recognition:** whisper.cpp with the German
   model whisper-large-v3-turbo-german (Q5_0 as the default, fp16 as
   an option for powerful hardware) plus Silero VAD segmentation.

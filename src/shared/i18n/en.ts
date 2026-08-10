@@ -328,6 +328,13 @@ export const en: Uebersetzung = {
     neueKombination: 'New key combination:',
     hotkeyPlatzhalter: 'e.g. CommandOrControl+Shift+D',
     hotkeyUebernehmen: 'Apply hotkey',
+    notizZeile: 'Quick note (save only):',
+    notizNichtVergeben: 'no shortcut assigned',
+    notizErklaerung:
+      'The quick note records exactly like a dictation, but it never inserts the text anywhere: it is only saved as a note in the active company, and the clipboard stays untouched. Without a shortcut it is available from the menu bar icon.',
+    notizPlatzhalter: 'e.g. CommandOrControl+Shift+N',
+    notizUebernehmen: 'Apply quick note hotkey',
+    notizEntfernen: 'Remove shortcut',
     clipboardWiederherstellen:
       'Restore the clipboard after inserting (data protection, recommended)',
     accessibilityHinweis:
@@ -722,6 +729,11 @@ export const en: Uebersetzung = {
     flow: {
       overlayTextEingefuegt: 'Text inserted (and in the clipboard).',
       overlayTextInZwischenablage: 'The text is in the clipboard.',
+      overlayNotizGespeichert: 'Saved as a note.',
+      notizNichtGespeichert: (grund: string): string =>
+        `The note could not be saved (${grund}). The text is in the clipboard and is not lost.`,
+      notizHotkeyWieDiktat:
+        'This shortcut is already the dictation hotkey. Please choose a different one for the quick note.',
       hotkeyBelegt: (accelerator: string): string =>
         `The key combination ${accelerator} is already taken by another app or by the system. Please choose a different combination in the VoiceWall window under "System-wide dictation", e.g. CommandOrControl+Alt+D.`,
       hotkeyWechselBelegt: (neu: string, bisher: string): string =>
@@ -992,6 +1004,7 @@ export const en: Uebersetzung = {
     tray: {
       diktatStarten: 'Start dictation',
       diktatStoppen: 'Stop dictation',
+      notizStarten: 'Record quick note',
       fensterOeffnen: 'Open VoiceWall',
       beenden: 'Quit VoiceWall',
       tooltipAufnahme: 'VoiceWall: recording',

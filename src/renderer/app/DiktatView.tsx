@@ -51,6 +51,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [hotkeyInput, setHotkeyInput] = useState('');
+  const [notizHotkeyInput, setNotizHotkeyInput] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const levelDecay = useRef<number | null>(null);
 
@@ -152,6 +153,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
   const engineReady = status?.engineReady ?? false;
   const dictationActive = status?.dictationActive ?? false;
   const hotkey = status?.hotkey ?? null;
+  const notizHotkey = status?.notizHotkey ?? null;
   const accessibility = status?.accessibility ?? 'not-applicable';
   const lastTranscript = status?.lastTranscript ?? null;
   const clipboardRestoreEnabled = status?.clipboardRestoreEnabled ?? true;
@@ -199,6 +201,23 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             )}
           </li>
           <li>
+            {t.notizZeile}{' '}
+            <strong className="mono" data-testid="notiz-hotkey-current">
+              {notizHotkey?.accelerator ?? t.notizNichtVergeben}
+            </strong>{' '}
+            {notizHotkey?.accelerator != null && (
+              <span className="notice">
+                ({formatAccelerator(notizHotkey.accelerator, platform, uiSprache)}
+                {') '}
+              </span>
+            )}
+            {notizHotkey?.accelerator != null && !notizHotkey.registered && (
+              <span className="warn-text" data-testid="notiz-hotkey-conflict">
+                {t.hotkeyKonflikt}
+              </span>
+            )}
+          </li>
+          <li>
             {t.zustandZeile}{' '}
             <strong data-testid="flow-state">{texte.format.flowState[flowState]}</strong>
           </li>
@@ -220,6 +239,40 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             onClick={() => void runAction(() => window.voicewall.setHotkey(hotkeyInput.trim()))}
           >
             {t.hotkeyUebernehmen}
+          </button>
+        </div>
+        <p className="notice">{t.notizErklaerung}</p>
+        <div className="actions">
+          <label htmlFor="notiz-hotkey-input">{t.neueKombination}</label>
+          <input
+            id="notiz-hotkey-input"
+            type="text"
+            value={notizHotkeyInput}
+            placeholder={t.notizPlatzhalter}
+            onChange={(event) => {
+              setNotizHotkeyInput(event.target.value);
+            }}
+          />
+          <button
+            type="button"
+            data-testid="notiz-hotkey-apply"
+            disabled={busy || notizHotkeyInput.trim().length === 0}
+            onClick={() =>
+              void runAction(() => window.voicewall.setNotizHotkey(notizHotkeyInput.trim()))
+            }
+          >
+            {t.notizUebernehmen}
+          </button>{' '}
+          <button
+            type="button"
+            data-testid="notiz-hotkey-clear"
+            disabled={busy || notizHotkey?.accelerator == null}
+            onClick={() => {
+              setNotizHotkeyInput('');
+              void runAction(() => window.voicewall.setNotizHotkey(null));
+            }}
+          >
+            {t.notizEntfernen}
           </button>
         </div>
         <div className="actions">

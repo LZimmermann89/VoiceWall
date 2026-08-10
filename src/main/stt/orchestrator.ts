@@ -25,6 +25,7 @@ import {
   type DictationFlowStateView,
   type DictationLanguage,
   type HotkeyStatus,
+  type NotizHotkeyStatus,
   type MicrophoneState,
   type ModelDetailsResult,
   type UiLanguage,
@@ -81,6 +82,8 @@ export interface OrchestratorDeps {
 export interface FlowStatus {
   readonly flowState: DictationFlowStateView;
   readonly hotkey: HotkeyStatus;
+  /** Optionaler Schnellnotiz-Hotkey (Diktat nur speichern). */
+  readonly notizHotkey: NotizHotkeyStatus;
   readonly accessibility: AccessibilityState;
   readonly lastTranscript: string | null;
   readonly clipboardRestoreEnabled: boolean;
@@ -93,6 +96,7 @@ export interface FlowStatus {
 const DEFAULT_FLOW_STATUS: FlowStatus = {
   flowState: 'idle',
   hotkey: { accelerator: '', registered: false },
+  notizHotkey: { accelerator: null, registered: false },
   accessibility: 'not-applicable',
   lastTranscript: null,
   clipboardRestoreEnabled: true,
@@ -405,6 +409,7 @@ export class DictationOrchestrator {
       lastError: this.lastError,
       flowState: flow.flowState,
       hotkey: flow.hotkey,
+      notizHotkey: flow.notizHotkey,
       accessibility: flow.accessibility,
       lastTranscript: flow.lastTranscript,
       clipboardRestoreEnabled: flow.clipboardRestoreEnabled,

@@ -90,6 +90,13 @@ export class DictationFlowController {
   private state: DictationFlowState = 'idle';
   private config: GlobalConfig = defaultGlobalConfig();
   private hotkeyRegistered = false;
+  private notizHotkeyRegistered = false;
+  /**
+   * True, wenn die laufende Sitzung als Schnellnotiz gestartet wurde. Wird beim
+   * Start gesetzt und beim Abschluss oder Abbruch zurueckgesetzt, damit ein
+   * spaeteres normales Diktat nicht versehentlich als Notiz endet.
+   */
+  private notizSession = false;
   private lastTranscript: string | null = null;
   private sessionSegments: string[] = [];
   /** Summierte Audiolaenge der Sitzung (fuer `dauer_sekunden`). */
@@ -139,10 +146,14 @@ export class DictationFlowController {
 
     this.registerIpcHandlers();
     this.registerHotkey(this.config.hotkey.accelerator);
+    this.registerNotizHotkey(this.config.hotkey.notizAccelerator);
 
     this.tray = createTrayController({
       onToggleDictation: () => {
         this.toggle();
+      },
+      onToggleNotiz: () => {
+        this.toggleNotiz();
       },
       onOpenWindow: this.deps.openMainWindow,
       onQuit: this.deps.quitApp,
@@ -171,6 +182,21 @@ export class DictationFlowController {
     this.dispatch('toggle');
   }
 
+  /**
+   * Schnellnotiz umschalten: dieselbe Aufnahme wie beim normalen Diktat, nur
+   * endet sie NICHT in der Zielanwendung, sondern ausschliesslich als Notiz im
+   * Firmenordner. Der Modus wird beim Start der Aufnahme gesetzt; ein zweiter
+   * Druck (egal auf welchen der beiden Hotkeys) beendet sie und behaelt den
+   * beim Start gewaehlten Modus bei. Das ist die intuitive Variante: was man
+   * startet, bestimmt, wo der Text landet.
+   */
+  toggleNotiz(): void {
+    if (this.state === 'idle') {
+      this.notizSession = true;
+    }
+    this.dispatch('toggle');
+  }
+
   /** Aufnahme von aussen abbrechen (Sperrbildschirm, Suspend). */
   cancel(reason: string): void {
     if (this.state === 'recording' || this.state === 'transcribing') {
@@ -183,6 +209,7 @@ export class DictationFlowController {
   shutdown(): void {
     globalShortcut.unregisterAll();
     this.hotkeyRegistered = false;
+    this.notizHotkeyRegistered = false;
     this.clearOverlayHideTimer();
     if (this.overlay !== null && !this.overlay.isDestroyed()) {
       this.overlay.destroy();
@@ -251,6 +278,8 @@ export class DictationFlowController {
     this.tray?.setRecording(false);
     this.sessionSegments = [];
     this.sessionAudioMs = 0;
+    // Der Notizmodus gilt nur fuer die abgebrochene Sitzung.
+    this.notizSession = false;
     this.hideOverlay();
     await this.deps.orchestrator.abortDictation();
   }
@@ -264,8 +293,15 @@ export class DictationFlowController {
     // auf dem finalen Text, VOR Clipboard/Paste und VOR Speicherung.
     const processed =
       roh.length === 0 ? { text: '', ersetzungen: [] } : await this.processTranscriptText(roh);
+    const alsNotiz = this.notizSession;
+    this.notizSession = false;
     if (processed.text.length === 0) {
       this.showOverlay({ kind: 'no-speech', message: null }, OVERLAY_DONE_VISIBLE_MS);
+      this.dispatch('delivery-complete');
+      return;
+    }
+    if (alsNotiz) {
+      await this.deliverAsNote(processed.text, audioMs, processed.ersetzungen);
       this.dispatch('delivery-complete');
       return;
     }
@@ -428,6 +464,75 @@ export class DictationFlowController {
     }
   }
 
+  /**
+   * Zustellung der Schnellnotiz: Der Text wird ausschliesslich als Diktat in
+   * der aktiven Firma abgelegt. Er wird NICHT eingefuegt, und die
+   * Zwischenablage bleibt im Erfolgsfall unberuehrt (der Nutzer hat dort
+   * moeglicherweise etwas, das er noch braucht).
+   *
+   * Anders als beim normalen Diktat haengt das Speichern hier NICHT am
+   * Auto-Speichern-Schalter: Speichern ist der einzige Zweck dieses Weges.
+   *
+   * Resilienz wie ueberall sonst: Geht das Speichern schief (keine Firma
+   * eingerichtet, Schreibfehler), landet der Text in der Zwischenablage und die
+   * Meldung sagt das. Kein diktierter Text verschwindet stillschweigend.
+   */
+  private async deliverAsNote(
+    text: string,
+    audioMs: number,
+    ersetzungen: readonly string[],
+  ): Promise<void> {
+    this.lastTranscript = text;
+    this.lastAudioMs = audioMs;
+    this.lastErsetzungen = ersetzungen;
+
+    const gespeichert = await this.saveNote(text, audioMs, ersetzungen);
+    if (gespeichert.ok) {
+      this.showOverlay(
+        { kind: 'done', message: texte().flow.overlayNotizGespeichert },
+        OVERLAY_DONE_VISIBLE_MS,
+      );
+      return;
+    }
+    clipboard.writeText(text);
+    this.showOverlay(
+      { kind: 'error', message: texte().flow.notizNichtGespeichert(gespeichert.message) },
+      OVERLAY_ERROR_VISIBLE_MS,
+    );
+  }
+
+  /** Speichert eine Schnellnotiz und meldet den Grund, wenn es nicht geht. */
+  private async saveNote(
+    text: string,
+    audioMs: number,
+    ersetzungen: readonly string[],
+  ): Promise<ActionResult> {
+    const companies = this.deps.companies;
+    if (companies === null) {
+      return { ok: false, message: texte().flow.firmenverwaltungFehlt };
+    }
+    try {
+      const sprache = await this.activeLanguageLenient();
+      const saved = await companies.saveDictate({
+        text,
+        dauerSekunden: Math.round(audioMs / 1000),
+        quelle: 'diktat',
+        sprache,
+        modell: transcriptModelNameFor(sprache, this.config.modell),
+        ...(ersetzungen.length === 0 ? {} : { ersetzungen }),
+      });
+      if (!saved.ok) {
+        this.deps.logger.warn(`Notiz konnte nicht gespeichert werden: ${saved.message}`);
+        return { ok: false, message: saved.message };
+      }
+      return { ok: true };
+    } catch (error) {
+      const grund = error instanceof Error ? error.message : String(error);
+      this.deps.logger.error(`Unerwarteter Fehler beim Notiz-Speichern: ${grund}`);
+      return { ok: false, message: grund };
+    }
+  }
+
   /** Letztes Transkript manuell als Diktat speichern (IPC/Test-UI). */
   private async saveLastDictate(): Promise<SaveDictateResult> {
     if (this.deps.companies === null) {
@@ -504,6 +609,76 @@ export class DictationFlowController {
       this.deps.orchestrator.reportFlowError(texte().flow.hotkeyBelegt(accelerator));
     }
     return registered;
+  }
+
+  /**
+   * Registriert den optionalen Schnellnotiz-Hotkey. Ein leerer Wert (null)
+   * bedeutet: kein zweiter Hotkey, die Schnellnotiz laeuft dann nur ueber das
+   * Tray-Menue. Das ist der Auslieferungszustand.
+   */
+  private registerNotizHotkey(accelerator: string | null): boolean {
+    if (accelerator === null) {
+      this.notizHotkeyRegistered = false;
+      return true;
+    }
+    let registered = false;
+    try {
+      registered = globalShortcut.register(accelerator, () => {
+        this.toggleNotiz();
+      });
+    } catch (error) {
+      this.deps.logger.error(
+        `Schnellnotiz-Hotkey konnte nicht registriert werden: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    this.notizHotkeyRegistered = registered;
+    if (registered) {
+      this.deps.logger.info(`Globaler Schnellnotiz-Hotkey registriert: ${accelerator}`);
+    } else {
+      this.deps.orchestrator.reportFlowError(texte().flow.hotkeyBelegt(accelerator));
+    }
+    return registered;
+  }
+
+  /**
+   * Setzt den Schnellnotiz-Hotkey (null loescht ihn). Er darf nicht mit dem
+   * Diktat-Hotkey identisch sein: derselbe Griff duerfte nicht zwei
+   * verschiedene Dinge tun, und Electron wuerde die zweite Registrierung
+   * ohnehin abweisen.
+   */
+  private async setNotizHotkey(accelerator: string | null): Promise<ActionResult> {
+    let ziel: string | null = null;
+    if (accelerator !== null) {
+      const parsed = hotkeyAcceleratorSchema.safeParse(accelerator);
+      if (!parsed.success) {
+        return { ok: false, message: texte().flow.ungueltigeTastenkombination };
+      }
+      if (parsed.data === this.config.hotkey.accelerator) {
+        return { ok: false, message: texte().flow.notizHotkeyWieDiktat };
+      }
+      ziel = parsed.data;
+    }
+    const previous = this.config.hotkey.notizAccelerator;
+    if (this.notizHotkeyRegistered && previous !== null) {
+      globalShortcut.unregister(previous);
+      this.notizHotkeyRegistered = false;
+    }
+    if (!this.registerNotizHotkey(ziel)) {
+      // Alte Kombination reaktivieren, damit die Schnellnotiz nicht still
+      // verschwindet, nur weil die neue Kombination belegt ist.
+      this.registerNotizHotkey(previous);
+      this.deps.orchestrator.notifyStatusChanged();
+      return {
+        ok: false,
+        message: texte().flow.hotkeyBelegt(ziel ?? ''),
+      };
+    }
+    this.config = await this.deps.configWriter.update((current) => ({
+      ...current,
+      hotkey: { ...current.hotkey, notizAccelerator: ziel },
+    }));
+    this.deps.orchestrator.notifyStatusChanged();
+    return { ok: true };
   }
 
   private async setHotkey(accelerator: string): Promise<ActionResult> {
@@ -702,6 +877,10 @@ export class DictationFlowController {
         accelerator: this.config.hotkey.accelerator,
         registered: this.hotkeyRegistered,
       },
+      notizHotkey: {
+        accelerator: this.config.hotkey.notizAccelerator,
+        registered: this.notizHotkeyRegistered,
+      },
       accessibility: this.effectiveAccessibility(),
       lastTranscript: this.lastTranscript,
       clipboardRestoreEnabled: this.config.clipboard.restorePrevious,
@@ -722,6 +901,18 @@ export class DictationFlowController {
       }
       return this.setHotkey(parsed.data);
     });
+
+    ipcMain.handle(
+      IpcChannel.SetNotizHotkey,
+      async (_event, raw: unknown): Promise<ActionResult> => {
+        // null ist ein gueltiger Wert: er loescht den Schnellnotiz-Hotkey.
+        const parsed = z.string().min(1).nullable().safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, message: texte().flow.eingabeTastenkombination };
+        }
+        return this.setNotizHotkey(parsed.data);
+      },
+    );
 
     ipcMain.handle(
       IpcChannel.SetClipboardRestore,
@@ -857,6 +1048,23 @@ export class DictationFlowController {
           };
         }
         return this.deliverText(processed.text, 0, processed.ersetzungen);
+      },
+    );
+
+    ipcMain.handle(
+      IpcChannel.DevRunNoteResult,
+      async (_event, raw: unknown): Promise<ActionResult> => {
+        const parsed = z.string().min(1).safeParse(raw);
+        if (!parsed.success) {
+          return { ok: false, message: texte().flow.ungueltigerText };
+        }
+        // Wie eine echte Schnellnotiz: Ersetzungen + Aufbereitung, dann
+        // ausschliesslich speichern (kein Clipboard, kein Paste).
+        const processed = await this.processTranscriptText(parsed.data);
+        if (processed.text.length === 0) {
+          return { ok: false, message: texte().flow.aufbereiteterTextLeer };
+        }
+        return this.saveNote(processed.text, 0, processed.ersetzungen);
       },
     );
 

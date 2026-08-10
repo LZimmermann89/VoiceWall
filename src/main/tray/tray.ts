@@ -15,6 +15,11 @@ import { createTrayIconPng, type TrayIconVariant } from './tray-icon';
 export interface TrayHandlers {
   /** Diktat-Toggle (identisch zum Hotkey). */
   readonly onToggleDictation: () => void;
+  /**
+   * Schnellnotiz-Toggle: nimmt auf und speichert das Ergebnis nur als Notiz.
+   * Ueber das Tray immer erreichbar, auch ohne vergebenen zweiten Hotkey.
+   */
+  readonly onToggleNotiz: () => void;
   /** Hauptfenster oeffnen/in den Vordergrund holen. */
   readonly onOpenWindow: () => void;
   /** App beenden. */
@@ -55,6 +60,9 @@ export function createTrayController(handlers: TrayHandlers): TrayController {
           label: isRecording ? t.diktatStoppen : t.diktatStarten,
           click: handlers.onToggleDictation,
         },
+        // Waehrend einer laufenden Aufnahme waere ein zweiter Startpunkt
+        // irrefuehrend: der Modus steht bereits fest, gestoppt wird oben.
+        ...(isRecording ? [] : [{ label: t.notizStarten, click: handlers.onToggleNotiz }]),
         { label: t.fensterOeffnen, click: handlers.onOpenWindow },
         { type: 'separator' },
         { label: t.beenden, click: handlers.onQuit },

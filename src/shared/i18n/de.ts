@@ -358,6 +358,13 @@ export const de = {
     neueKombination: 'Neue Tastenkombination:',
     hotkeyPlatzhalter: 'z. B. CommandOrControl+Shift+D',
     hotkeyUebernehmen: 'Hotkey übernehmen',
+    notizZeile: 'Schnellnotiz (nur speichern):',
+    notizNichtVergeben: 'kein Tastenkürzel vergeben',
+    notizErklaerung:
+      'Die Schnellnotiz nimmt genauso auf wie das Diktat, fügt den Text aber nirgends ein: er wird nur als Notiz in der aktiven Firma gespeichert, und die Zwischenablage bleibt unangetastet. Ohne Tastenkürzel ist sie über das Menüleisten-Symbol erreichbar.',
+    notizPlatzhalter: 'z. B. CommandOrControl+Shift+N',
+    notizUebernehmen: 'Schnellnotiz-Hotkey übernehmen',
+    notizEntfernen: 'Tastenkürzel entfernen',
     clipboardWiederherstellen:
       'Zwischenablage nach dem Einfügen wiederherstellen (Datenschutz, empfohlen)',
     accessibilityHinweis:
@@ -706,6 +713,11 @@ export const de = {
     flow: {
       overlayTextEingefuegt: 'Text eingefügt (und in der Zwischenablage).',
       overlayTextInZwischenablage: 'Text liegt in der Zwischenablage.',
+      overlayNotizGespeichert: 'Als Notiz gespeichert.',
+      notizNichtGespeichert: (grund: string): string =>
+        `Die Notiz konnte nicht gespeichert werden (${grund}). Der Text liegt in der Zwischenablage und geht nicht verloren.`,
+      notizHotkeyWieDiktat:
+        'Diese Tastenkombination ist bereits der Diktat-Hotkey. Bitte für die Schnellnotiz eine andere wählen.',
       hotkeyBelegt: (accelerator: string): string =>
         `Die Tastenkombination ${accelerator} ist bereits von einer anderen App oder vom System belegt. Bitte im VoiceWall-Fenster unter "Systemweites Diktat" eine andere Kombination wählen, z. B. CommandOrControl+Alt+D.`,
       hotkeyWechselBelegt: (neu: string, bisher: string): string =>
@@ -1002,6 +1014,7 @@ export const de = {
     tray: {
       diktatStarten: 'Diktat starten',
       diktatStoppen: 'Diktat stoppen',
+      notizStarten: 'Schnellnotiz aufnehmen',
       fensterOeffnen: 'VoiceWall öffnen',
       beenden: 'VoiceWall beenden',
       tooltipAufnahme: 'VoiceWall: Aufnahme läuft',
