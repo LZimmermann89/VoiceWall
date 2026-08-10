@@ -123,8 +123,21 @@ export const aufbereitungConfigSchema = z.object({
   wortdopplungenEntfernen: z.boolean(),
   /** Gesprochene Kommandos ("Punkt", "neue Zeile", ...) umsetzen (Opt-in). */
   sprachkommandos: z.boolean(),
+  /** Zielanwendung am Textende erkennen und dorthin zustellen (Opt-in). */
+  zielanwendung: z.boolean(),
 });
 export type AufbereitungConfig = z.infer<typeof aufbereitungConfigSchema>;
+
+/**
+ * Ergebnis einer Zustellung mit Zielerkennung (nur Dev/Test-Kanal). Liegt hier
+ * im Schema, weil die Preload-Bruecke jede IPC-Antwort validiert, bevor sie in
+ * den Renderer geht.
+ */
+export const zielZustellungSchema = z.object({
+  zielId: z.string().nullable(),
+  pasted: z.boolean(),
+  message: z.string().nullable(),
+});
 
 /** Gesamtzustand der App, Grundlage der Status-UI. */
 export const appStatusSchema = z.object({

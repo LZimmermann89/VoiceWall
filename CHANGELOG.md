@@ -8,6 +8,32 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Added
 
+- **Zielanwendung ansagen:** endet das Diktat auf eine feste Wendung wie
+  „an Word senden", „in Excel einfügen" oder „nach Outlook übertragen",
+  wird sie entfernt, das genannte Fenster nach vorne geholt und der Text
+  dort eingefügt. Mitgeliefert ist ein Katalog von über 50 gängigen
+  Anwendungen; die Programmnamen darin sind ausgelesen, nicht geraten
+  (Microsoft Teams heißt intern anders als es in der Menüleiste steht).
+  Die Oberfläche zeigt, welche Ziele auf dem jeweiligen Rechner
+  überhaupt ansteuerbar sind.
+
+  Drei Entscheidungen dahinter sind erklärungswert. Erstens ist die
+  Erkennung bewusst eng: Präposition und Verb sind Pflicht, und die
+  Wendung muss am Satzende stehen. Ein Diktat, das bloß auf einen
+  Programmnamen endet, löst nichts aus. Zweitens wird bei einem nicht
+  erreichbaren Ziel **nichts** eingefügt, statt ersatzweise in das
+  gerade offene Fenster zu tippen; der Text bleibt über Zwischenablage
+  und Speicherung gesichert. Drittens ist eine Kommandozeile nicht im
+  Katalog: dort stünde eingefügter Text einen Tastendruck vor der
+  Ausführung, und eine Fehlerkennung hätte eine ganz andere Tragweite
+  als in einem Textfeld.
+
+  Die Anwendung wird nach vorne geholt, aber nie gestartet: ein Diktat,
+  das ungefragt Programme öffnet, wäre eine Überraschung. Auf macOS
+  geschieht das ohne zusätzliche Systemfreigabe, VoiceWall bleibt also
+  bei genau einer erklärungsbedürftigen Berechtigung statt einer pro
+  Zielprogramm. Standardmäßig aus.
+
 - **Schnellnotiz:** ein zweiter, optionaler Hotkey nimmt wie gewohnt auf,
   fügt den Text aber nirgends ein, sondern speichert ihn ausschließlich
   als Notiz in der aktiven Firma; die Zwischenablage bleibt dabei

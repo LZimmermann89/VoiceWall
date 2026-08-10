@@ -427,6 +427,11 @@ export const de = {
       'Wortdopplungen zusammenziehen: direkte Wiederholungen wie "das das" werden zu "das". Standardmäßig aus, weil dies in seltenen Fällen legitimes Deutsch verändern kann ("die Frau, die die Blumen kaufte"). Nur einschalten, wenn häufiges Stottern im Diktat das größere Problem ist.',
     sprachkommandosLabel:
       'Sprachkommandos umsetzen: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz" (englisches Diktat: "period", "comma", "new line", "new paragraph", "paragraph"). Ein Kommandowort direkt nach einem Artikel ("der Punkt", "ein Komma") wird als normales Wort erkannt und bleibt stehen. Satzzeichen, die die Spracherkennung selbst um ein Kommandowort setzt, werden mitentfernt ("Test, Punkt." wird zu "Test."). Standardmäßig aus.',
+    zielanwendungLabel:
+      'Zielanwendung am Satzende erkennen: endet das Diktat auf "an Word senden", "in Excel einfügen" oder "nach Outlook übertragen", wird diese Wendung entfernt, das genannte Fenster nach vorne geholt und der Text dort eingefügt. Präposition und Verb sind Pflicht, deshalb löst ein Satz, der nur auf einen Programmnamen endet ("die Daten in Excel"), nichts aus. Läuft das Programm nicht, wird nichts eingefügt: der Text bleibt in der Zwischenablage und eine Meldung nennt den Grund. Standardmäßig aus.',
+    zielanwendungHinweis:
+      'Erkannte Verben: senden, schicken, einfügen, übertragen, kopieren. Erkannte Einleitungen: an, in, ins, nach, zu. Eine Kommandozeile ist bewusst nicht ansteuerbar: dort stünde eingefügter Text einen Tastendruck vor der Ausführung.',
+    zielanwendungVerfuegbar: 'Auf diesem Rechner ansteuerbar:',
     fachwoerterbuchTitel: 'Fach-Wörterbuch der aktiven Firma',
     fachwoerterbuchKeineFirma:
       'Noch keine Firma angelegt. Das Fach-Wörterbuch gehört zur Firma und liegt auditierbar in deren Ordner (.voicewall/vokabular.json).',
@@ -751,6 +756,17 @@ export const de = {
         `Automatisches Einfügen fehlgeschlagen${detail}. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfügen. Hinweis: Läuft die Ziel-App als Administrator, blockiert Windows simulierte Eingaben (UIPI); dann bitte immer den Kopieren-Knopf verwenden.`,
       nichtUnterstuetzt:
         'Automatisches Einfügen wird auf diesem Betriebssystem nicht unterstützt. Der Text liegt in der Zwischenablage, bitte mit Strg+V manuell einfügen.',
+    },
+
+    // paste/ziel-aktivierung.ts
+    ziel: {
+      laeuftNicht: (name: string): string =>
+        `${name} ist gerade nicht geöffnet. Der Text liegt in der Zwischenablage und geht nicht verloren: Fenster öffnen und mit Einfügen übernehmen.`,
+      nichtAufDieserPlattform: (name: string): string =>
+        `${name} gibt es auf diesem Betriebssystem nicht. Der Text liegt in der Zwischenablage.`,
+      aktivierungFehlgeschlagen: (name: string): string =>
+        `${name} ließ sich nicht in den Vordergrund holen. Der Text liegt in der Zwischenablage, bitte dort einfügen.`,
+      overlayGesendet: (name: string): string => `Text an ${name} übergeben.`,
     },
 
     // permission/accessibility.ts und permission/microphone.ts

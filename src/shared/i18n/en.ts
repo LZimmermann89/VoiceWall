@@ -397,6 +397,11 @@ export const en: Uebersetzung = {
       'Collapse word doublings: direct repetitions like "the the" become "the". Off by default because in rare cases this can alter legitimate text. Only enable it if frequent stuttering in dictation is the bigger problem.',
     sprachkommandosLabel:
       'Apply voice commands: "period", "comma", "new line", "new paragraph", "paragraph" (German dictation additionally: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz"). A command word right after an article ("the period", "a comma") is recognized as an ordinary word and left untouched. Punctuation the speech recognition itself places around a command word is removed as well ("test, period." becomes "test."). Off by default.',
+    zielanwendungLabel:
+      'Detect a target application at the end of a sentence: if the dictation ends with "to Word send" or "into Excel insert", that phrase is removed, the named window is brought to the front and the text is inserted there. Preposition and verb are both required, so a sentence merely ending in a program name ("the figures in Excel") triggers nothing. If the program is not running, nothing is inserted: the text stays in the clipboard and a message explains why. Off by default.',
+    zielanwendungHinweis:
+      'Recognized verbs: send, insert, paste, transfer. Recognized introductions: to, into. A command line is deliberately not available as a target: inserted text would sit one keystroke away from execution there.',
+    zielanwendungVerfuegbar: 'Available on this computer:',
     fachwoerterbuchTitel: 'Specialist dictionary of the active company',
     fachwoerterbuchKeineFirma:
       'No company created yet. The specialist dictionary belongs to the company and is stored auditable in its folder (.voicewall/vokabular.json).',
@@ -764,6 +769,16 @@ export const en: Uebersetzung = {
         `Automatic insertion failed${detail}. The text is in the clipboard, please insert it manually with Ctrl+V. Note: if the target app runs as administrator, Windows blocks simulated input (UIPI); in that case always use the copy button.`,
       nichtUnterstuetzt:
         'Automatic insertion is not supported on this operating system. The text is in the clipboard, please insert it manually with Ctrl+V.',
+    },
+
+    ziel: {
+      laeuftNicht: (name: string): string =>
+        `${name} is not open right now. The text is in the clipboard and is not lost: open the window and paste it.`,
+      nichtAufDieserPlattform: (name: string): string =>
+        `${name} does not exist on this operating system. The text is in the clipboard.`,
+      aktivierungFehlgeschlagen: (name: string): string =>
+        `${name} could not be brought to the front. The text is in the clipboard, please paste it there.`,
+      overlayGesendet: (name: string): string => `Text handed over to ${name}.`,
     },
 
     freigaben: {

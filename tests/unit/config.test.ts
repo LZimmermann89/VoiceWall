@@ -144,6 +144,7 @@ describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
       fuellwoerterEntfernen: true,
       wortdopplungenEntfernen: false,
       sprachkommandos: false,
+      zielanwendung: false,
     });
   });
 
@@ -157,6 +158,7 @@ describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
         fuellwoerterEntfernen: true,
         wortdopplungenEntfernen: false,
         sprachkommandos: false,
+        zielanwendung: false,
       });
     }
   });
@@ -183,6 +185,36 @@ describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
     if (parsed.success) {
       expect(parsed.data.aufbereitung.fuellwoerterEntfernen).toBe(false);
       expect(parsed.data.aufbereitung.sprachkommandos).toBe(true);
+    }
+  });
+});
+
+describe('globalConfigSchema: Zielanwendung', () => {
+  it('ist standardmaessig aus', () => {
+    // Die Regel wechselt das Fenster und schneidet Text ab. Beides gehoert in
+    // eine bewusste Entscheidung, nicht in den Auslieferungsstand.
+    expect(defaultGlobalConfig().aufbereitung.zielanwendung).toBe(false);
+  });
+
+  it('ergaenzt in einer Alt-Konfig ohne das Feld den sicheren Default AUS', () => {
+    const parsed = globalConfigSchema.safeParse({
+      ...defaultGlobalConfig(),
+      aufbereitung: { fuellwoerterEntfernen: true, sprachkommandos: false },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.aufbereitung.zielanwendung).toBe(false);
+    }
+  });
+
+  it('uebernimmt den eingeschalteten Zustand unveraendert', () => {
+    const parsed = globalConfigSchema.safeParse({
+      ...defaultGlobalConfig(),
+      aufbereitung: { fuellwoerterEntfernen: true, sprachkommandos: false, zielanwendung: true },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.aufbereitung.zielanwendung).toBe(true);
     }
   });
 });

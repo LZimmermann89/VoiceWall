@@ -170,12 +170,17 @@ export const globalConfigSchema = z
         // erhalten damit den sicheren Standard (kein stiller Wortdopplungs-Kollaps).
         wortdopplungenEntfernen: z.boolean().default(false),
         sprachkommandos: z.boolean().default(false),
+        // Zielanwendung am Textende ("... an Word senden"). Default AUS: die
+        // Regel wechselt das Fenster und schneidet Text ab. Beides gehoert in
+        // eine bewusste Entscheidung des Nutzers, nicht in den Auslieferungsstand.
+        zielanwendung: z.boolean().default(false),
       })
       .passthrough()
       .default({
         fuellwoerterEntfernen: true,
         wortdopplungenEntfernen: false,
         sprachkommandos: false,
+        zielanwendung: false,
       }),
     /**
      * Sprache der Oberflaeche: 'de' ist der
@@ -209,6 +214,7 @@ export function defaultGlobalConfig(): GlobalConfig {
       fuellwoerterEntfernen: true,
       wortdopplungenEntfernen: false,
       sprachkommandos: false,
+      zielanwendung: false,
     },
     uiSprache: 'de',
   };

@@ -30,6 +30,7 @@ import {
   appStatusSchema,
   audioLevelSchema,
   deliveryResultSchema,
+  zielZustellungSchema,
   devDictateResultSchema,
   devDictationContextSchema,
   modelDetailsResultSchema,
@@ -218,6 +219,8 @@ const bridge: VoiceWallBridge = {
     deliveryResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevRunDictationResult, text)),
   devRunNoteResult: async (text) =>
     actionResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevRunNoteResult, text)),
+  devRunTargetedResult: async (text) =>
+    zielZustellungSchema.parse(await ipcRenderer.invoke(IpcChannel.DevRunTargetedResult, text)),
   devDictatePcm: async (pcm) => {
     try {
       return devDictateResultSchema.parse(await ipcRenderer.invoke(IpcChannel.DevDictatePcm, pcm));

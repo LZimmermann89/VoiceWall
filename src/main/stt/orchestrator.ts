@@ -104,6 +104,7 @@ const DEFAULT_FLOW_STATUS: FlowStatus = {
     fuellwoerterEntfernen: true,
     wortdopplungenEntfernen: false,
     sprachkommandos: false,
+    zielanwendung: false,
   },
   uiLanguage: 'de',
 };

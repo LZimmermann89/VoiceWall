@@ -125,6 +125,11 @@ export const IpcChannel = {
    */
   DevRunNoteResult: 'dev:run-note-result',
   /**
+   * Nur Dev/Test: Zustellung inklusive Zielerkennung am Textende. Meldet, ob
+   * ein Ziel erkannt wurde und ob tatsaechlich eingefuegt wurde.
+   */
+  DevRunTargetedResult: 'dev:run-targeted-result',
+  /**
    * Nur Dev/Test: kompletter Diktat-Beweis aus PCM: Injektion durch die
    * VAD-/Whisper-Engine (mit aktivem Woerterbuch-Prompt), dann Ersetzungen,
    * Aufbereitung und echte Zustellung (Clipboard/Paste/Auto-Speichern).

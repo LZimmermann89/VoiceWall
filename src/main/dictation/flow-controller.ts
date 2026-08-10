@@ -43,8 +43,9 @@ import {
 } from '../../shared/schema';
 import { aufbereitenText } from '../../shared/textaufbereitung';
 import { applyErsetzungenMitProtokoll, formatAngewandteErsetzung } from '../../shared/vokabular';
+import { erkenneZielbefehl, type Zielanwendung } from '../../shared/zielanwendung';
 import type { OverlayStatePayload } from '../../shared/types';
-import type { Result } from '../../shared/result';
+import { err, type Result } from '../../shared/result';
 import type { SaveDictateResult } from '../../shared/company';
 import { runClipboardSequence, realDelay } from '../clipboard/transcript-clipboard';
 import { readGlobalConfig } from '../config/config-store';
@@ -56,6 +57,12 @@ import { transcriptModelNameFor } from '../model/model-catalog';
 import type { CompanyManager } from '../storage/companies';
 import { createOverlayWindow, showOverlayInactive } from '../overlay/overlay-window';
 import { createPasteAdapter, type PasteAdapter } from '../paste/index';
+import {
+  createZielAktivierer,
+  zielIstAnsteuerbar,
+  FENSTERWECHSEL_WARTEZEIT_MS,
+  type ZielAktivierer,
+} from '../paste/ziel-aktivierung';
 import {
   accessibilityMissingMessage,
   getAccessibilityState,
@@ -79,6 +86,16 @@ export interface FlowControllerDeps {
   readonly quitApp: () => void;
   /** Aktiviert die Dev-/Test-IPC-Kanaele (nie im ausgelieferten Produkt). */
   readonly enableTestIpc: boolean;
+}
+
+/** Ergebnis einer Zustellung mit Zielerkennung (auch fuer den Test-Kanal). */
+interface ZielZustellung {
+  /** Kennung des erkannten Ziels oder null, wenn keines genannt wurde. */
+  readonly zielId: string | null;
+  /** Wurde tatsaechlich eingefuegt? */
+  readonly pasted: boolean;
+  /** Meldung, falls etwas nicht wie gewuenscht lief. */
+  readonly message: string | null;
 }
 
 /** Sichtbarkeitsdauer des Overlays nach Abschluss (done/no-speech). */
@@ -111,6 +128,7 @@ export class DictationFlowController {
   private tray: TrayController | null = null;
 
   private pasteAdapter: PasteAdapter | null = null;
+  private zielAktivierer: ZielAktivierer | null = null;
   private pasteUnsupportedMessage: string | null = null;
 
   // Dev-/Test-Steuerung (nur ueber Test-IPC erreichbar).
@@ -125,6 +143,11 @@ export class DictationFlowController {
     this.config = await readGlobalConfig(this.deps.userDataPath, this.deps.logger);
     // Main-Katalogsprache aus der persistierten Konfiguration.
     setUiLanguage(this.config.uiSprache);
+
+    const aktivierer = createZielAktivierer(process.platform);
+    if (aktivierer.ok) {
+      this.zielAktivierer = aktivierer.value;
+    }
 
     const adapter = createPasteAdapter(process.platform);
     if (adapter.ok) {
@@ -305,10 +328,54 @@ export class DictationFlowController {
       this.dispatch('delivery-complete');
       return;
     }
-    const result = await this.deliverText(processed.text, audioMs, processed.ersetzungen);
+
+    await this.zustellenMitZiel(processed.text, audioMs, processed.ersetzungen);
+    this.dispatch('delivery-complete');
+  }
+
+  /**
+   * Zustellung inklusive Zielerkennung am Textende ("... an Word senden").
+   *
+   * Ablauf: Wendung abtrennen, das genannte Fenster nach vorne holen, erst
+   * dann einfuegen. Laesst sich das Fenster nicht erreichen, wird BEWUSST
+   * nichts eingefuegt: der Nutzer wollte den Text ausdruecklich woanders
+   * haben, und ihn ersatzweise in das gerade offene Fenster zu tippen waere
+   * das Gegenteil davon. Der Text ist dann ueber Zwischenablage und
+   * Auto-Speichern gesichert, die Meldung nennt den Grund.
+   *
+   * Produktiv- und Testpfad gehen hier gemeinsam durch, damit nicht wieder
+   * etwas anderes getestet wird als der Nutzer benutzt.
+   */
+  private async zustellenMitZiel(
+    text: string,
+    audioMs: number,
+    ersetzungen: readonly string[],
+  ): Promise<ZielZustellung> {
+    const zielbefehl = this.config.aufbereitung.zielanwendung
+      ? erkenneZielbefehl(text, await this.activeLanguageLenient())
+      : null;
+    if (zielbefehl !== null) {
+      const aktiviert = await this.aktiviereZiel(zielbefehl.ziel);
+      if (!aktiviert.ok) {
+        await this.bewahreOhneEinfuegen(zielbefehl.text, audioMs, ersetzungen);
+        this.showOverlay({ kind: 'error', message: aktiviert.error }, OVERLAY_ERROR_VISIBLE_MS);
+        return { zielId: zielbefehl.ziel.id, pasted: false, message: aktiviert.error };
+      }
+      // Dem Fensterwechsel Zeit lassen, sonst geht der Tastendruck noch an
+      // das alte Fenster.
+      await realDelay(FENSTERWECHSEL_WARTEZEIT_MS);
+    }
+
+    const result = await this.deliverText(zielbefehl?.text ?? text, audioMs, ersetzungen);
     if (result.pasted) {
       this.showOverlay(
-        { kind: 'done', message: texte().flow.overlayTextEingefuegt },
+        {
+          kind: 'done',
+          message:
+            zielbefehl === null
+              ? texte().flow.overlayTextEingefuegt
+              : texte().ziel.overlayGesendet(zielbefehl.ziel.name),
+        },
         OVERLAY_DONE_VISIBLE_MS,
       );
     } else {
@@ -317,7 +384,11 @@ export class DictationFlowController {
         OVERLAY_ERROR_VISIBLE_MS,
       );
     }
-    this.dispatch('delivery-complete');
+    return {
+      zielId: zielbefehl?.ziel.id ?? null,
+      pasted: result.pasted,
+      message: result.message,
+    };
   }
 
   /**
@@ -499,6 +570,39 @@ export class DictationFlowController {
       { kind: 'error', message: texte().flow.notizNichtGespeichert(gespeichert.message) },
       OVERLAY_ERROR_VISIBLE_MS,
     );
+  }
+
+  /**
+   * Holt die genannte Anwendung nach vorne. Ist auf dieser Plattform kein
+   * Aktivierer verfuegbar (Linux), gilt das als nicht ansteuerbar.
+   */
+  private async aktiviereZiel(ziel: Zielanwendung): Promise<Result<void, string>> {
+    if (this.zielAktivierer === null) {
+      return err(texte().ziel.nichtAufDieserPlattform(ziel.name));
+    }
+    if (!zielIstAnsteuerbar(ziel, process.platform)) {
+      return err(texte().ziel.nichtAufDieserPlattform(ziel.name));
+    }
+    return this.zielAktivierer.aktiviere(ziel);
+  }
+
+  /**
+   * Sichert einen Text, ohne ihn irgendwo einzufuegen: Auto-Speichern wie
+   * gewohnt, dazu die Zwischenablage als Resilienzpfad. Wird gebraucht, wenn
+   * die gewuenschte Zielanwendung nicht erreichbar ist; dann waere Einfuegen
+   * in das gerade offene Fenster das Gegenteil dessen, was der Nutzer wollte.
+   */
+  private async bewahreOhneEinfuegen(
+    text: string,
+    audioMs: number,
+    ersetzungen: readonly string[],
+  ): Promise<void> {
+    this.lastTranscript = text;
+    this.lastAudioMs = audioMs;
+    this.lastErsetzungen = ersetzungen;
+    await this.autoSaveDictate(text, audioMs, ersetzungen);
+    clipboard.writeText(text);
+    this.deps.orchestrator.notifyStatusChanged();
   }
 
   /** Speichert eine Schnellnotiz und meldet den Grund, wenn es nicht geht. */
@@ -888,6 +992,7 @@ export class DictationFlowController {
         fuellwoerterEntfernen: this.config.aufbereitung.fuellwoerterEntfernen,
         wortdopplungenEntfernen: this.config.aufbereitung.wortdopplungenEntfernen,
         sprachkommandos: this.config.aufbereitung.sprachkommandos,
+        zielanwendung: this.config.aufbereitung.zielanwendung,
       },
       uiLanguage: this.config.uiSprache,
     };
@@ -1065,6 +1170,22 @@ export class DictationFlowController {
           return { ok: false, message: texte().flow.aufbereiteterTextLeer };
         }
         return this.saveNote(processed.text, 0, processed.ersetzungen);
+      },
+    );
+
+    ipcMain.handle(
+      IpcChannel.DevRunTargetedResult,
+      async (_event, raw: unknown): Promise<ZielZustellung> => {
+        const parsed = z.string().min(1).safeParse(raw);
+        if (!parsed.success) {
+          return { zielId: null, pasted: false, message: texte().flow.ungueltigerText };
+        }
+        // Genau derselbe Weg wie im echten Diktat, inklusive Zielerkennung.
+        const processed = await this.processTranscriptText(parsed.data);
+        if (processed.text.length === 0) {
+          return { zielId: null, pasted: false, message: texte().flow.aufbereiteterTextLeer };
+        }
+        return this.zustellenMitZiel(processed.text, 0, processed.ersetzungen);
       },
     );
 

@@ -42,6 +42,18 @@ welcome (see the test guide `docs/TESTLEITFADEN.md`, English version:
   shortcut the quick note is available from the menu bar icon. If the note
   cannot be saved (no company set up yet), the text goes to the clipboard and
   the message says so: no dictated text is lost here either.
+- **Name a target application:** if the dictation ends with a fixed phrase
+  such as "to Word send" or "into Excel insert", that phrase is removed,
+  the named window is brought to the front and the text is inserted there.
+  The catalogue covers more than 50 common applications (Office, Apple
+  programs, browsers, messengers, development environments); the interface
+  shows which of them can be addressed on the machine at hand. Preposition
+  and verb are both required, so a sentence merely ending in a program name
+  ("the figures in Excel") triggers nothing. If the named program is not
+  running, **nothing** is inserted: the text stays in the clipboard and a
+  message explains why, because typing it into whatever window happens to be
+  open would be the opposite of what was asked for. A command line is
+  deliberately not available as a target. Off by default.
 - **Local German speech recognition:** whisper.cpp with the German
   model whisper-large-v3-turbo-german (Q5_0 as the default, fp16 as
   an option for powerful hardware) plus Silero VAD segmentation.

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from 'rea
 import type { CompanyListView } from '../../shared/company';
 import type { AppStatus, ModelProgress, SystemInfo, TranscriptPayload } from '../../shared/schema';
 import type { Ersetzung } from '../../shared/vokabular';
+import { zieleFuerPlattform } from '../../shared/zielanwendung';
 import { formatAccelerator, formatBytes } from './format';
 import { useSprache } from './i18n';
 import { useToast } from './Toasts';
@@ -161,6 +162,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
     fuellwoerterEntfernen: true,
     wortdopplungenEntfernen: false,
     sprachkommandos: false,
+    zielanwendung: false,
   };
   const flowState = status?.flowState ?? 'idle';
   const platform = systemInfo?.platform ?? 'darwin';
@@ -546,6 +548,36 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             {t.sprachkommandosLabel}
           </label>
         </div>
+        <div className="actions">
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              data-testid="switch-zielanwendung"
+              checked={aufbereitung.zielanwendung}
+              disabled={busy}
+              onChange={(event) =>
+                void runAction(() =>
+                  window.voicewall.setAufbereitung({
+                    ...aufbereitung,
+                    zielanwendung: event.target.checked,
+                  }),
+                )
+              }
+            />{' '}
+            {t.zielanwendungLabel}
+          </label>
+        </div>
+        {aufbereitung.zielanwendung && (
+          <>
+            <p className="notice">{t.zielanwendungHinweis}</p>
+            <p className="notice" data-testid="ziel-liste">
+              {t.zielanwendungVerfuegbar}{' '}
+              {zieleFuerPlattform(platform)
+                .map((ziel) => ziel.name)
+                .join(', ')}
+            </p>
+          </>
+        )}
         <h4>{t.fachwoerterbuchTitel}</h4>
         {!hasCompany ? (
           <p className="placeholder">{t.fachwoerterbuchKeineFirma}</p>

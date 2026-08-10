@@ -224,6 +224,15 @@ export interface VoiceWallBridge {
    */
   readonly devRunNoteResult: (text: string) => Promise<ActionResult>;
   /**
+   * Nur Dev/Test: Zustellung inklusive Zielerkennung am Textende. Meldet das
+   * erkannte Ziel und ob eingefuegt wurde.
+   */
+  readonly devRunTargetedResult: (text: string) => Promise<{
+    zielId: string | null;
+    pasted: boolean;
+    message: string | null;
+  }>;
+  /**
    * Nur Dev/Test: kompletter Diktat-Beweis aus PCM (Engine-Injektion mit
    * Woerterbuch-Prompt, VAD-Schleuse, Ersetzungen, Aufbereitung, Zustellung).
    */

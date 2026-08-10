@@ -44,6 +44,19 @@ echter Windows-Hardware aus, Testberichte sind willkommen (siehe
   sich die Notiz nicht speichern (noch keine Firma eingerichtet), landet der
   Text in der Zwischenablage und die Meldung sagt es: auch hier geht kein
   diktierter Text verloren.
+- **Zielanwendung ansagen:** endet das Diktat auf eine feste Wendung wie
+  „an Word senden", „in Excel einfügen" oder „nach Outlook übertragen",
+  wird diese Wendung entfernt, das genannte Fenster nach vorne geholt und
+  der Text dort eingefügt. Der Katalog umfasst über 50 gängige
+  Anwendungen (Office, Apple-Programme, Browser, Messenger,
+  Entwicklungsumgebungen); die Oberfläche zeigt, welche davon auf dem
+  jeweiligen Rechner ansteuerbar sind. Präposition und Verb sind Pflicht,
+  ein Satz, der bloß auf einen Programmnamen endet („die Zahlen in
+  Excel"), löst deshalb nichts aus. Läuft das genannte Programm nicht,
+  wird **nichts** eingefügt: der Text bleibt in der Zwischenablage und
+  eine Meldung nennt den Grund, denn ihn ersatzweise in das gerade offene
+  Fenster zu tippen wäre das Gegenteil des Gewünschten. Eine
+  Kommandozeile ist bewusst nicht ansteuerbar. Standardmäßig aus.
 - **Deutsche Spracherkennung lokal:** whisper.cpp mit dem deutschen
   Modell whisper-large-v3-turbo-german (Q5_0 als Standard, fp16 als
   Option für starke Hardware) plus Silero-VAD-Segmentierung. Die
