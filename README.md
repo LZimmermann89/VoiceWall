@@ -33,6 +33,11 @@ echter Windows-Hardware aus, Testberichte sind willkommen (siehe
   bleibt sein Inhalt unangetastet. Sperrt sich der Rechner oder geht er
   in den Ruhezustand, bricht ein laufendes Diktat ab und das Audio wird
   verworfen, statt noch verschriftet zu werden.
+- **Zielanwendung starten:** Ist das genannte Programm nicht offen, kann
+  VoiceWall es auf Wunsch öffnen (eigener Schalter, standardmäßig aus) und
+  wartet dann, bis es bereit ist. Beachten Sie: ein frisch gestartetes
+  Textprogramm zeigt oft nur seinen Startbildschirm und noch kein
+  Eingabefeld, dann findet der Text kein Ziel.
 - **Schnellnotiz (nur speichern):** ein zweiter, optionaler Hotkey nimmt
   genauso auf wie das Diktat, fügt den Text aber nirgends ein: er wird
   ausschließlich als Notiz in der aktiven Firma gespeichert, und die

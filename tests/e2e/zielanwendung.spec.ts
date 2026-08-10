@@ -28,6 +28,7 @@ interface ZielBridge {
       wortdopplungenEntfernen: boolean;
       sprachkommandos: boolean;
       zielanwendung: boolean;
+      zielanwendungStarten: boolean;
     }) => Promise<{ ok: boolean; message?: string }>;
     devMockPaste: (enabled: boolean) => Promise<{ ok: boolean }>;
     devSetAccessibility: (trusted: boolean | null) => Promise<{ ok: boolean }>;
@@ -43,6 +44,7 @@ const SCHALTER_AUS = {
   wortdopplungenEntfernen: false,
   sprachkommandos: false,
   zielanwendung: false,
+  zielanwendungStarten: false,
 };
 
 function bridge(window: Page): ZielBridge['voicewall'] {
@@ -112,6 +114,26 @@ test('Zielanwendung: erkennt die Wendung und fuegt bei unerreichbarem Ziel nicht
     const ohneBefehl = await api.devRunTargetedResult('Ein ganz normales Diktat ohne Zielangabe');
     expect(ohneBefehl.zielId).toBeNull();
     expect(ohneBefehl.pasted).toBe(true);
+    expect(await api.devGetPasteCalls()).toBe(2);
+
+    // 4. Auch mit erlaubtem Starten bleibt die Zusage bestehen: was es auf
+    //    dieser Plattform gar nicht gibt, laesst sich nicht starten, und dann
+    //    wird weiterhin nichts eingefuegt. Der Schalter darf die Sicherheit
+    //    nicht aufweichen, er darf nur oeffnen, was es wirklich gibt.
+    expect(
+      (
+        await api.setAufbereitung({
+          ...SCHALTER_AUS,
+          zielanwendung: true,
+          zielanwendungStarten: true,
+        })
+      ).ok,
+    ).toBe(true);
+    const mitStarten = await api.devRunTargetedResult(
+      `Der Vorgang ist abgeschlossen an ${unerreichbaresZiel.gesprochen} senden`,
+    );
+    expect(mitStarten.zielId).toBe(unerreichbaresZiel.id);
+    expect(mitStarten.pasted).toBe(false);
     expect(await api.devGetPasteCalls()).toBe(2);
   } finally {
     await app.close();

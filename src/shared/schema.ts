@@ -125,6 +125,8 @@ export const aufbereitungConfigSchema = z.object({
   sprachkommandos: z.boolean(),
   /** Zielanwendung am Textende erkennen und dorthin zustellen (Opt-in). */
   zielanwendung: z.boolean(),
+  /** Eine geschlossene Zielanwendung starten statt melden (Opt-in). */
+  zielanwendungStarten: z.boolean(),
 });
 export type AufbereitungConfig = z.infer<typeof aufbereitungConfigSchema>;
 

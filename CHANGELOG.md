@@ -34,6 +34,14 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   bei genau einer erklärungsbedürftigen Berechtigung statt einer pro
   Zielprogramm. Standardmäßig aus.
 
+- **Geschlossene Zielanwendung starten** (eigener Schalter, standardmäßig
+  aus): Ist das genannte Programm nicht offen, wird es geöffnet, und
+  VoiceWall wartet, bis es bereit ist, statt nach fester Zeit blind
+  einzufügen. Ehrlich dazugesagt: ein frisch gestartetes Textprogramm
+  zeigt oft nur seinen Startbildschirm und noch gar kein Eingabefeld,
+  dann findet der Text kein Ziel. Der Schalter weicht die Zusage nicht
+  auf, dass bei einem nicht erreichbaren Ziel nichts eingefügt wird; er
+  öffnet nur, was es wirklich gibt.
 - **Schnellnotiz:** ein zweiter, optionaler Hotkey nimmt wie gewohnt auf,
   fügt den Text aber nirgends ein, sondern speichert ihn ausschließlich
   als Notiz in der aktiven Firma; die Zwischenablage bleibt dabei
@@ -76,6 +84,19 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
   Neuinstallation aus der Sperrdatei hat den Ordner tatsächlich auf
   den gemeldeten Stand gebracht. Wer nur auf die Meldung schaut,
   verlässt sich auf eine Behauptung statt auf einen Beleg.
+
+### Changed
+
+- Abschnitt 01 der Diktat-Ansicht wieder gegliedert: Die Schnellnotiz
+  hatte einen zweiten Eingabeblock direkt unter den ersten gehängt, mit
+  derselben Beschriftung wie dieser und einem langen Erklärungsabsatz
+  dazwischen. Aus der aufgeräumten Abfolge war eine ungegliederte Kette
+  geworden. Die Schnellnotiz steht jetzt unter einer eigenen Überschrift
+  mit eigenem Feldnamen, wie das Fach-Wörterbuch auch, und der Erklärtext
+  sitzt unter der Überschrift statt zwischen den Bedienelementen. Bei der
+  Zielanwendung sind aus zwei nachgestellten Hinweisabsätzen einer
+  geworden; die Erläuterung steht jetzt am Schalter selbst, wie bei den
+  übrigen Schaltern.
 
 ### Fixed
 

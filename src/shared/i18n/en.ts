@@ -328,6 +328,8 @@ export const en: Uebersetzung = {
     neueKombination: 'New key combination:',
     hotkeyPlatzhalter: 'e.g. CommandOrControl+Shift+D',
     hotkeyUebernehmen: 'Apply hotkey',
+    notizAbschnitt: 'Quick note',
+    notizFeldLabel: 'Shortcut for the quick note:',
     notizZeile: 'Quick note (save only):',
     notizNichtVergeben: 'no shortcut assigned',
     notizErklaerung:
@@ -398,9 +400,9 @@ export const en: Uebersetzung = {
     sprachkommandosLabel:
       'Apply voice commands: "period", "comma", "new line", "new paragraph", "paragraph" (German dictation additionally: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz"). A command word right after an article ("the period", "a comma") is recognized as an ordinary word and left untouched. Punctuation the speech recognition itself places around a command word is removed as well ("test, period." becomes "test."). Off by default.',
     zielanwendungLabel:
-      'Detect a target application at the end of a sentence: if the dictation ends with "to Word send" or "into Excel insert", that phrase is removed, the named window is brought to the front and the text is inserted there. Preposition and verb are both required, so a sentence merely ending in a program name ("the figures in Excel") triggers nothing. If the program is not running, nothing is inserted: the text stays in the clipboard and a message explains why. Off by default.',
-    zielanwendungHinweis:
-      'Recognized verbs: send, insert, paste, transfer. Recognized introductions: to, into. A command line is deliberately not available as a target: inserted text would sit one keystroke away from execution there.',
+      'Detect a target application at the end of a sentence: if the dictation ends with "to Word send" or "into Excel insert", that phrase is removed, the named window is brought to the front and the text is inserted there. Preposition and verb are both required, so a sentence merely ending in a program name ("the figures in Excel") triggers nothing. If the program is not running, nothing is inserted: the text stays in the clipboard and a message explains why. Recognized verbs: send, insert, paste, transfer; recognized introductions: to, into. A command line is deliberately not available as a target. Off by default.',
+    zielanwendungStartenLabel:
+      'Start a closed target application instead of only reporting it. VoiceWall then waits until the program is ready and inserts afterwards. Bear in mind: a freshly started program often shows only its start screen and no input field yet, in which case the text finds no target. Off by default.',
     zielanwendungVerfuegbar: 'Available on this computer:',
     fachwoerterbuchTitel: 'Specialist dictionary of the active company',
     fachwoerterbuchKeineFirma:
@@ -776,6 +778,8 @@ export const en: Uebersetzung = {
         `${name} is not open right now. The text is in the clipboard and is not lost: open the window and paste it.`,
       nichtAufDieserPlattform: (name: string): string =>
         `${name} does not exist on this operating system. The text is in the clipboard.`,
+      startDauertZuLang: (name: string): string =>
+        `${name} was started but was not ready in time. The text is in the clipboard, please paste it there.`,
       aktivierungFehlgeschlagen: (name: string): string =>
         `${name} could not be brought to the front. The text is in the clipboard, please paste it there.`,
       overlayGesendet: (name: string): string => `Text handed over to ${name}.`,

@@ -18,10 +18,15 @@
  * einer erklaerungsbeduerftigen Berechtigung (Bedienungshilfen) statt bei
  * einer pro Zielprogramm.
  *
- * Bewusste Entscheidung gegen automatisches Starten: Laeuft die Anwendung
- * nicht, wird sie NICHT gestartet, sondern gemeldet. Ein Diktat, das
- * ungefragt Programme oeffnet, waere eine Ueberraschung; und der Nutzer
- * wollte in ein OFFENES Fenster schreiben.
+ * Starten ist ein Schalter, kein Automatismus: Ohne ihn wird eine geschlossene
+ * Anwendung gemeldet statt geoeffnet, denn ein Diktat, das ungefragt Programme
+ * startet, waere eine Ueberraschung. Mit ihm wird gestartet und gewartet, bis
+ * das Fenster wirklich steht.
+ *
+ * EHRLICHE GRENZE des Startens: Ein frisch geoeffnetes Textprogramm zeigt oft
+ * nur seinen Startbildschirm, also gar kein Eingabefeld. Der Text hat dann
+ * nichts, worin er landen koennte. Das Starten hilft dort, wo die Anwendung
+ * ihre Sitzung wiederherstellt, und nicht ueberall.
  */
 import { execFile } from 'node:child_process';
 import { texte } from '../i18n';
@@ -45,9 +50,28 @@ export interface ZielAktivierer {
   /**
    * Holt die Anwendung nach vorne. Erwartbare Faelle (laeuft nicht, auf
    * dieser Plattform unbekannt) kommen als Katalog-Meldung zurueck, nie als
-   * Ausnahme.
+   * Ausnahme. `startenErlaubt` entscheidet, ob eine geschlossene Anwendung
+   * geoeffnet werden darf.
    */
-  readonly aktiviere: (ziel: Zielanwendung) => Promise<Result<void, string>>;
+  readonly aktiviere: (
+    ziel: Zielanwendung,
+    startenErlaubt: boolean,
+  ) => Promise<Result<void, string>>;
+}
+
+/**
+ * Wie lange nach dem Starten auf das Fenster gewartet wird, und in welchem
+ * Takt nachgesehen wird. Grosse Programme brauchen mehrere Sekunden; laenger
+ * als eine halbe Minute zu warten hilft niemandem mehr.
+ */
+const START_WARTEN_MAX_MS = 30_000;
+const START_WARTEN_TAKT_MS = 500;
+
+/** Kurze Pause ohne Fremdabhaengigkeit. */
+function warte(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 /** Fuehrt ein Programm aus und meldet nur, ob es mit 0 endete. */
@@ -80,24 +104,41 @@ function laufErfolgreich(
 function createMacosZielAktivierer(): ZielAktivierer {
   return {
     id: 'macos-open',
-    aktiviere: async (ziel) => {
+    aktiviere: async (ziel, startenErlaubt) => {
       const app = ziel.macosApp;
       if (app === null || ziel.macosProzess.length === 0) {
         return err(texte().ziel.nichtAufDieserPlattform(ziel.name));
       }
-      let laeuft = false;
-      for (const prozess of ziel.macosProzess) {
-        if (await laufErfolgreich('pgrep', ['-x', prozess], SUCHE_TIMEOUT_MS)) {
-          laeuft = true;
-          break;
+      const laeuft = async (): Promise<boolean> => {
+        for (const prozess of ziel.macosProzess) {
+          if (await laufErfolgreich('pgrep', ['-x', prozess], SUCHE_TIMEOUT_MS)) {
+            return true;
+          }
         }
-      }
-      if (!laeuft) {
+        return false;
+      };
+      const liefBereits = await laeuft();
+      if (!liefBereits && !startenErlaubt) {
         return err(texte().ziel.laeuftNicht(ziel.name));
       }
-      // -a waehlt die Anwendung, ohne ein Dokument zu oeffnen.
+      // -a waehlt die Anwendung. Laeuft sie schon, holt das nur ihr Fenster
+      // nach vorne; laeuft sie nicht, startet es sie.
       const aktiviert = await laufErfolgreich('open', ['-a', app], AKTIVIERUNG_TIMEOUT_MS);
-      return aktiviert ? ok(undefined) : err(texte().ziel.aktivierungFehlgeschlagen(ziel.name));
+      if (!aktiviert) {
+        return err(texte().ziel.aktivierungFehlgeschlagen(ziel.name));
+      }
+      if (liefBereits) {
+        return ok(undefined);
+      }
+      // Frisch gestartet: warten, bis das Programm wirklich da ist. Ohne das
+      // ginge der Tastendruck ins Leere, weil das Fenster noch nicht steht.
+      for (let gewartet = 0; gewartet < START_WARTEN_MAX_MS; gewartet += START_WARTEN_TAKT_MS) {
+        await warte(START_WARTEN_TAKT_MS);
+        if (await laeuft()) {
+          return ok(undefined);
+        }
+      }
+      return err(texte().ziel.startDauertZuLang(ziel.name));
     },
   };
 }
@@ -117,32 +158,57 @@ const WINDOWS_AKTIVIERUNG =
   '$w = New-Object -ComObject WScript.Shell; ' +
   'if (-not $w.AppActivate($p.Id)) { exit 4 }';
 
+/**
+ * Statisches PowerShell-Kommando zum Starten: sucht den Programmnamen ueber
+ * Start-Process und wartet danach, bis ein Fenster steht. Auch hier kommt der
+ * Name ausschliesslich ueber die Umgebung herein.
+ */
+const WINDOWS_START =
+  '$namen = $env:VOICEWALL_ZIEL_PROZESS -split ";"; ' +
+  '$gestartet = $false; ' +
+  'foreach ($n in $namen) { ' +
+  'if (-not $gestartet) { try { Start-Process -FilePath $n -ErrorAction Stop; ' +
+  '$gestartet = $true } catch { } } }; ' +
+  'if (-not $gestartet) { exit 5 }';
+
 /** Windows: Prozess mit Fenster suchen und per AppActivate nach vorne holen. */
 function createWindowsZielAktivierer(): ZielAktivierer {
   return {
     id: 'windows-appactivate',
-    aktiviere: async (ziel) => {
+    aktiviere: async (ziel, startenErlaubt) => {
       if (ziel.windowsProzess.length === 0) {
         return err(texte().ziel.nichtAufDieserPlattform(ziel.name));
       }
-      const erfolg = await laufErfolgreich(
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-Command',
-          WINDOWS_AKTIVIERUNG,
-        ],
-        AKTIVIERUNG_TIMEOUT_MS,
-        // Der Programmname geht ueber die Umgebung, nicht in das Kommando.
-        { VOICEWALL_ZIEL_PROZESS: ziel.windowsProzess.join(';') },
-      );
+      // Der Programmname geht ueber die Umgebung, nicht in das Kommando.
+      const umgebung = { VOICEWALL_ZIEL_PROZESS: ziel.windowsProzess.join(';') };
+      const powershell = (kommando: string, timeoutMs: number): Promise<boolean> =>
+        laufErfolgreich(
+          'powershell.exe',
+          ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', kommando],
+          timeoutMs,
+          umgebung,
+        );
+
+      if (await powershell(WINDOWS_AKTIVIERUNG, AKTIVIERUNG_TIMEOUT_MS)) {
+        return ok(undefined);
+      }
       // Zwischen "laeuft nicht" und "Aktivierung misslungen" wird bewusst
       // nicht unterschieden: fuer den Nutzer ist die naechste Handlung
       // dieselbe, naemlich das Fenster selbst zu oeffnen.
-      return erfolg ? ok(undefined) : err(texte().ziel.laeuftNicht(ziel.name));
+      if (!startenErlaubt) {
+        return err(texte().ziel.laeuftNicht(ziel.name));
+      }
+      if (!(await powershell(WINDOWS_START, AKTIVIERUNG_TIMEOUT_MS))) {
+        return err(texte().ziel.laeuftNicht(ziel.name));
+      }
+      // Gestartet: warten, bis ein Fenster steht und sich aktivieren laesst.
+      for (let gewartet = 0; gewartet < START_WARTEN_MAX_MS; gewartet += START_WARTEN_TAKT_MS) {
+        await warte(START_WARTEN_TAKT_MS);
+        if (await powershell(WINDOWS_AKTIVIERUNG, AKTIVIERUNG_TIMEOUT_MS)) {
+          return ok(undefined);
+        }
+      }
+      return err(texte().ziel.startDauertZuLang(ziel.name));
     },
   };
 }

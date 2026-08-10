@@ -358,6 +358,8 @@ export const de = {
     neueKombination: 'Neue Tastenkombination:',
     hotkeyPlatzhalter: 'z. B. CommandOrControl+Shift+D',
     hotkeyUebernehmen: 'Hotkey übernehmen',
+    notizAbschnitt: 'Schnellnotiz',
+    notizFeldLabel: 'Tastenkürzel für die Schnellnotiz:',
     notizZeile: 'Schnellnotiz (nur speichern):',
     notizNichtVergeben: 'kein Tastenkürzel vergeben',
     notizErklaerung:
@@ -428,9 +430,9 @@ export const de = {
     sprachkommandosLabel:
       'Sprachkommandos umsetzen: "Punkt", "Komma", "Fragezeichen", "Ausrufezeichen", "Doppelpunkt", "neue Zeile", "Zeilenumbruch", "neuer Absatz", "Absatz" (englisches Diktat: "period", "comma", "new line", "new paragraph", "paragraph"). Ein Kommandowort direkt nach einem Artikel ("der Punkt", "ein Komma") wird als normales Wort erkannt und bleibt stehen. Satzzeichen, die die Spracherkennung selbst um ein Kommandowort setzt, werden mitentfernt ("Test, Punkt." wird zu "Test."). Standardmäßig aus.',
     zielanwendungLabel:
-      'Zielanwendung am Satzende erkennen: endet das Diktat auf "an Word senden", "in Excel einfügen" oder "nach Outlook übertragen", wird diese Wendung entfernt, das genannte Fenster nach vorne geholt und der Text dort eingefügt. Präposition und Verb sind Pflicht, deshalb löst ein Satz, der nur auf einen Programmnamen endet ("die Daten in Excel"), nichts aus. Läuft das Programm nicht, wird nichts eingefügt: der Text bleibt in der Zwischenablage und eine Meldung nennt den Grund. Standardmäßig aus.',
-    zielanwendungHinweis:
-      'Erkannte Verben: senden, schicken, einfügen, übertragen, kopieren. Erkannte Einleitungen: an, in, ins, nach, zu. Eine Kommandozeile ist bewusst nicht ansteuerbar: dort stünde eingefügter Text einen Tastendruck vor der Ausführung.',
+      'Zielanwendung am Satzende erkennen: endet das Diktat auf "an Word senden", "in Excel einfügen" oder "nach Outlook übertragen", wird diese Wendung entfernt, das genannte Fenster nach vorne geholt und der Text dort eingefügt. Präposition und Verb sind Pflicht, deshalb löst ein Satz, der nur auf einen Programmnamen endet ("die Daten in Excel"), nichts aus. Läuft das Programm nicht, wird nichts eingefügt: der Text bleibt in der Zwischenablage und eine Meldung nennt den Grund. Erkannte Verben: senden, schicken, einfügen, übertragen, kopieren; erkannte Einleitungen: an, in, ins, nach, zu. Eine Kommandozeile ist bewusst nicht ansteuerbar. Standardmäßig aus.',
+    zielanwendungStartenLabel:
+      'Geschlossene Zielanwendung starten, statt es nur zu melden. VoiceWall wartet dann, bis das Programm bereit ist, und fügt erst danach ein. Bedenken Sie: ein frisch gestartetes Programm zeigt oft nur seinen Startbildschirm und noch kein Eingabefeld, dann findet der Text kein Ziel. Standardmäßig aus.',
     zielanwendungVerfuegbar: 'Auf diesem Rechner ansteuerbar:',
     fachwoerterbuchTitel: 'Fach-Wörterbuch der aktiven Firma',
     fachwoerterbuchKeineFirma:
@@ -764,6 +766,8 @@ export const de = {
         `${name} ist gerade nicht geöffnet. Der Text liegt in der Zwischenablage und geht nicht verloren: Fenster öffnen und mit Einfügen übernehmen.`,
       nichtAufDieserPlattform: (name: string): string =>
         `${name} gibt es auf diesem Betriebssystem nicht. Der Text liegt in der Zwischenablage.`,
+      startDauertZuLang: (name: string): string =>
+        `${name} wurde gestartet, war aber nicht rechtzeitig bereit. Der Text liegt in der Zwischenablage, bitte dort einfügen.`,
       aktivierungFehlgeschlagen: (name: string): string =>
         `${name} ließ sich nicht in den Vordergrund holen. Der Text liegt in der Zwischenablage, bitte dort einfügen.`,
       overlayGesendet: (name: string): string => `Text an ${name} übergeben.`,

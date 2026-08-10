@@ -33,6 +33,11 @@ welcome (see the test guide `docs/TESTLEITFADEN.md`, English version:
   themselves in the meantime, their content is left untouched. If the
   machine locks or suspends, a running dictation is aborted and the
   audio is discarded rather than transcribed.
+- **Start the target application:** if the named program is not open,
+  VoiceWall can open it on request (separate switch, off by default) and
+  then waits until it is ready. Note: a freshly started program often shows
+  only its start screen and no input field yet, in which case the text finds
+  no target.
 - **Quick note (save only):** a second, optional hotkey records exactly like
   a dictation but never inserts the text anywhere: it is saved solely as a
   note in the active company, and the clipboard stays untouched. Made for the

@@ -163,6 +163,7 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
     wortdopplungenEntfernen: false,
     sprachkommandos: false,
     zielanwendung: false,
+    zielanwendungStarten: false,
   };
   const flowState = status?.flowState ?? 'idle';
   const platform = systemInfo?.platform ?? 'darwin';
@@ -243,9 +244,23 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
             {t.hotkeyUebernehmen}
           </button>
         </div>
+        <div className="actions">
+          <label className="switch-row">
+            <input
+              type="checkbox"
+              checked={clipboardRestoreEnabled}
+              disabled={busy}
+              onChange={(event) =>
+                void runAction(() => window.voicewall.setClipboardRestore(event.target.checked))
+              }
+            />{' '}
+            {t.clipboardWiederherstellen}
+          </label>
+        </div>
+        <h4>{t.notizAbschnitt}</h4>
         <p className="notice">{t.notizErklaerung}</p>
         <div className="actions">
-          <label htmlFor="notiz-hotkey-input">{t.neueKombination}</label>
+          <label htmlFor="notiz-hotkey-input">{t.notizFeldLabel}</label>
           <input
             id="notiz-hotkey-input"
             type="text"
@@ -276,19 +291,6 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
           >
             {t.notizEntfernen}
           </button>
-        </div>
-        <div className="actions">
-          <label className="switch-row">
-            <input
-              type="checkbox"
-              checked={clipboardRestoreEnabled}
-              disabled={busy}
-              onChange={(event) =>
-                void runAction(() => window.voicewall.setClipboardRestore(event.target.checked))
-              }
-            />{' '}
-            {t.clipboardWiederherstellen}
-          </label>
         </div>
         {accessibility === 'missing' && (
           <div className="accessibility-hint" data-testid="accessibility-hint">
@@ -568,15 +570,33 @@ export function DiktatView(props: DiktatViewProps): ReactElement {
           </label>
         </div>
         {aufbereitung.zielanwendung && (
-          <>
-            <p className="notice">{t.zielanwendungHinweis}</p>
-            <p className="notice" data-testid="ziel-liste">
-              {t.zielanwendungVerfuegbar}{' '}
-              {zieleFuerPlattform(platform)
-                .map((ziel) => ziel.name)
-                .join(', ')}
-            </p>
-          </>
+          <div className="actions">
+            <label className="switch-row">
+              <input
+                type="checkbox"
+                data-testid="switch-zielanwendung-starten"
+                checked={aufbereitung.zielanwendungStarten}
+                disabled={busy}
+                onChange={(event) =>
+                  void runAction(() =>
+                    window.voicewall.setAufbereitung({
+                      ...aufbereitung,
+                      zielanwendungStarten: event.target.checked,
+                    }),
+                  )
+                }
+              />{' '}
+              {t.zielanwendungStartenLabel}
+            </label>
+          </div>
+        )}
+        {aufbereitung.zielanwendung && (
+          <p className="notice" data-testid="ziel-liste">
+            {t.zielanwendungVerfuegbar}{' '}
+            {zieleFuerPlattform(platform)
+              .map((ziel) => ziel.name)
+              .join(', ')}
+          </p>
         )}
         <h4>{t.fachwoerterbuchTitel}</h4>
         {!hasCompany ? (

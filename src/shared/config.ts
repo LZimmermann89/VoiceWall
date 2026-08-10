@@ -174,6 +174,10 @@ export const globalConfigSchema = z
         // Regel wechselt das Fenster und schneidet Text ab. Beides gehoert in
         // eine bewusste Entscheidung des Nutzers, nicht in den Auslieferungsstand.
         zielanwendung: z.boolean().default(false),
+        // Eine geschlossene Zielanwendung starten, statt sie zu melden.
+        // Default AUS: ein Diktat, das ungefragt Programme oeffnet, waere
+        // eine Ueberraschung.
+        zielanwendungStarten: z.boolean().default(false),
       })
       .passthrough()
       .default({
@@ -181,6 +185,7 @@ export const globalConfigSchema = z
         wortdopplungenEntfernen: false,
         sprachkommandos: false,
         zielanwendung: false,
+        zielanwendungStarten: false,
       }),
     /**
      * Sprache der Oberflaeche: 'de' ist der
@@ -215,6 +220,7 @@ export function defaultGlobalConfig(): GlobalConfig {
       wortdopplungenEntfernen: false,
       sprachkommandos: false,
       zielanwendung: false,
+      zielanwendungStarten: false,
     },
     uiSprache: 'de',
   };

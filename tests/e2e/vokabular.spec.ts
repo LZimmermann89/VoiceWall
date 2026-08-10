@@ -140,6 +140,7 @@ test('Stufe 1: Wörterbuch-Editor, Schalter-Persistenz und korrigierte Zustellun
             wortdopplungenEntfernen: boolean;
             sprachkommandos: boolean;
             zielanwendung: boolean;
+            zielanwendungStarten: boolean;
           };
         };
         return config.aufbereitung;
@@ -152,6 +153,7 @@ test('Stufe 1: Wörterbuch-Editor, Schalter-Persistenz und korrigierte Zustellun
         sprachkommandos: true,
         // Zielanwendung am Satzende, ebenfalls Default AUS.
         zielanwendung: false,
+        zielanwendungStarten: false,
       });
     // Zuruecksetzen (der Zustellungs-Test unten laeuft mit Kommandos AUS).
     await window.getByTestId('switch-sprachkommandos').click();

@@ -583,7 +583,7 @@ export class DictationFlowController {
     if (!zielIstAnsteuerbar(ziel, process.platform)) {
       return err(texte().ziel.nichtAufDieserPlattform(ziel.name));
     }
-    return this.zielAktivierer.aktiviere(ziel);
+    return this.zielAktivierer.aktiviere(ziel, this.config.aufbereitung.zielanwendungStarten);
   }
 
   /**
@@ -993,6 +993,7 @@ export class DictationFlowController {
         wortdopplungenEntfernen: this.config.aufbereitung.wortdopplungenEntfernen,
         sprachkommandos: this.config.aufbereitung.sprachkommandos,
         zielanwendung: this.config.aufbereitung.zielanwendung,
+        zielanwendungStarten: this.config.aufbereitung.zielanwendungStarten,
       },
       uiLanguage: this.config.uiSprache,
     };

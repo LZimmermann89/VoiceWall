@@ -145,6 +145,7 @@ describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
       wortdopplungenEntfernen: false,
       sprachkommandos: false,
       zielanwendung: false,
+      zielanwendungStarten: false,
     });
   });
 
@@ -159,6 +160,7 @@ describe('globalConfigSchema: Aufbereitung (Stufe 1)', () => {
         wortdopplungenEntfernen: false,
         sprachkommandos: false,
         zielanwendung: false,
+        zielanwendungStarten: false,
       });
     }
   });
