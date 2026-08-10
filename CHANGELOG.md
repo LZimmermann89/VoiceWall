@@ -6,6 +6,74 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ## [Unreleased]
 
+### Added
+
+- **Schnellnotiz:** ein zweiter, optionaler Hotkey nimmt wie gewohnt auf,
+  fügt den Text aber nirgends ein, sondern speichert ihn ausschließlich
+  als Notiz in der aktiven Firma; die Zwischenablage bleibt dabei
+  unangetastet. Gedacht für den Gedanken zwischendurch, wenn kein
+  Textfeld offen ist. Das Kürzel ist im Auslieferungszustand bewusst
+  **nicht** vergeben, damit VoiceWall keine Kombination belegt, die in
+  anderen Programmen schon etwas bedeutet; ohne Kürzel ist die
+  Schnellnotiz über das Menüleisten-Symbol erreichbar. Anders als beim
+  normalen Diktat hängt das Speichern hier nicht am
+  Auto-Speichern-Schalter, denn Speichern ist der einzige Zweck dieses
+  Weges. Schlägt es fehl (noch keine Firma eingerichtet), landet der Text
+  in der Zwischenablage und die Meldung nennt den Grund: auch hier geht
+  kein diktierter Text verloren. Ein E2E-Test belegt beides, die
+  gespeicherte Datei und dass der Einfüge-Zähler bei null bleibt.
+- **Format-neutrale Qualitätsmessung:** die WER-Berechnung liefert jetzt
+  zusätzlich die Ausrichtung (welche Wörter abweichen, nicht nur wie
+  viele), und ein deutscher Zahlwort-Parser stellt Referenz und
+  Transkript auf dieselbe Schreibkonvention ("zwanzig Milligramm" gegen
+  "20 mg"). Damit wird sichtbar, welcher Teil der Wortfehlerrate ein
+  echter Erkennungsfehler ist und welcher nur Schreibweise. Rein interne
+  Messwerkzeuge, am ausgelieferten Verhalten ändert sich nichts.
+
+### Security
+
+- Sieben gemeldete Schwachstellen in Werkzeugen der Bauumgebung behoben
+  (`brace-expansion`, `fast-uri`, `js-yaml`, `nanoid`, `postcss`, `tar`,
+  `undici`), alle über Aktualisierungen innerhalb der bestehenden
+  Versionsbereiche, kein einziger Sprung auf eine neue Hauptversion.
+  Betroffen war ausschließlich der Werkzeugkasten: die Pakete stammen von
+  `vite` und `electron-builder`, und das ausgelieferte Programm enthält
+  keines davon (die Paketierung nimmt ausschließlich das gebaute
+  Verzeichnis auf, keine `node_modules`; eine gezielte Suche im gebauten
+  Programm findet keinen der sieben). Für Anwender bestand damit kein
+  Risiko, für das Prüfgate der Bauumgebung schon.
+- Dabei fiel eine Falle auf, die festgehalten gehört: `npm` hatte seine
+  eigene Buchführung im Abhängigkeitsordner bereits auf die reparierten
+  Versionen gesetzt, während auf der Festplatte weiterhin die alten
+  Dateien lagen. `npm audit` prüft gegen die Buchführung und meldete
+  deshalb Sauberkeit, die es nicht gab. Erst eine vollständige
+  Neuinstallation aus der Sperrdatei hat den Ordner tatsächlich auf
+  den gemeldeten Stand gebracht. Wer nur auf die Meldung schaut,
+  verlässt sich auf eine Behauptung statt auf einen Beleg.
+
+### Fixed
+
+- Der Regressionstest des echten Aufnahmepfads war von der Maschinenlast
+  abhängig: er belegte den PCM-Fluss ausschließlich über die
+  Pegelanzeige in der Oberfläche und gab dafür 15 Sekunden, in denen
+  zuvor noch die Engine startete (Modell laden, auf macOS Metal
+  initialisieren). Einzeln lief er knapp durch, zusammen mit der übrigen
+  Suite fiel er. Er prüft jetzt zuerst die eingetroffenen Pegelwerte
+  selbst (unabhängig vom Rendern und vom Abklingen des Balkens) und
+  danach zusätzlich die Anzeige. Bei der Messung kam außerdem heraus,
+  dass das Testsignal des simulierten Mikrofons entgegen der bisherigen
+  Annahme kein Dauerton ist, sondern pulsiert: zwischen den Tönen liegt
+  der Pegel sekundenlang bei null. Der Test musste bis dahin zufällig ein
+  Tonfenster treffen. Er zeichnet jetzt den Verlauf auf und fragt, ob die
+  Anzeige jemals ausgeschlagen hat, statt den Momentanwert abzufragen.
+  Damit misst er wieder das Produkt statt der Auslastung, und er ist
+  nebenbei von gut 16 auf gut 3 Sekunden geschrumpft.
+- Zwei E2E-Tests des Fach-Wörterbuchs geprüft und korrigiert: der eine
+  kannte den inzwischen eigenständigen Schalter für Wortdopplungen noch
+  nicht, der andere suchte die Fehlschreibung in der
+  gesamten Datei statt nur im Text und schlug deshalb am
+  Front-Matter-Beleg an, der die angewandte Regel korrekterweise nennt.
+
 ### Removed
 
 - Dependabot-Konfiguration (`.github/dependabot.yml`) entfernt.
