@@ -135,11 +135,21 @@ test('Stufe 1: Wörterbuch-Editor, Schalter-Persistenz und korrigierte Zustellun
     await expect
       .poll(() => {
         const config = JSON.parse(readFileSync(join(userDataDir, 'config.json'), 'utf8')) as {
-          aufbereitung?: { fuellwoerterEntfernen: boolean; sprachkommandos: boolean };
+          aufbereitung?: {
+            fuellwoerterEntfernen: boolean;
+            wortdopplungenEntfernen: boolean;
+            sprachkommandos: boolean;
+          };
         };
         return config.aufbereitung;
       })
-      .toEqual({ fuellwoerterEntfernen: true, sprachkommandos: true });
+      .toEqual({
+        fuellwoerterEntfernen: true,
+        // Inzwischen ein eigener Schalter, Default AUS: der
+        // Wortdopplungs-Kollaps kann Inhalt verfaelschen.
+        wortdopplungenEntfernen: false,
+        sprachkommandos: true,
+      });
     // Zuruecksetzen (der Zustellungs-Test unten laeuft mit Kommandos AUS).
     await window.getByTestId('switch-sprachkommandos').click();
     await expect(window.getByTestId('switch-sprachkommandos')).not.toBeChecked();
@@ -234,7 +244,18 @@ test('Stufe 1: Diktat-Flow per PCM-Injektion mit Ersetzungsregel (echtes Modell)
     expect(files).toHaveLength(1);
     const raw = readFileSync(files[0] ?? '', 'utf8');
     expect(raw).toContain('VoiceWall');
-    expect(raw).not.toContain('Voice Wall');
+    // Geprueft wird der BODY: im Front-Matter steht die angewandte Regel als
+    // Beleg ("Voice Wall -> VoiceWall (1x)") und enthaelt die Fehlschreibung
+    // deshalb voellig zu Recht. Genau das ist der Zweck des Belegs.
+    const gespeichert = parseFrontMatter(raw);
+    expect(gespeichert.ok).toBe(true);
+    if (gespeichert.ok) {
+      expect(gespeichert.value.body).toContain('VoiceWall');
+      expect(gespeichert.value.body).not.toContain('Voice Wall');
+      expect(transcriptMetaSchema.parse(gespeichert.value.meta).ersetzungen).toEqual([
+        'Voice Wall -> VoiceWall (1x)',
+      ]);
+    }
   } finally {
     await app.close();
   }
