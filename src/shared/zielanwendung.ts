@@ -17,10 +17,18 @@
  * Katalog, nie aus dem Transkript. Aus dem Diktat kommt nur die Entscheidung,
  * WELCHER Eintrag gemeint ist.
  *
- * Erkennungsmuster, bewusst eng:
- * - Praeposition UND Verb sind Pflicht ("an Word senden"), nicht nur der Name.
- *   "Bitte die Daten in Excel" loest deshalb nichts aus.
- * - Die Wendung muss am ENDE des Textes stehen.
+ * Erkannt werden ZWEI Formen, weil Deutsch das Verb unterschiedlich stellt:
+ * - die Infinitivform am Textende ("... an Word senden"), und
+ * - der Befehlssatz am Textende ("... Schicke das an Word.").
+ * Wer spricht, waehlt fast immer die zweite. Nur die erste zu erkennen hiess,
+ * an der natuerlichen Sprechweise vorbeizubauen.
+ *
+ * Beide bleiben bewusst eng:
+ * - Praeposition UND Verb sind Pflicht, nicht nur der Name. "Bitte die Daten
+ *   in Excel" loest deshalb nichts aus.
+ * - Die Wendung steht am ENDE des Textes, und davor muss Text stehen: ohne
+ *   Inhalt gaebe es nichts zuzustellen.
+ * - Der Befehlssatz muss kurz sein (hoechstens acht Woerter).
  * Die verbleibende Unschaerfe (ein Diktat, das woertlich auf "in Excel
  * einfuegen" endet) ist der Grund, warum der Schalter standardmaessig AUS ist.
  *
@@ -518,6 +526,40 @@ const VERBEN: Readonly<Record<DictationLanguage, readonly string[]>> = {
   en: ['send', 'insert', 'paste', 'transfer'],
 };
 
+/**
+ * Verben, mit denen ein Befehlssatz BEGINNT ("Schicke das an Word").
+ *
+ * Warum es diese zweite Liste braucht: Im Deutschen steht das Verb im
+ * Infinitivsatz hinten ("... an Word senden"), im Befehlssatz aber vorne
+ * ("Schicke das an Word"). Wer spricht, waehlt fast immer die zweite Form.
+ * Nur die erste zu erkennen hiess, an der natuerlichen Sprechweise
+ * vorbeizubauen.
+ */
+const BEFEHLSVERBEN: Readonly<Record<DictationLanguage, readonly string[]>> = {
+  de: [
+    'schicke',
+    'schick',
+    'sende',
+    'send',
+    'füge',
+    'fuege',
+    'packe',
+    'pack',
+    'kopiere',
+    'übertrage',
+    'uebertrage',
+    'schreibe',
+  ],
+  en: ['send', 'insert', 'paste', 'put', 'transfer', 'copy'],
+};
+
+/**
+ * Hoechstlaenge des Befehlssatzes in Woertern. Ein Befehl ist kurz; alles
+ * Laengere ist mit hoher Wahrscheinlichkeit normaler Diktattext, der zufaellig
+ * mit einem passenden Verb beginnt.
+ */
+const BEFEHLSSATZ_MAX_WOERTER = 8;
+
 /** Ergebnis der Erkennung: bereinigter Text plus erkanntes Ziel. */
 export interface Zielbefehl {
   /** Der Text ohne die Schlusswendung. */
@@ -544,10 +586,74 @@ function vergleichsform(text: string): string {
  * aus Nutzerdaten. Laengere Zielnamen gewinnen vor kuerzeren, damit
  * "power point" nicht als "point" missverstanden wird.
  */
-export function erkenneZielbefehl(
-  text: string,
-  sprache: DictationLanguage = 'de',
-): Zielbefehl | null {
+/**
+ * Alle Namensvarianten, laengste zuerst: damit "power point" nicht als
+ * "point" missverstanden wird.
+ */
+function kandidatenNachLaenge(): { ziel: Zielanwendung; gesprochen: string }[] {
+  return ZIELANWENDUNGEN.flatMap((ziel) =>
+    ziel.gesprochen.map((gesprochen) => ({ ziel, gesprochen })),
+  ).sort((a, b) => b.gesprochen.split(' ').length - a.gesprochen.split(' ').length);
+}
+
+/**
+ * Sucht einen Befehlssatz am Textende ("... Schicke das an Word.").
+ *
+ * Bedingungen, alle vier muessen zutreffen: Der letzte Satz beginnt mit einem
+ * Befehlsverb, enthaelt Praeposition und Zielnamen, ist kurz, und es steht
+ * Text davor. Die Kuerze ist das wichtigste Sicherheitsmerkmal: ein Befehl ist
+ * kurz, ein Diktatsatz selten.
+ */
+function erkenneBefehlssatz(text: string, sprache: DictationLanguage): Zielbefehl | null {
+  // Den letzten Satz abtrennen. Das Satzzeichen des Befehls selbst muss dabei
+  // zuerst weg, sonst faende die Suche nach der Satzgrenze genau dieses und
+  // der "letzte Satz" waere leer.
+  const ohneEndzeichen = text.trimEnd().replace(/[.!?]+$/, '');
+  const grenze = Math.max(
+    ohneEndzeichen.lastIndexOf('.'),
+    ohneEndzeichen.lastIndexOf('!'),
+    ohneEndzeichen.lastIndexOf('?'),
+  );
+  if (grenze === -1) {
+    // Ohne vorherigen Satz gibt es keinen Text, der zugestellt werden koennte.
+    return null;
+  }
+  const davor = ohneEndzeichen.slice(0, grenze + 1).trim();
+  const letzterSatz = ohneEndzeichen.slice(grenze + 1).trim();
+  if (davor.length === 0 || letzterSatz.length === 0) {
+    return null;
+  }
+  const woerter = vergleichsform(letzterSatz)
+    .split(' ')
+    .filter((wort) => wort.length > 0);
+  if (woerter.length < 3 || woerter.length > BEFEHLSSATZ_MAX_WOERTER) {
+    return null;
+  }
+  if (!BEFEHLSVERBEN[sprache].includes(woerter[0] ?? '')) {
+    return null;
+  }
+  // Irgendwo im Satz muss "<Praeposition> <Zielname>" stehen.
+  const praepositionen = PRAEPOSITIONEN[sprache];
+  for (const { ziel, gesprochen } of kandidatenNachLaenge()) {
+    const namensteile = gesprochen.split(' ');
+    for (let start = 1; start + namensteile.length <= woerter.length; start += 1) {
+      if (woerter.slice(start, start + namensteile.length).join(' ') !== gesprochen) {
+        continue;
+      }
+      if (!praepositionen.includes(woerter[start - 1] ?? '')) {
+        continue;
+      }
+      return { text: davor, ziel };
+    }
+  }
+  return null;
+}
+
+/**
+ * Erste Form: die Infinitiv-Schlusswendung ("... an Word senden"), bei der
+ * das Verb das letzte Wort ist.
+ */
+function erkenneSchlusswendung(text: string, sprache: DictationLanguage): Zielbefehl | null {
   const praepositionen = PRAEPOSITIONEN[sprache];
   const verben = VERBEN[sprache];
   const woerter = vergleichsform(text)
@@ -561,12 +667,7 @@ export function erkenneZielbefehl(
   if (!verben.includes(letztes)) {
     return null;
   }
-  // Alle Namensvarianten nach Wortzahl absteigend pruefen (laengste zuerst).
-  const kandidaten = ZIELANWENDUNGEN.flatMap((ziel) =>
-    ziel.gesprochen.map((gesprochen) => ({ ziel, gesprochen })),
-  ).sort((a, b) => b.gesprochen.split(' ').length - a.gesprochen.split(' ').length);
-
-  for (const { ziel, gesprochen } of kandidaten) {
+  for (const { ziel, gesprochen } of kandidatenNachLaenge()) {
     const namensteile = gesprochen.split(' ');
     const start = woerter.length - 1 - namensteile.length;
     if (start < 1) {
@@ -596,6 +697,17 @@ export function erkenneZielbefehl(
     return { text: bereinigt, ziel };
   }
   return null;
+}
+
+/**
+ * Sucht die Zielanwendung am Textende, in beiden Sprachstellungen.
+ * Zuerst die Infinitivform, dann der Befehlssatz.
+ */
+export function erkenneZielbefehl(
+  text: string,
+  sprache: DictationLanguage = 'de',
+): Zielbefehl | null {
+  return erkenneSchlusswendung(text, sprache) ?? erkenneBefehlssatz(text, sprache);
 }
 
 /** Liefert die Zielanwendung zu einer Kennung oder null. */

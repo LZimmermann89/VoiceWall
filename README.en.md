@@ -70,8 +70,8 @@ welcome (see the test guide `docs/TESTLEITFADEN.md`, English version:
   shortcut the quick note is available from the menu bar icon. If the note
   cannot be saved (no company set up yet), the text goes to the clipboard and
   the message says so: no dictated text is lost here either.
-- **Name a target application:** if the dictation ends with a fixed phrase
-  such as "to Word send" or "into Excel insert", that phrase is removed,
+- **Name a target application:** if the dictation ends with a command such
+  as "Send this to Word", "to Word send" or "Insert this into Excel", that phrase is removed,
   the named window is brought to the front and the text is inserted there.
   The catalogue covers more than 50 common applications (Office, Apple
   programs, browsers, messengers, development environments); the interface

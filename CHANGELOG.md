@@ -150,6 +150,17 @@ die Versionierung folgt [SemVer](https://semver.org/lang/de/).
 
 ### Fixed
 
+- Der Befehl für die Zielanwendung wurde nur in einer von zwei
+  Sprachstellungen erkannt. Deutsch stellt das Verb im Infinitivsatz
+  hinten („… an Word senden"), im Befehlssatz aber vorne („Schicke das an
+  Word"). Erkannt wurde nur die erste Form, und wer spricht, wählt fast
+  immer die zweite. Damit ging die Funktion an der natürlichen
+  Sprechweise vorbei. Beide Stellungen funktionieren jetzt, ebenso das
+  geteilte Verb („Füge das in Excel ein"), bei dem der zweite Teil hinter
+  dem Programmnamen steht. Die Absicherung bleibt streng: vor dem Befehl
+  muss Text stehen, der Befehlssatz muss kurz sein, und ohne Präposition
+  oder ohne bekannten Programmnamen löst nichts aus.
+
 - Der Regressionstest des echten Aufnahmepfads war von der Maschinenlast
   abhängig: er belegte den PCM-Fluss ausschließlich über die
   Pegelanzeige in der Oberfläche und gab dafür 15 Sekunden, in denen

@@ -60,6 +60,64 @@ describe('erkenneZielbefehl: Treffer', () => {
   });
 });
 
+describe('erkenneZielbefehl: Befehlssatz mit Verb vorne', () => {
+  it('erkennt die natuerliche Sprechweise', () => {
+    // Im Deutschen steht das Verb im Infinitivsatz hinten, im Befehlssatz
+    // aber vorne. Wer spricht, waehlt fast immer die zweite Form; nur die
+    // erste zu erkennen hiess, an der Sprechweise vorbeizubauen.
+    const treffer = erkenneZielbefehl('Das Angebot ist geprüft. Schicke das an Word.');
+    expect(treffer?.ziel.id).toBe('word');
+    expect(treffer?.text).toBe('Das Angebot ist geprüft.');
+  });
+
+  it('erkennt die gaengigen Befehlsverben', () => {
+    expect(erkenneZielbefehl('Text hier. Sende das an Outlook.')?.ziel.id).toBe('outlook');
+    expect(erkenneZielbefehl('Text hier. Kopiere das in Excel.')?.ziel.id).toBe('excel');
+    expect(erkenneZielbefehl('Text hier. Packe das in Teams.')?.ziel.id).toBe('teams');
+    expect(erkenneZielbefehl('Text hier. Übertrage das nach Notion.')?.ziel.id).toBe('notion');
+  });
+
+  it('kommt mit dem geteilten Verb zurecht ("füge ... ein")', () => {
+    // Trennbare Verben stellen den zweiten Teil ans Satzende, hinter das
+    // Ziel. Deshalb wird der Zielname im ganzen Satz gesucht, nicht nur am
+    // Schluss.
+    expect(erkenneZielbefehl('Text hier. Füge das in Visual Studio Code ein.')?.ziel.id).toBe(
+      'vscode',
+    );
+  });
+
+  it('braucht kein Satzzeichen am Ende des Befehls', () => {
+    expect(erkenneZielbefehl('Text hier. Schicke dies zu Word')?.ziel.id).toBe('word');
+  });
+
+  it('erkennt die englische Befehlsform', () => {
+    expect(erkenneZielbefehl('Text here. Send this to Word.', 'en')?.ziel.id).toBe('word');
+  });
+
+  it('loest ohne Text davor nicht aus', () => {
+    // Nur der Befehl: es gaebe nichts zuzustellen.
+    expect(erkenneZielbefehl('Schicke das an Word.')).toBeNull();
+  });
+
+  it('loest bei einem langen Satz nicht aus', () => {
+    // Ein Befehl ist kurz. Die Laengengrenze ist das wichtigste
+    // Sicherheitsmerkmal gegen Diktattext, der zufaellig passend beginnt.
+    expect(
+      erkenneZielbefehl('Text. Schicke bitte das fertige Dokument mit allen Anlagen an Word.'),
+    ).toBeNull();
+  });
+
+  it('loest ohne Befehlsverb nicht aus', () => {
+    expect(erkenneZielbefehl('Text hier. Die Datei liegt in Word.')).toBeNull();
+  });
+
+  it('loest nicht aus, wenn der Befehlssatz nicht am Ende steht', () => {
+    expect(
+      erkenneZielbefehl('Wir haben die Datei an Word geschickt und danach nochmals geprüft.'),
+    ).toBeNull();
+  });
+});
+
 describe('erkenneZielbefehl: darf NICHT ausloesen', () => {
   it('nicht ohne Verb am Ende', () => {
     // Der haeufigste Fehlauslöser waere ein Satz, der auf den blossen

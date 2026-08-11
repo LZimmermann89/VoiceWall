@@ -73,8 +73,8 @@ echter Windows-Hardware aus, Testberichte sind willkommen (siehe
   sich die Notiz nicht speichern (noch keine Firma eingerichtet), landet der
   Text in der Zwischenablage und die Meldung sagt es: auch hier geht kein
   diktierter Text verloren.
-- **Zielanwendung ansagen:** endet das Diktat auf eine feste Wendung wie
-  „an Word senden", „in Excel einfügen" oder „nach Outlook übertragen",
+- **Zielanwendung ansagen:** endet das Diktat auf einen Befehl wie „Schicke das an
+  Word", „an Word senden" oder „Füge das in Excel ein",
   wird diese Wendung entfernt, das genannte Fenster nach vorne geholt und
   der Text dort eingefügt. Der Katalog umfasst über 50 gängige
   Anwendungen (Office, Apple-Programme, Browser, Messenger,
