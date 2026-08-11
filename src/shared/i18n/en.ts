@@ -419,7 +419,7 @@ export const en: Uebersetzung = {
     kontakteImport: 'Import from CSV',
     kontakteExport: 'Save as CSV',
     kontakteImportHinweis:
-      'To edit in Excel: "Save as CSV", edit there, then "Import from CSV". Both semicolon and comma are recognized, as are umlauts from older Excel versions. An import replaces nothing: identical names are updated, new ones are added.',
+      'To edit in Excel: "Save as CSV", edit there, then "Import from CSV". You can also simply create your own table with headings such as Company, Name and Email; the columns are detected, and extra ones such as Company do no harm. In Excel choose "Save as" and store it as CSV. An import replaces nothing: identical names are updated, new ones are added, and unusable rows are reported individually.',
     kontakteImportErfolg: (neu: number, aktualisiert: number, verworfen: number): string => {
       const teile = [`${String(neu)} new`, `${String(aktualisiert)} updated`];
       if (verworfen > 0) {

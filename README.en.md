@@ -47,9 +47,13 @@ welcome (see the test guide `docs/TESTLEITFADEN.md`, English version:
   personal data. Off by default.
   The list can be edited directly in the app, and for larger sets there is
   CSV in both directions: "Save as CSV", edit in Excel, "Import from CSV".
-  German Excel separates with semicolons and writes Windows-1252 instead of
-  UTF-8 depending on the version; both are detected so that umlauts do not
-  turn into question marks. An import replaces nothing, it merges: identical
+  Columns are detected by their heading and, failing
+  that, by their content: a table with "Company, Name, Email" works just as
+  well as one without any headings at all, because the address column is
+  the one containing addresses. Extra columns do no harm. German Excel
+  separates with semicolons and writes Windows-1252 instead of UTF-8
+  depending on the version; both are detected so that umlauts do not turn
+  into question marks. An import replaces nothing, it merges: identical
   names are updated, new ones are added, and invalid rows are reported
   individually with their line number instead of being silently dropped.
 - **Start the target application:** if the named program is not open,

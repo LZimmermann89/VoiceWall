@@ -22,9 +22,86 @@
  */
 import { kontaktSchema, MAX_KONTAKTE, type Kontakt } from './mailbefehl';
 
-/** Spaltenueberschriften, die als Name bzw. Adresse durchgehen. */
-const NAME_SPALTEN = ['name', 'kontakt', 'empfänger', 'empfaenger', 'contact', 'recipient'];
-const ADRESSE_SPALTEN = ['adresse', 'e-mail', 'email', 'e-mail-adresse', 'mail', 'address'];
+/**
+ * Erkennt eine Spaltenueberschrift, egal wie sie geschrieben ist.
+ *
+ * Bewusst KEINE feste Wortliste: "Mailadresse", "E-Mail-Adresse", "E Mail",
+ * "eMail_Adresse" sind alle dasselbe, und eine Liste ist nie vollstaendig.
+ * Verglichen wird deshalb auf einer entschlackten Form (klein, ohne
+ * Trennzeichen) mit Teilwoertern.
+ */
+function normalisiereUeberschrift(feld: string): string {
+  return feld
+    .toLowerCase()
+    .normalize('NFC')
+    .replace(/[\s._-]/g, '')
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/ß/g, 'ss');
+}
+
+/** Ist diese Ueberschrift eine Adress-Spalte? */
+function istAdressUeberschrift(feld: string): boolean {
+  const wert = normalisiereUeberschrift(feld);
+  return wert.includes('mail') || wert === 'adresse' || wert.includes('address');
+}
+
+/** Ist diese Ueberschrift eine Namens-Spalte? */
+function istNamensUeberschrift(feld: string): boolean {
+  const wert = normalisiereUeberschrift(feld);
+  return (
+    wert.includes('name') ||
+    wert.includes('kontakt') ||
+    wert.includes('empfaenger') ||
+    wert.includes('ansprechpartner') ||
+    wert.includes('contact') ||
+    wert.includes('recipient')
+  );
+}
+
+/**
+ * Ist diese Ueberschrift eine Firmen-Spalte? Sie wird nur gebraucht, um sie
+ * NICHT mit dem Namen zu verwechseln: eine Tabelle mit Firma, Name und
+ * Mailadresse ist der Normalfall, und "Firma" steht darin oft zuerst.
+ */
+function istFirmenUeberschrift(feld: string): boolean {
+  const wert = normalisiereUeberschrift(feld);
+  return (
+    wert.includes('firma') ||
+    wert.includes('unternehmen') ||
+    wert.includes('company') ||
+    wert.includes('organisation') ||
+    wert.includes('organization')
+  );
+}
+
+/** Sieht dieser Wert nach einer E-Mail-Adresse aus? */
+function siehtNachAdresseAus(wert: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(wert.trim());
+}
+
+/**
+ * Bestimmt die Spalte mit den Adressen anhand des INHALTS: welche Spalte
+ * enthaelt in den Datenzeilen am haeufigsten etwas mit At-Zeichen und Punkt?
+ *
+ * Das ist die verlaesslichste Erkennung ueberhaupt, weil sie ohne
+ * Ueberschriften auskommt und in jeder Sprache funktioniert. Sie greift,
+ * wenn die Kopfzeile nichts hergibt oder gar keine da ist.
+ */
+function findeAdressSpalteImInhalt(zeilen: readonly string[][]): number {
+  let besteSpalte = -1;
+  let besteTreffer = 0;
+  const spalten = Math.max(0, ...zeilen.map((felder) => felder.length));
+  for (let spalte = 0; spalte < spalten; spalte += 1) {
+    const treffer = zeilen.filter((felder) => siehtNachAdresseAus(felder[spalte] ?? '')).length;
+    if (treffer > besteTreffer) {
+      besteTreffer = treffer;
+      besteSpalte = spalte;
+    }
+  }
+  return besteSpalte;
+}
 
 /** Ergebnis eines Imports: was uebernommen wurde und was nicht. */
 export interface CsvImportErgebnis {
@@ -94,42 +171,82 @@ function erkenneTrenner(kopfzeile: string): string {
  */
 export function parseKontakteCsv(inhalt: string): CsvImportErgebnis {
   const ohneBom = inhalt.replace(/^\uFEFF/, '');
-  const zeilen = ohneBom
+  const rohzeilen = ohneBom
     .split(/\r?\n/)
     .map((zeile) => zeile.trim())
     .filter((zeile) => zeile.length > 0);
-  if (zeilen.length === 0) {
+  if (rohzeilen.length === 0) {
     return { kontakte: [], verworfen: [] };
   }
-  const trenner = erkenneTrenner(zeilen[0] ?? '');
+  const trenner = erkenneTrenner(rohzeilen[0] ?? '');
+  const zerlegt = rohzeilen.map((zeile) => zerlegeZeile(zeile, trenner));
 
-  // Kopfzeile auswerten, falls vorhanden.
-  let nameIndex = 0;
-  let adresseIndex = 1;
-  let start = 0;
-  const kopf = zerlegeZeile(zeilen[0] ?? '', trenner).map((feld) => feld.toLowerCase());
-  const kopfName = kopf.findIndex((feld) => NAME_SPALTEN.includes(feld));
-  const kopfAdresse = kopf.findIndex((feld) => ADRESSE_SPALTEN.includes(feld));
-  if (kopfName !== -1 && kopfAdresse !== -1) {
-    nameIndex = kopfName;
-    adresseIndex = kopfAdresse;
-    start = 1;
+  // 1. Kopfzeile auswerten, falls eine da ist. Erkannt wird sie daran, dass
+  //    sie selbst keine Adresse enthaelt und mindestens eine bekannte
+  //    Ueberschrift traegt.
+  const kopf = zerlegt[0] ?? [];
+  const kopfHatAdresse = kopf.some((feld) => siehtNachAdresseAus(feld));
+  const kopfErkannt =
+    !kopfHatAdresse &&
+    kopf.some(
+      (feld) =>
+        istAdressUeberschrift(feld) || istNamensUeberschrift(feld) || istFirmenUeberschrift(feld),
+    );
+  const start = kopfErkannt ? 1 : 0;
+  const daten = zerlegt.slice(start);
+
+  let adresseIndex = kopfErkannt ? kopf.findIndex((feld) => istAdressUeberschrift(feld)) : -1;
+  let nameIndex = kopfErkannt ? kopf.findIndex((feld) => istNamensUeberschrift(feld)) : -1;
+
+  // 2. Was die Ueberschrift nicht hergibt, entscheidet der Inhalt: die
+  //    Adressspalte ist die, in der Adressen stehen. Das funktioniert auch
+  //    ganz ohne Kopfzeile und in jeder Sprache.
+  if (adresseIndex === -1) {
+    adresseIndex = findeAdressSpalteImInhalt(daten);
+  }
+  if (nameIndex === -1) {
+    // Ohne Namensspalte in der Kopfzeile: eine Firmenspalte nehmen, wenn es
+    // sie gibt (Firmenkontakte ohne Ansprechpartner sind ueblich), sonst die
+    // erste Spalte, die nicht die Adressspalte ist.
+    const firmaIndex = kopfErkannt ? kopf.findIndex((feld) => istFirmenUeberschrift(feld)) : -1;
+    if (firmaIndex !== -1 && firmaIndex !== adresseIndex) {
+      nameIndex = firmaIndex;
+    } else {
+      const spalten = Math.max(0, ...daten.map((felder) => felder.length));
+      nameIndex = 0;
+      for (let spalte = 0; spalte < spalten; spalte += 1) {
+        if (spalte !== adresseIndex) {
+          nameIndex = spalte;
+          break;
+        }
+      }
+    }
+  }
+  if (adresseIndex === -1) {
+    // Nirgends etwas, das nach einer Adresse aussieht: die zweite Spalte ist
+    // die uebliche Stelle, dann meldet die Pruefung unten sauber je Zeile.
+    adresseIndex = nameIndex === 0 ? 1 : 0;
   }
 
   const kontakte: Kontakt[] = [];
   const verworfen: string[] = [];
-  for (let i = start; i < zeilen.length; i += 1) {
+  for (let i = 0; i < daten.length; i += 1) {
+    // Zeilennummer aus Sicht des Nutzers: inklusive Kopfzeile, ab 1.
+    const zeilennummer = i + start + 1;
     if (kontakte.length >= MAX_KONTAKTE) {
-      verworfen.push(`Zeile ${String(i + 1)}: Obergrenze von ${String(MAX_KONTAKTE)} erreicht.`);
+      verworfen.push(
+        `Zeile ${String(zeilennummer)}: Obergrenze von ${String(MAX_KONTAKTE)} erreicht.`,
+      );
       break;
     }
-    const felder = zerlegeZeile(zeilen[i] ?? '', trenner);
-    const name = felder[nameIndex] ?? '';
-    const adresse = felder[adresseIndex] ?? '';
-    const geprueft = kontaktSchema.safeParse({ name, adresse });
+    const felder = daten[i] ?? [];
+    const geprueft = kontaktSchema.safeParse({
+      name: felder[nameIndex] ?? '',
+      adresse: felder[adresseIndex] ?? '',
+    });
     if (!geprueft.success) {
       verworfen.push(
-        `Zeile ${String(i + 1)}: ${geprueft.error.issues[0]?.message ?? 'ungültiger Eintrag'}`,
+        `Zeile ${String(zeilennummer)}: ${geprueft.error.issues[0]?.message ?? 'ungültiger Eintrag'}`,
       );
       continue;
     }

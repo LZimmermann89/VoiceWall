@@ -449,7 +449,7 @@ export const de = {
     kontakteImport: 'Aus CSV importieren',
     kontakteExport: 'Als CSV speichern',
     kontakteImportHinweis:
-      'Für die Bearbeitung in Excel: „Als CSV speichern", dort bearbeiten, dann „Aus CSV importieren". Semikolon und Komma werden beide erkannt, ebenso Umlaute aus älteren Excel-Fassungen. Ein Import ersetzt nichts: gleiche Namen werden aktualisiert, neue kommen hinzu.',
+      'Für die Bearbeitung in Excel: „Als CSV speichern", dort bearbeiten, dann „Aus CSV importieren". Sie können auch einfach eine eigene Tabelle anlegen, mit Überschriften wie Firma, Name und Mailadresse; die Spalten werden erkannt, zusätzliche wie Firma stören nicht. In Excel dann „Speichern unter" und als CSV ablegen. Ein Import ersetzt nichts: gleiche Namen werden aktualisiert, neue kommen hinzu, unbrauchbare Zeilen werden einzeln gemeldet.',
     kontakteImportErfolg: (neu: number, aktualisiert: number, verworfen: number): string => {
       const teile = [`${String(neu)} neu`, `${String(aktualisiert)} aktualisiert`];
       if (verworfen > 0) {

@@ -47,7 +47,11 @@ echter Windows-Hardware aus, Testberichte sind willkommen (siehe
   es personenbezogene Daten sind. Standardmäßig aus.
   Die Liste lässt sich in der App direkt bearbeiten, und für größere
   Bestände gibt es CSV in beide Richtungen: „Als CSV speichern", in Excel
-  bearbeiten, „Aus CSV importieren". Deutsches Excel trennt mit Semikolon
+  bearbeiten, „Aus CSV importieren". Die Spalten werden am Namen der
+  Überschrift und notfalls am Inhalt erkannt: eine Tabelle mit „Firma,
+  Name, Mailadresse" funktioniert genauso wie eine ganz ohne
+  Überschriften, denn die Adressspalte ist die, in der Adressen stehen.
+  Zusätzliche Spalten stören nicht. Deutsches Excel trennt mit Semikolon
   und schreibt je nach Version Windows-1252 statt UTF-8; beides wird
   erkannt, damit aus Umlauten keine Fragezeichen werden. Ein Import
   ersetzt nichts, er führt zusammen: gleiche Namen werden aktualisiert,

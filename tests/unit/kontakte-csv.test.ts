@@ -77,6 +77,83 @@ describe('parseKontakteCsv', () => {
   });
 });
 
+describe('parseKontakteCsv: erkennt Spalten ohne feste Wortliste', () => {
+  it('nimmt die Tabelle, die man in Excel einfach so tippt', () => {
+    // Der Normalfall aus der Praxis: drei Spalten, Ueberschriften frei
+    // formuliert, "Firma" zuerst. Genau hier ist eine starre Wortliste
+    // gescheitert (Mailadresse stand nicht drin) und hat alles verworfen.
+    const ergebnis = parseKontakteCsv(
+      'Firma;Name;Mailadresse\nFernau GmbH;Lars;l.zimmermann@fernau-gmbh.de\nBeispiel AG;Frau Weber;weber@beispiel.de',
+    );
+    expect(ergebnis.verworfen).toEqual([]);
+    expect(ergebnis.kontakte).toEqual([
+      { name: 'Lars', adresse: 'l.zimmermann@fernau-gmbh.de' },
+      { name: 'Frau Weber', adresse: 'weber@beispiel.de' },
+    ]);
+  });
+
+  it('versteht jede Schreibweise der Adress-Ueberschrift', () => {
+    for (const ueberschrift of [
+      'Mailadresse',
+      'E-Mail-Adresse',
+      'eMail_Adresse',
+      'E Mail',
+      'EMAIL',
+      'Adresse',
+      'Email Address',
+    ]) {
+      const ergebnis = parseKontakteCsv(`Name;${ueberschrift}\nLars;lars@x.de`);
+      expect(ergebnis.kontakte, ueberschrift).toEqual([{ name: 'Lars', adresse: 'lars@x.de' }]);
+    }
+  });
+
+  it('nimmt die Firmenspalte als Namen, wenn es keine Namensspalte gibt', () => {
+    // Firmenkontakte ohne Ansprechpartner sind ueblich.
+    const ergebnis = parseKontakteCsv('Firma;Mailadresse\nFernau GmbH;info@fernau-gmbh.de');
+    expect(ergebnis.kontakte).toEqual([{ name: 'Fernau GmbH', adresse: 'info@fernau-gmbh.de' }]);
+  });
+
+  it('findet die Adressspalte am Inhalt, wenn die Kopfzeile fehlt', () => {
+    // Das ist die verlaesslichste Erkennung: die Adressspalte ist die, in
+    // der Adressen stehen. Funktioniert auch, wenn sie vorne steht.
+    expect(parseKontakteCsv('Lars;lars@x.de\nWeber;weber@x.de').kontakte).toEqual([
+      { name: 'Lars', adresse: 'lars@x.de' },
+      { name: 'Weber', adresse: 'weber@x.de' },
+    ]);
+    expect(parseKontakteCsv('lars@x.de;Lars\nweber@x.de;Weber').kontakte).toEqual([
+      { name: 'Lars', adresse: 'lars@x.de' },
+      { name: 'Weber', adresse: 'weber@x.de' },
+    ]);
+  });
+
+  it('kommt auch ohne Kopfzeile mit drei Spalten zurecht', () => {
+    expect(parseKontakteCsv('Fernau GmbH;Lars;lars@x.de').kontakte).toEqual([
+      { name: 'Fernau GmbH', adresse: 'lars@x.de' },
+    ]);
+  });
+
+  it('versteht englische Ueberschriften', () => {
+    expect(parseKontakteCsv('Company;Contact;Email\nAcme;John;john@acme.com').kontakte).toEqual([
+      { name: 'John', adresse: 'john@acme.com' },
+    ]);
+  });
+
+  it('nimmt bei Vorname und Nachname die erste Namensspalte (dokumentiert)', () => {
+    // Beide Ueberschriften enthalten "name"; welche gemeint ist, kann die
+    // Datei nicht sagen. Genommen wird die erste, das ist vorhersagbar.
+    expect(parseKontakteCsv('Vorname;Nachname;Mail\nLars;Zimmermann;lars@x.de').kontakte).toEqual([
+      { name: 'Lars', adresse: 'lars@x.de' },
+    ]);
+  });
+
+  it('haelt eine Kopfzeile nicht faelschlich fuer Daten', () => {
+    // Wenn die erste Zeile selbst eine Adresse enthaelt, ist sie keine
+    // Kopfzeile und darf nicht verschluckt werden.
+    const ergebnis = parseKontakteCsv('lars@x.de;Lars\nweber@x.de;Weber');
+    expect(ergebnis.kontakte).toHaveLength(2);
+  });
+});
+
 describe('baueKontakteCsv', () => {
   it('schreibt Kopfzeile, Semikolon und BOM, damit Excel es richtig oeffnet', () => {
     const csv = baueKontakteCsv([{ name: 'Lars', adresse: 'lars@x.de' }]);
